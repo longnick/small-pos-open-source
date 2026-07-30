@@ -112,6 +112,31 @@ export interface Shift {
   note?: string;
 }
 
+export interface AuditEntry {
+  id: string;
+  tenantId: string;
+  staffId: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  details: Record<string, unknown>;
+  /** Epoch milliseconds. */
+  timestamp: number;
+}
+
+export type DomainEvent =
+  | { type: "order.opened"; payload: { orderId: string; tableId: string } }
+  | { type: "order.item_added"; payload: { orderId: string; itemId: string } }
+  | { type: "order.item_removed"; payload: { orderId: string; itemId: string } }
+  | { type: "order.sent"; payload: { orderId: string } }
+  | { type: "order.paid"; payload: { orderId: string; paymentId: string } }
+  | { type: "order.cancelled"; payload: { orderId: string; reason: string } }
+  | { type: "table.opened"; payload: { tableId: string } }
+  | { type: "table.transferred"; payload: { fromTableId: string; toTableId: string } }
+  | { type: "shift.opened"; payload: { shiftId: string } }
+  | { type: "shift.closed"; payload: { shiftId: string } }
+  | { type: "catalog.item_updated"; payload: { itemId: string } };
+
 export interface CatalogGroup {
   id: string;
   tenantId: string;
