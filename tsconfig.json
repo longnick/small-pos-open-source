@@ -5,6 +5,9 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -13,6 +16,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "paths": {
+      "@/*": ["./src/*"],
       "@pos/core": ["./packages/pos-core/src"],
       "@pos/core/*": ["./packages/pos-core/src/*"],
       "@pos/storage": ["./packages/pos-storage/src"],

@@ -1,122 +1,521 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useMemo, useState } from "react";
+import {
+  Coffee,
+  Plus,
+  Minus,
+  Trash2,
+  Receipt,
+  ChefHat,
+  Clock,
+  User,
+  Search,
+  LayoutGrid,
+  BookOpen,
+  BarChart3,
+  Users,
+} from "lucide-react";
 
-function App() {
-  const [count, setCount] = useState(0)
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { MenuManagement } from "@/components/pos/MenuManagement";
+import { ReportsPanel } from "@/components/pos/ReportsPanel";
+import { StaffManagement } from "@/components/pos/StaffManagement";
+import { KitchenPanel } from "@/components/pos/KitchenPanel";
+import {
+  CATEGORIES,
+  INITIAL_MENU_ITEMS,
+  formatCurrency,
+  type MenuItem,
+  type TableInfo,
+  type TableStatus,
+} from "@/lib/pos";
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+const INITIAL_TABLES: TableInfo[] = Array.from({ length: 10 }, (_, i) => ({
+  id: i + 1,
+  name: `Bàn ${i + 1}`,
+  status: i < 3 ? "occupied" : i === 3 ? "pending" : "free",
+  guests: i < 3 ? 2 + i : undefined,
+}));
 
-      <div className="ticks"></div>
+const VIEWS = [
+  { id: "pos", name: "Bán hàng", icon: LayoutGrid },
+  { id: "kitchen", name: "Bếp", icon: ChefHat },
+  { id: "menu", name: "Quản lý món", icon: BookOpen },
+  { id: "report", name: "Báo cáo", icon: BarChart3 },
+  { id: "staff", name: "Nhân sự", icon: Users },
+] as const;
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+type ViewId = (typeof VIEWS)[number]["id"];
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+// --- Helpers ---
+
+function getStatusLabel(status: TableStatus) {
+  switch (status) {
+    case "free":
+      return "Trống";
+    case "occupied":
+      return "Có khách";
+    case "pending":
+      return "Chờ thanh toán";
+  }
 }
 
-export default App
+
+// --- Components ---
+
+function TableCard({
+  table,
+  selected,
+  onClick,
+}: {
+  table: TableInfo;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const statusColor =
+    table.status === "free"
+      ? "border-success bg-success/10 text-success-foreground"
+      : table.status === "occupied"
+        ? "border-primary bg-primary/10 text-espresso"
+        : "border-warning bg-warning/10 text-espresso";
+
+  return (
+    <button
+      onClick={onClick}
+      className={`relative flex flex-col items-start justify-between rounded-xl border-2 p-3 text-left transition-all active:scale-95 sm:p-4 ${
+        selected ? "border-primary ring-2 ring-primary/30" : "border-border"
+      } ${statusColor}`}
+    >
+      <span className="text-sm font-semibold sm:text-base">{table.name}</span>
+      <span className="mt-1 text-xs font-medium opacity-90">
+        {getStatusLabel(table.status)}
+      </span>
+      {table.guests ? (
+        <span className="mt-2 inline-flex items-center gap-1 text-xs opacity-80">
+          <User className="h-3 w-3" />
+          {table.guests}
+        </span>
+      ) : null}
+      {table.status === "occupied" && (
+        <span className="absolute right-2 top-2 flex h-2 w-2 rounded-full bg-primary animate-pulse" />
+      )}
+    </button>
+  );
+}
+
+function MenuItemCard({ item }: { item: MenuItem }) {
+  return (
+    <Card className="group overflow-hidden border-border transition-shadow hover:shadow-md">
+      <CardContent className="flex flex-col gap-2 p-3 sm:p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h4 className="font-semibold text-foreground text-sm sm:text-base leading-tight">
+              {item.name}
+            </h4>
+            {item.popular && (
+              <Badge
+                variant="secondary"
+                className="mt-1 bg-accent text-accent-foreground text-[10px]"
+              >
+                Bán chạy
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+          <span className="font-bold text-primary text-sm sm:text-base">
+            {formatCurrency(item.price)}
+          </span>
+          <Button
+            size="icon"
+            className="h-8 w-8 rounded-full bg-primary text-primary-foreground shadow-sm"
+            onClick={() => undefined}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function QuantityButton({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex h-7 w-7 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors hover:bg-accent disabled:opacity-40"
+    >
+      {children}
+    </button>
+  );
+}
+
+// --- Main Page ---
+
+function App() {
+  const [selectedTableId, setSelectedTableId] = useState<number>(1);
+  const tables = INITIAL_TABLES;
+  const [activeCategory, setActiveCategory] = useState<string>("coffee");
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<ViewId>("pos");
+
+  const selectedTable = tables.find((t) => t.id === selectedTableId)!;
+  const currentOrder = [
+    { itemId: "c1", name: "Cà phê đen", price: 25000, quantity: 2, sentQty: 2 },
+    { itemId: "f1", name: "Cơm gà", price: 55000, quantity: 1, note: "Ít cơm", sentQty: 1 },
+  ];
+  const filteredItems = useMemo(
+    () => INITIAL_MENU_ITEMS.filter(
+      (item) => item.category === activeCategory && item.available !== false && item.name.toLowerCase().includes(search.trim().toLowerCase()),
+    ),
+    [activeCategory, search],
+  );
+  const subtotal = currentOrder.reduce((sum, line) => sum + line.price * line.quantity, 0);
+
+  // --- Panels ---
+
+  const tablesPanel = (
+    <div className="flex h-full flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-foreground">Danh sách bàn</h2>
+        <div className="flex gap-2 text-xs">
+          <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-1 text-success-foreground">
+            <span className="h-2 w-2 rounded-full bg-success" />
+            Trống
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-1 text-primary-foreground">
+            <span className="h-2 w-2 rounded-full bg-primary" />
+            Có khách
+          </span>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
+        {tables.map((table) => (
+          <TableCard
+            key={table.id}
+            table={table}
+            selected={table.id === selectedTableId}
+            onClick={() => setSelectedTableId(table.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+  const menuPanel = (
+    <div className="flex h-full flex-col gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-lg font-bold text-foreground">Thực đơn</h2>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Tìm món..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 pl-9 text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 pb-1">
+        {CATEGORIES.map((cat) => {
+          const Icon = cat.icon;
+          return (
+          <button
+            key={cat.id}
+            onClick={() => setActiveCategory(cat.id)}
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${
+              activeCategory === cat.id
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            }`}
+          >
+              <Icon className="h-4 w-4" />
+              {cat.name}
+            </button>
+          );
+        })}
+      </div>
+
+      <ScrollArea className="flex-1 -mx-1 px-1">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredItems.map((item) => (
+            <MenuItemCard key={item.id} item={item} />
+          ))}
+        </div>
+        {filteredItems.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Search className="mb-2 h-8 w-8 opacity-50" />
+            <p className="text-sm">Không tìm thấy món nào</p>
+          </div>
+        )}
+      </ScrollArea>
+    </div>
+  );
+
+  const orderPanel = (
+    <div className="flex h-full flex-col">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-foreground">
+            Đơn {selectedTable.name}
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {getStatusLabel(selectedTable.status)} ·{" "}
+            {currentOrder.length} món
+          </p>
+        </div>
+        {currentOrder.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => undefined}
+          >
+            <Trash2 className="mr-1 h-3 w-3" />
+            Xóa đơn
+          </Button>
+        )}
+      </div>
+
+      <ScrollArea className="flex-1 -mx-1 px-1">
+        {currentOrder.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+            <Receipt className="mb-2 h-10 w-10 opacity-40" />
+            <p className="text-sm">Chọn món để thêm vào đơn</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {currentOrder.map((line) => (
+              <div
+                key={line.itemId}
+                className="flex items-center justify-between rounded-xl border border-border bg-card p-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-card-foreground text-sm">
+                    {line.name}
+                  </p>
+                  {(line.sentQty ?? 0) > 0 ? (
+                    <Badge className="mt-0.5 bg-success/15 text-[10px] text-espresso">
+                      Đã gửi bếp {line.sentQty}
+                      {line.quantity > (line.sentQty ?? 0)
+                        ? ` · mới ${line.quantity - (line.sentQty ?? 0)}`
+                        : ""}
+                    </Badge>
+                  ) : (
+                    <Badge className="mt-0.5 bg-warning/20 text-[10px] text-espresso">
+                      Chưa gửi bếp
+                    </Badge>
+                  )}
+                  {line.note && (
+                    <p className="text-xs text-muted-foreground">{line.note}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {formatCurrency(line.price)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <QuantityButton
+                    onClick={() => undefined}
+                    disabled={line.quantity <= 1}
+                  >
+                    <Minus className="h-3 w-3" />
+                  </QuantityButton>
+                  <span className="w-5 text-center text-sm font-semibold">
+                    {line.quantity}
+                  </span>
+                  <QuantityButton
+                    onClick={() => undefined}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </QuantityButton>
+                  <button
+                    onClick={() => undefined}
+                    className="ml-1 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ScrollArea>
+
+      <Separator className="my-3" />
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Tạm tính</span>
+          <span>{formatCurrency(subtotal)}</span>
+        </div>
+        <div className="flex items-center justify-between text-base font-semibold">
+          <span>Tổng cộng</span>
+          <span className="text-xl font-bold text-primary">
+            {formatCurrency(subtotal)}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button
+          variant="secondary"
+          className="h-12 text-sm font-semibold"
+          disabled
+          onClick={() => undefined}
+        >
+          <ChefHat className="mr-2 h-4 w-4" />
+          Gửi bếp
+        </Button>
+        <Button
+          className="h-12 bg-primary text-sm font-semibold text-primary-foreground shadow-sm"
+          disabled
+          onClick={() => undefined}
+        >
+          <Receipt className="mr-2 h-4 w-4" />
+          Thanh toán
+        </Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen flex-col bg-background">
+      {/* Header */}
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-4 shadow-sm sm:h-16 sm:px-6">
+        <div className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <Coffee className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-base font-bold leading-tight text-card-foreground sm:text-lg">
+              CafePOS
+            </h1>
+            <p className="text-[10px] text-muted-foreground sm:text-xs">
+              Quán ăn · Cafe nhỏ
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="hidden items-center gap-1.5 text-sm text-muted-foreground sm:flex">
+            <Clock className="h-4 w-4" />
+            <span>10:30</span>
+          </div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
+            <User className="h-4 w-4" />
+          </div>
+        </div>
+      </header>
+
+      {/* Main navigation */}
+      <nav className="flex shrink-0 gap-2 overflow-x-auto border-b border-border bg-card px-3 py-2 sm:px-6">
+        {VIEWS.map((v) => {
+          const Icon = v.icon;
+          return (
+            <button
+              key={v.id}
+              onClick={() => setView(v.id)}
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${
+                view === v.id
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {v.name}
+
+            </button>
+          );
+        })}
+      </nav>
+
+      {view === "pos" ? (
+        <>
+          {/* Desktop layout */}
+          <main className="hidden flex-1 gap-4 overflow-hidden p-4 lg:grid lg:grid-cols-12">
+            <section className="col-span-3 flex flex-col rounded-2xl border border-border bg-card p-4 shadow-sm">
+              {tablesPanel}
+            </section>
+            <section className="col-span-5 flex flex-col rounded-2xl border border-border bg-card p-4 shadow-sm">
+              {menuPanel}
+            </section>
+            <section className="col-span-4 flex flex-col rounded-2xl border border-border bg-card p-4 shadow-sm">
+              {orderPanel}
+            </section>
+          </main>
+
+          {/* Mobile/Tablet layout */}
+          <main className="flex flex-1 flex-col overflow-hidden p-3 lg:hidden">
+            <Tabs defaultValue="tables" className="flex h-full flex-col">
+              <TabsList className="grid w-full grid-cols-3 bg-secondary">
+                <TabsTrigger value="tables" className="text-xs sm:text-sm">
+                  Bàn
+                </TabsTrigger>
+                <TabsTrigger value="menu" className="text-xs sm:text-sm">
+                  Thực đơn
+                </TabsTrigger>
+                <TabsTrigger value="order" className="text-xs sm:text-sm">
+                  Đơn{" "}
+                  {currentOrder.length > 0 && (
+                    <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                      {currentOrder.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent
+                value="tables"
+                className="mt-3 flex-1 rounded-2xl border border-border bg-card p-3 shadow-sm data-[state=inactive]:hidden"
+              >
+                {tablesPanel}
+              </TabsContent>
+              <TabsContent
+                value="menu"
+                className="mt-3 flex-1 rounded-2xl border border-border bg-card p-3 shadow-sm data-[state=inactive]:hidden"
+              >
+                {menuPanel}
+              </TabsContent>
+              <TabsContent
+                value="order"
+                className="mt-3 flex-1 rounded-2xl border border-border bg-card p-3 shadow-sm data-[state=inactive]:hidden"
+              >
+                {orderPanel}
+              </TabsContent>
+            </Tabs>
+          </main>
+        </>
+      ) : (
+        <main className="flex flex-1 flex-col overflow-hidden p-3 sm:p-4">
+          <section className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
+            {view === "menu" && (
+              <MenuManagement />
+            )}
+            {view === "report" && <ReportsPanel />}
+            {view === "staff" && <StaffManagement />}
+            {view === "kitchen" && (
+              <KitchenPanel />
+            )}
+          </section>
+        </main>
+      )}
+
+    </div>
+  );
+}
+
+
+export default App;
