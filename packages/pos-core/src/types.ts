@@ -40,6 +40,48 @@ export interface Staff {
   createdAt: number;
 }
 
+export type OrderStatus = "open" | "sent" | "paid" | "cancelled";
+
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  catalogItemId: string;
+  /** Catalog item name snapshot. */
+  name: string;
+  /** Catalog item price snapshot, integer VND. */
+  price: number;
+  quantity: number;
+  note?: string;
+  /** Epoch milliseconds. */
+  cancelledAt?: number;
+  cancelReason?: string;
+}
+
+export interface Order {
+  id: string;
+  tenantId: string;
+  tableId: string;
+  staffId: string;
+  status: OrderStatus;
+  items: OrderItem[];
+  /** Computed integer VND. */
+  subtotal: number;
+  /** Integer VND. */
+  discount: number;
+  discountType: "amount" | "percent";
+  discountPercent?: number;
+  /** Computed integer VND. */
+  total: number;
+  /** Epoch milliseconds. */
+  createdAt: number;
+  /** Epoch milliseconds. */
+  sentAt?: number;
+  /** Epoch milliseconds. */
+  paidAt?: number;
+  /** Epoch milliseconds. */
+  cancelledAt?: number;
+}
+
 export interface CatalogGroup {
   id: string;
   tenantId: string;
