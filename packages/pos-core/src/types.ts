@@ -1,5 +1,19 @@
 export type Role = "manager" | "cashier" | "staff" | "kitchen";
 
+export type TableStatus = "empty" | "occupied" | "waiting_payment";
+
+export interface PosTable {
+  id: string;
+  tenantId: string;
+  /** 1–10 product constraint. */
+  number: number;
+  status: TableStatus;
+  currentOrderId?: string;
+  /** Epoch milliseconds. */
+  openedAt: number;
+  staffId: string;
+}
+
 export interface Tenant {
   id: string;
   name: string;
