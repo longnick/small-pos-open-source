@@ -82,6 +82,36 @@ export interface Order {
   cancelledAt?: number;
 }
 
+export type PaymentMethod = "cash" | "transfer" | "card" | "other";
+
+export interface Payment {
+  id: string;
+  tenantId: string;
+  orderId: string;
+  /** Integer VND. */
+  amount: number;
+  method: PaymentMethod;
+  staffId: string;
+  /** Epoch milliseconds. */
+  createdAt: number;
+  note?: string;
+}
+
+export interface Shift {
+  id: string;
+  tenantId: string;
+  staffId: string;
+  /** Epoch milliseconds. */
+  openedAt: number;
+  /** Epoch milliseconds. */
+  closedAt?: number;
+  /** Integer VND. */
+  openingCash: number;
+  /** Integer VND. */
+  closingCash?: number;
+  note?: string;
+}
+
 export interface CatalogGroup {
   id: string;
   tenantId: string;
