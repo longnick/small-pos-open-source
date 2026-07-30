@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "paths": {
+      "@pos/core": ["./packages/pos-core/src"],
+      "@pos/core/*": ["./packages/pos-core/src/*"],
+      "@pos/storage": ["./packages/pos-storage/src"],
+      "@pos/storage/*": ["./packages/pos-storage/src/*"],
+      "@pos/ui": ["./packages/pos-ui/src"],
+      "@pos/ui/*": ["./packages/pos-ui/src/*"],
+      "@pos/module-sdk": ["./packages/module-sdk/src"],
+      "@pos/module-sdk/*": ["./packages/module-sdk/src/*"],
+      "@pos/module-registry": ["./packages/module-registry/src"],
+      "@pos/module-registry/*": ["./packages/module-registry/src/*"]
+    }
+  },
+  "include": ["src", "packages"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}

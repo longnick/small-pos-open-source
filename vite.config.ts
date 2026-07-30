@@ -1,0 +1,16 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@pos/core": path.resolve(__dirname, "packages/pos-core/src"),
+      "@pos/storage": path.resolve(__dirname, "packages/pos-storage/src"),
+      "@pos/ui": path.resolve(__dirname, "packages/pos-ui/src"),
+      "@pos/module-sdk": path.resolve(__dirname, "packages/module-sdk/src"),
+      "@pos/module-registry": path.resolve(__dirname, "packages/module-registry/src"),
+    },
+  },
+});
