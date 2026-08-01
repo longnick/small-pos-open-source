@@ -1,5 +1,14 @@
 # AI Changelog
 
+## 2026-08-01 10:40 - Task 2.1 tenant auth session boundaries
+
+Repo: `/home/longnick/projects/small-pos`
+Branch: `main`
+Summary: Tenant/auth store now rejects cross-tenant sign-in before verifier work, clears staff on tenant boundary changes, and prevents stale or older async sign-ins from restoring staff.
+Files changed: `src/stores/tenant-auth-store.ts`, focused store test, bounded AI map records.
+Verification: Parent RED evidence: focused suite PASS 5 / FAIL 5 for required boundary cases. GREEN focused suite passed 10 tests; final gates recorded in task log.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-01-1040-task-2-1-auth-boundaries.md`
+
 ## 2026-08-01 10:20 - Task 2.1 tenant and auth Zustand store
 
 Repo: `/home/longnick/projects/small-pos`

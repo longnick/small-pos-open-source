@@ -33,10 +33,10 @@ Related files:
   - role: exports `useTenantAuthStore` Zustand React hook with tenant, staff, sign-in/out, and authorization state operations.
   - depends on: `packages/pos-core/src/types.ts` and `packages/pos-core/src/auth.ts`.
   - used by: future UI/auth adapters; no PIN UI, Dexie persistence/hydration, or storage wiring in Task 2.1.
-  - notes: no raw PIN state; candidate `pinHash` stays within transient core verification call.
+  - notes: no raw PIN state; candidate `pinHash` stays within transient core verification call. Tenant changes and sign-out invalidate pending sign-ins; only latest verified sign-in for unchanged captured tenant/session can set staff.
 
 - `src/stores/tenant-auth-store.test.ts`
-  - role: covers tenant changes, async sign-in, rejected sign-in session preservation, sign-out, and RBAC delegation.
+  - role: covers tenant changes, tenant-match sign-in guard, stale/latest async sign-in boundaries, rejected sign-in session preservation, sign-out, and RBAC delegation.
   - depends on: `src/stores/tenant-auth-store.ts`.
   - used by: Vitest.
 

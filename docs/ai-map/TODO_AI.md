@@ -15,10 +15,11 @@ None.
 
 ## Risks
 
-- Tenant/auth store is not wired to UI, DB, Dexie hydration, or login/PIN screen by Task 2.1 scope.
+- Tenant/auth store remains in-memory only; no UI, DB, Dexie hydration, or login/PIN screen by Task 2.1 scope.
 
 ## Done recently
 
+- Task 2.1 tenant auth session boundaries — `docs/ai-map/TASK_LOGS/2026-08-01-1040-task-2-1-auth-boundaries.md`
 - Task 2.1 tenant and auth Zustand store — `docs/ai-map/TASK_LOGS/2026-08-01-1020-task-2-1-tenant-auth-store.md`
 - Task 1.12 non-string PIN guard — `docs/ai-map/TASK_LOGS/2026-08-01-0820-task-1-12-non-string-pin-guard.md`
 - Task 1.12 PIN auth and RBAC — `docs/ai-map/TASK_LOGS/2026-08-01-0810-task-1-12-rbac.md`
