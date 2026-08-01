@@ -7,7 +7,7 @@ None.
 ## Next
 
 - Continue approved Phase 2 task after Task 2.2.
-- Keep catalog/table store in-memory and independently loaded; add UI, Dexie hydration, CRUD, and tenant/auth coupling only in approved later tasks.
+- Keep catalog/table store in-memory and independently loaded; retain fail-closed public input guards. Add UI, Dexie hydration, CRUD, and tenant/auth coupling only in approved later tasks.
 - Keep `verifyPin` adapter-injected; add bcrypt/cloud adapter only when persistence/auth integration phase requires it.
 
 ## Blocked

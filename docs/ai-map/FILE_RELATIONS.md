@@ -50,7 +50,7 @@ Related files:
   - role: exports `useCatalogTableStore` Zustand React hook with atomic `replaceTenantData`, `clear`, sorted available-item lookup, and table lookup.
   - depends on: `packages/pos-core/src/types.ts`.
   - used by: future catalog/table UI adapters; no current UI, Dexie persistence/hydration, CRUD, tenant/auth-store coupling, raw seed conversion, or order-flow wiring in Task 2.2.
-  - notes: replacement rejects blank tenant ID, duplicate collection IDs/table numbers, cross-tenant records, and item references to absent groups without changing existing state.
+  - notes: replacement rejects malformed runtime input before field access (non-primitive/blank tenant ID, non-plain data, missing/non-array collections, invalid record identity/group ID/table number), plus duplicate collection IDs/table numbers, cross-tenant records, and item references to absent groups, without changing existing state.
 
 - `src/stores/catalog-table-store.test.ts`
   - role: covers atomic valid replacement, caller-array isolation, fail-closed validation with state preservation, clearing, available item sorting/non-mutation, and table lookup.

@@ -70,6 +70,35 @@ test.each([
   });
 });
 
+test.each([
+  ["null tenant ID", null, { catalogGroups: [], catalogItems: [], tables: [] }],
+  ["number tenant ID", 123, { catalogGroups: [], catalogItems: [], tables: [] }],
+  ["whitespace tenant ID", "   ", { catalogGroups: [], catalogItems: [], tables: [] }],
+  ["null data", tenantId, null],
+  ["non-object data", tenantId, "data"],
+  ["missing catalogGroups", tenantId, { catalogItems: [], tables: [] }],
+  ["non-array catalogGroups", tenantId, { catalogGroups: {}, catalogItems: [], tables: [] }],
+  ["missing catalogItems", tenantId, { catalogGroups: [], tables: [] }],
+  ["non-array catalogItems", tenantId, { catalogGroups: [], catalogItems: {}, tables: [] }],
+  ["missing tables", tenantId, { catalogGroups: [], catalogItems: [] }],
+  ["non-array tables", tenantId, { catalogGroups: [], catalogItems: [], tables: {} }],
+  ["null catalog group record", tenantId, { catalogGroups: [null], catalogItems: [], tables: [] }],
+  ["null catalog item record", tenantId, { catalogGroups: [], catalogItems: [null], tables: [] }],
+  ["null table record", tenantId, { catalogGroups: [], catalogItems: [], tables: [null] }],
+])("rejects malformed %s and preserves prior state", (_reason, inputTenantId, data) => {
+  const prior = { catalogGroups: [group("prior-group")], catalogItems: [], tables: [table("prior-table", 9)] };
+  expect(useCatalogTableStore.getState().replaceTenantData(tenantId, prior)).toBe(true);
+  const before = useCatalogTableStore.getState();
+
+  expect(useCatalogTableStore.getState().replaceTenantData(inputTenantId as string, data as never)).toBe(false);
+  expect(useCatalogTableStore.getState()).toMatchObject({
+    tenantId: before.tenantId,
+    catalogGroups: before.catalogGroups,
+    catalogItems: before.catalogItems,
+    tables: before.tables,
+  });
+});
+
 test("clear removes tenant-scoped data", () => {
   useCatalogTableStore.getState().replaceTenantData(tenantId, { catalogGroups: [group("group-1")], catalogItems: [], tables: [table("table-1", 1)] });
 

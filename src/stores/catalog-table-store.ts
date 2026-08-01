@@ -17,14 +17,30 @@ type CatalogTableState = TenantData & {
 
 const hasDuplicate = <T extends { id: string }>(records: T[]) => new Set(records.map(({ id }) => id)).size !== records.length;
 
+const isPrimitiveNonemptyString = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
+const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object";
+const hasRecordIdentity = (value: unknown): value is Record<string, unknown> & { id: string; tenantId: string } =>
+  isRecord(value) && isPrimitiveNonemptyString(value.id) && isPrimitiveNonemptyString(value.tenantId);
+
+const isTenantData = (value: unknown): value is TenantData => {
+  if (!isPlainObject(value) || !Array.isArray(value.catalogGroups) || !Array.isArray(value.catalogItems) || !Array.isArray(value.tables)) return false;
+
+  return value.catalogGroups.every(hasRecordIdentity)
+    && value.catalogItems.every((record) => isRecord(record) && hasRecordIdentity(record) && isPrimitiveNonemptyString(record["groupId"]))
+    && value.tables.every((record) => isRecord(record) && hasRecordIdentity(record) && typeof record["number"] === "number" && Number.isFinite(record["number"]));
+};
+
 export const useCatalogTableStore = create<CatalogTableState>((set, get) => ({
   tenantId: null,
   catalogGroups: [],
   catalogItems: [],
   tables: [],
   replaceTenantData: (tenantId, data) => {
+    if (!isPrimitiveNonemptyString(tenantId) || !isTenantData(data)) return false;
+
     if (
-      !tenantId.trim() ||
       hasDuplicate(data.catalogGroups) ||
       hasDuplicate(data.catalogItems) ||
       hasDuplicate(data.tables) ||

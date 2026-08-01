@@ -1,5 +1,14 @@
 # AI Changelog
 
+## 2026-08-01 11:05 - Task 2.2 catalog/table malformed public input guards
+
+Repo: `/home/longnick/projects/small-pos`
+Branch: `main`
+Summary: `replaceTenantData` now rejects malformed runtime values before field access: non-primitive/blank tenant IDs, non-plain data, missing/non-array collections, and invalid records. Rejection returns `false` without changing current state.
+Files changed: `src/stores/catalog-table-store.ts`, focused store test, bounded AI map records.
+Verification: RED target failed 13 malformed cases with field-access `TypeError`; GREEN target passed 25 tests. Final gates recorded in task log.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-01-1105-task-2-2-input-guards.md`
+
 ## 2026-08-01 10:54 - Task 2.2 catalog and table Zustand store
 
 Repo: `/home/longnick/projects/small-pos`
