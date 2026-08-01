@@ -74,6 +74,10 @@ test("verifies valid PIN with asynchronous verifier", async () => {
   await expect(verifyPin("1234", "hash", async () => true)).resolves.toBe(true);
 });
 
+test.each([undefined, "yes", 1, {}])("returns false for non-boolean verifier result: %p", async (result) => {
+  await expect(verifyPin("1234", "hash", () => result as boolean)).resolves.toBe(false);
+});
+
 test("returns false without calling verifier for invalid PIN or hash", async () => {
   const verifier = vi.fn(() => true);
 

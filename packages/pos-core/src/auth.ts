@@ -15,7 +15,7 @@ export async function verifyPin(pin: string, pinHash?: string, verifier?: PinHas
   if (typeof pin !== "string" || typeof pinHash !== "string" || !pinHash || !/^\d{4}$/.test(pin) || !verifier) return false;
 
   try {
-    return await verifier(pin, pinHash);
+    return (await verifier(pin, pinHash)) === true;
   } catch {
     return false;
   }

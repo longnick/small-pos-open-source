@@ -21,7 +21,7 @@ Related files:
   - role: covers PIN validation/failure containment and RBAC policy.
   - depends on: `packages/pos-core/src/auth.ts`.
   - used by: Vitest.
-  - notes: 22 cases cover roles, wildcards, malformed/non-primitive PIN hashes/actions, sync/async verifiers, and failure paths.
+  - notes: 26 cases cover roles, wildcards, malformed/non-primitive PIN hashes/actions, strict boolean verifier results, sync/async verifiers, and failure paths.
 
 ## Module: POS core
 

@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-01 08:45 - Task 1.12 strict verifier result
+
+Repo: `/home/longnick/projects/small-pos`
+Branch: `main`
+Agent: Hermes Agent
+Summary: `verifyPin` accepts only verifier result `true`; `undefined`, strings, numbers, and objects fail closed.
+Files changed: `packages/pos-core/src/auth.ts`, `packages/pos-core/test/auth.test.ts`, bounded AI map records.
+Verification: RED target failed for `undefined`, `"yes"`, `1`, and `{}` verifier results; GREEN target passed 26 tests. Final gate results recorded in task log.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-01-0845-task-1-12-strict-verifier-result.md`
+
 ## 2026-08-01 08:32 - Task 1.12 non-string auth inputs
 
 Repo: `/home/longnick/projects/small-pos`
