@@ -13,9 +13,9 @@ Related files:
   - notes: verifier is injected; bcrypt and cloud sync remain out of scope.
 
 - `packages/pos-core/src/types.ts`
-  - role: defines `Role` and staff `pinHash` contract.
+  - role: defines shared POS domain records, including tenant-tagged `CatalogGroup`, `CatalogItem`, and `PosTable`.
   - depends on: none.
-  - used by: `packages/pos-core/src/auth.ts` and core modules.
+  - used by: core modules and Zustand stores.
 
 - `packages/pos-core/test/auth.test.ts`
   - role: covers PIN validation/failure containment and RBAC policy.
@@ -38,6 +38,23 @@ Related files:
 - `src/stores/tenant-auth-store.test.ts`
   - role: covers tenant changes, tenant-match sign-in guard, stale/latest async sign-in boundaries, rejected sign-in session preservation, sign-out, and RBAC delegation.
   - depends on: `src/stores/tenant-auth-store.ts`.
+  - used by: Vitest.
+
+## Module: Catalog and table store
+
+Purpose: keep transient tenant-scoped catalog and table data only after full input validation.
+
+Related files:
+
+- `src/stores/catalog-table-store.ts`
+  - role: exports `useCatalogTableStore` Zustand React hook with atomic `replaceTenantData`, `clear`, sorted available-item lookup, and table lookup.
+  - depends on: `packages/pos-core/src/types.ts`.
+  - used by: future catalog/table UI adapters; no current UI, Dexie persistence/hydration, CRUD, tenant/auth-store coupling, raw seed conversion, or order-flow wiring in Task 2.2.
+  - notes: replacement rejects blank tenant ID, duplicate collection IDs/table numbers, cross-tenant records, and item references to absent groups without changing existing state.
+
+- `src/stores/catalog-table-store.test.ts`
+  - role: covers atomic valid replacement, caller-array isolation, fail-closed validation with state preservation, clearing, available item sorting/non-mutation, and table lookup.
+  - depends on: `src/stores/catalog-table-store.ts` and POS core domain types.
   - used by: Vitest.
 
 ## Module: POS core

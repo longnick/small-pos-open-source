@@ -12,10 +12,12 @@
 
 - `packages/pos-core/test/*.test.ts` — Vitest unit tests for core behavior.
 - `src/stores/tenant-auth-store.test.ts` — Vitest unit tests for tenant/auth store behavior.
+- `src/stores/catalog-table-store.test.ts` — Vitest unit tests for catalog/table store validation and read helpers.
 
 ## Application stores
 
 - `src/stores/tenant-auth-store.ts` — Zustand tenant/current-staff session hook; delegates PIN and RBAC rules to POS core.
+- `src/stores/catalog-table-store.ts` — Zustand tenant-scoped catalog groups, catalog items, and tables hook; atomically accepts internally consistent input only.
 
 ## Commands
 

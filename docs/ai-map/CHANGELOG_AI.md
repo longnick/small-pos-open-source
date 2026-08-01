@@ -1,5 +1,14 @@
 # AI Changelog
 
+## 2026-08-01 10:54 - Task 2.2 catalog and table Zustand store
+
+Repo: `/home/longnick/projects/small-pos`
+Branch: `main`
+Summary: Added bounded in-memory tenant catalog/table hook. Atomic replacement fails closed for invalid tenant data and preserves prior state; read helpers filter/sort without state mutation.
+Files changed: `src/stores/catalog-table-store.ts`, focused store test, bounded AI map records.
+Verification: RED target failed because `./catalog-table-store` module was absent; GREEN target passed 11 tests. Final gates recorded in task log.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-01-1054-task-2-2-catalog-table-store.md`
+
 ## 2026-08-01 10:40 - Task 2.1 tenant auth session boundaries
 
 Repo: `/home/longnick/projects/small-pos`
@@ -36,7 +45,7 @@ Branch: `main`
 Agent: Hermes Agent
 Summary: `verifyPin` now requires primitive non-empty string hash before verifier; `canAccess` now rejects non-primitive role/action input before permission lookup or regex evaluation.
 Files changed: `packages/pos-core/src/auth.ts`, `packages/pos-core/test/auth.test.ts`, bounded AI map records.
-Verification: RED target failed with Symbol `TypeError`, boxed action access, numeric/boxed hash verifier access; GREEN target passed 22 tests; final gate results recorded in commit.
+Verification: RED target failed with Symbol `TypeError`, boxed action access, numeric/boxed hash verifier access; GREEN target passed 22 tests; final gate results recorded in task log.
 Task log: `docs/ai-map/TASK_LOGS/2026-08-01-0832-task-1-12-non-string-auth-inputs.md`
 
 ## 2026-08-01 08:20 - Task 1.12 non-string PIN guard
@@ -56,7 +65,7 @@ Repo: `/home/longnick/projects/small-pos`
 Branch: `main`
 Agent: Hermes Agent
 Summary: Added injected PIN hash verification with contained verifier failures and fail-closed role action guard.
-Files changed: `packages/pos-core/src/auth.ts`, `packages/pos-core/test/auth.test.ts`, AI map files.
+Files changed: `packages/pos-core/src/auth.ts`, `packages/pos-core/test/auth.test.ts`, bounded AI map records.
 Verification: targeted `auth.test.ts` passed 17 tests; `npm run ci:e2e` passed 55 unit tests and 3 Playwright tests; `git diff --check` passed.
 Next: wire authentication into later UI/store phase only when planned.
 Task log: `docs/ai-map/TASK_LOGS/2026-08-01-0810-task-1-12-rbac.md`
