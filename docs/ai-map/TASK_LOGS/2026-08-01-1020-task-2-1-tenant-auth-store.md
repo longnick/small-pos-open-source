@@ -42,7 +42,7 @@ Notion public/integration status update blocked by missing user credentials/acce
 
 - `npm run ci:e2e` → PASS: `tsc --noEmit`, 15 unit files / 69 tests, Vite build, leakage scan, Playwright 3 tests.
 - `git diff --check` → exit 0.
-- Staged diff check and commit pending.
+- Staged diff check passed; commit `5b68362d3077b1e9c6946b0982897df4a927adc5` created.
 
 ## Next step
 
