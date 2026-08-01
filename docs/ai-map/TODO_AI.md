@@ -19,4 +19,5 @@ None.
 
 ## Done recently
 
+- Task 1.12 non-string PIN guard — `docs/ai-map/TASK_LOGS/2026-08-01-0820-task-1-12-non-string-pin-guard.md`
 - Task 1.12 PIN auth and RBAC — `docs/ai-map/TASK_LOGS/2026-08-01-0810-task-1-12-rbac.md`

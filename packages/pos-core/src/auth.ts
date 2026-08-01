@@ -12,7 +12,7 @@ const permissions: Record<Role, readonly string[]> = {
 const validAction = /^[a-z][a-z_]*\.[a-z][a-z_]*$/;
 
 export async function verifyPin(pin: string, pinHash?: string, verifier?: PinHashVerifier): Promise<boolean> {
-  if (!/^\d{4}$/.test(pin) || !pinHash || !verifier) return false;
+  if (typeof pin !== "string" || !/^\d{4}$/.test(pin) || !pinHash || !verifier) return false;
 
   try {
     return await verifier(pin, pinHash);

@@ -75,6 +75,13 @@ test("returns false without calling verifier for invalid PIN or hash", async () 
   expect(verifier).not.toHaveBeenCalled();
 });
 
+test("returns false without calling verifier for numeric PIN input", async () => {
+  const verifier = vi.fn(() => true);
+
+  await expect(verifyPin(1234 as unknown as string, "hash", verifier)).resolves.toBe(false);
+  expect(verifier).not.toHaveBeenCalled();
+});
+
 test("returns false when verifier throws or rejects", async () => {
   await expect(verifyPin("1234", "hash", () => { throw new Error("no"); })).resolves.toBe(false);
   await expect(verifyPin("1234", "hash", async () => { throw new Error("no"); })).resolves.toBe(false);
