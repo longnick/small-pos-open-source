@@ -7,7 +7,7 @@ None.
 ## Next
 
 - Continue approved Phase 2 task after Task 2.2.
-- Keep catalog/table store in-memory and independently loaded; retain fail-closed public input guards. Add UI, Dexie hydration, CRUD, and tenant/auth coupling only in approved later tasks.
+- Keep catalog/table store in-memory and independently loaded; retain fail-closed public input guards and record-copy boundaries. Add UI, Dexie hydration, CRUD, and tenant/auth coupling only in approved later tasks.
 - Keep `verifyPin` adapter-injected; add bcrypt/cloud adapter only when persistence/auth integration phase requires it.
 
 ## Blocked
@@ -20,6 +20,7 @@ None.
 
 ## Done recently
 
+- Task 2.2 catalog/table ownership and hostile input safety — `docs/ai-map/TASK_LOGS/2026-08-01-1115-task-2-2-ownership-input-safety.md`
 - Task 2.2 catalog and table Zustand store — `docs/ai-map/TASK_LOGS/2026-08-01-1054-task-2-2-catalog-table-store.md`
 - Task 2.1 tenant auth session boundaries — `docs/ai-map/TASK_LOGS/2026-08-01-1040-task-2-1-auth-boundaries.md`
 - Task 2.1 tenant and auth Zustand store — `docs/ai-map/TASK_LOGS/2026-08-01-1020-task-2-1-tenant-auth-store.md`

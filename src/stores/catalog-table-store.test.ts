@@ -30,7 +30,7 @@ beforeEach(() => {
   useCatalogTableStore.getState().clear();
 });
 
-test("loads valid tenant data atomically without retaining caller arrays", () => {
+test("loads valid tenant data atomically without retaining caller records", () => {
   const catalogGroups = [group("group-1")];
   const catalogItems = [item("item-1", "group-1")];
   const tables = [table("table-1", 1)];
@@ -39,12 +39,50 @@ test("loads valid tenant data atomically without retaining caller arrays", () =>
   catalogGroups.push(group("group-2"));
   catalogItems.push(item("item-2", "group-1"));
   tables.push(table("table-2", 2));
+  catalogGroups[0].name = "mutated group";
+  catalogItems[0].name = "mutated item";
+  tables[0].status = "occupied";
 
   expect(useCatalogTableStore.getState()).toMatchObject({
     tenantId,
     catalogGroups: [group("group-1")],
     catalogItems: [item("item-1", "group-1")],
     tables: [table("table-1", 1)],
+  });
+});
+
+test("read helpers return record copies", () => {
+  useCatalogTableStore.getState().replaceTenantData(tenantId, {
+    catalogGroups: [group("group-1")],
+    catalogItems: [item("item-1", "group-1")],
+    tables: [table("table-1", 1)],
+  });
+
+  const [returnedItem] = useCatalogTableStore.getState().itemsForGroup("group-1");
+  const returnedTable = useCatalogTableStore.getState().tableById("table-1");
+  returnedItem.name = "mutated item";
+  returnedTable!.status = "occupied";
+
+  expect(useCatalogTableStore.getState().catalogItems[0].name).toBe("item-1");
+  expect(useCatalogTableStore.getState().tables[0].status).toBe("empty");
+});
+
+test.each([
+  ["throwing getter", Object.defineProperty({}, "catalogGroups", { get: () => { throw new Error("hostile getter"); } })],
+  ["throwing Proxy", new Proxy({}, { getPrototypeOf: () => { throw new Error("hostile proxy"); } })],
+])("rejects hostile %s and preserves prior state", (_reason, hostileData) => {
+  const prior = { catalogGroups: [group("prior-group")], catalogItems: [], tables: [table("prior-table", 9)] };
+  expect(useCatalogTableStore.getState().replaceTenantData(tenantId, prior)).toBe(true);
+  const before = useCatalogTableStore.getState();
+
+  let result: boolean | undefined;
+  expect(() => { result = useCatalogTableStore.getState().replaceTenantData(tenantId, hostileData as never); }).not.toThrow();
+  expect(result).toBe(false);
+  expect(useCatalogTableStore.getState()).toMatchObject({
+    tenantId: before.tenantId,
+    catalogGroups: before.catalogGroups,
+    catalogItems: before.catalogItems,
+    tables: before.tables,
   });
 });
 

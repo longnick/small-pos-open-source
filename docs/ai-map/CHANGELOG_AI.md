@@ -1,5 +1,14 @@
 # AI Changelog
 
+## 2026-08-01 11:15 - Task 2.2 catalog/table ownership and hostile input safety
+
+Repo: `/home/longnick/projects/small-pos`
+Branch: `main`
+Summary: `replaceTenantData` now catches hostile getters/Proxies before `set` and copies validated records. Read helpers return record copies, preventing mutation outside Zustand.
+Files changed: `src/stores/catalog-table-store.ts`, focused store test, bounded AI map records.
+Verification: RED focused suite failed 4 ownership/hostile-input cases; GREEN passed 28 tests. Final gates recorded in task log.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-01-1115-task-2-2-ownership-input-safety.md`
+
 ## 2026-08-01 11:05 - Task 2.2 catalog/table malformed public input guards
 
 Repo: `/home/longnick/projects/small-pos`

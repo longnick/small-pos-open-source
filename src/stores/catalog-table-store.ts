@@ -38,29 +38,42 @@ export const useCatalogTableStore = create<CatalogTableState>((set, get) => ({
   catalogItems: [],
   tables: [],
   replaceTenantData: (tenantId, data) => {
-    if (!isPrimitiveNonemptyString(tenantId) || !isTenantData(data)) return false;
+    try {
+      if (!isPrimitiveNonemptyString(tenantId) || !isTenantData(data)) return false;
 
-    if (
-      hasDuplicate(data.catalogGroups) ||
-      hasDuplicate(data.catalogItems) ||
-      hasDuplicate(data.tables) ||
-      data.catalogGroups.some((record) => record.tenantId !== tenantId) ||
-      data.catalogItems.some((record) => record.tenantId !== tenantId) ||
-      data.tables.some((record) => record.tenantId !== tenantId)
-    ) return false;
+      if (
+        hasDuplicate(data.catalogGroups) ||
+        hasDuplicate(data.catalogItems) ||
+        hasDuplicate(data.tables) ||
+        data.catalogGroups.some((record) => record.tenantId !== tenantId) ||
+        data.catalogItems.some((record) => record.tenantId !== tenantId) ||
+        data.tables.some((record) => record.tenantId !== tenantId)
+      ) return false;
 
-    const groupIds = new Set(data.catalogGroups.map(({ id }) => id));
-    if (
-      data.catalogItems.some(({ groupId }) => !groupIds.has(groupId)) ||
-      new Set(data.tables.map(({ number }) => number)).size !== data.tables.length
-    ) return false;
+      const groupIds = new Set(data.catalogGroups.map(({ id }) => id));
+      if (
+        data.catalogItems.some(({ groupId }) => !groupIds.has(groupId)) ||
+        new Set(data.tables.map(({ number }) => number)).size !== data.tables.length
+      ) return false;
 
-    set({ tenantId, catalogGroups: [...data.catalogGroups], catalogItems: [...data.catalogItems], tables: [...data.tables] });
-    return true;
+      set({
+        tenantId,
+        catalogGroups: data.catalogGroups.map((record) => ({ ...record })),
+        catalogItems: data.catalogItems.map((record) => ({ ...record })),
+        tables: data.tables.map((record) => ({ ...record })),
+      });
+      return true;
+    } catch {
+      return false;
+    }
   },
   clear: () => set({ tenantId: null, catalogGroups: [], catalogItems: [], tables: [] }),
   itemsForGroup: (groupId) => get().catalogItems
     .filter((item) => item.groupId === groupId && item.available)
-    .sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id)),
-  tableById: (id) => get().tables.find((table) => table.id === id) ?? null,
+    .sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id))
+    .map((item) => ({ ...item })),
+  tableById: (id) => {
+    const table = get().tables.find((record) => record.id === id);
+    return table ? { ...table } : null;
+  },
 }));
