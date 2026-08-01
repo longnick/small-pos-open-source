@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-01 10:20 - Task 2.1 tenant and auth Zustand store
+
+Repo: `/home/longnick/projects/small-pos`
+Branch: `main`
+Agent: Hermes Agent
+Summary: Added in-memory tenant/current-staff Zustand hook, injected PIN verification delegation, sign-out, and core RBAC delegation. No UI or persistence.
+Files changed: `src/stores/tenant-auth-store.ts`, focused store test, exported core `PinHashVerifier`, Vitest source-test inclusion, approved Zustand dependency, bounded AI map records.
+Verification: RED target failed because store module was absent; GREEN target passed 5 tests. Final gates recorded in task log.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-01-1020-task-2-1-tenant-auth-store.md`
+
 ## 2026-08-01 08:45 - Task 1.12 strict verifier result
 
 Repo: `/home/longnick/projects/small-pos`

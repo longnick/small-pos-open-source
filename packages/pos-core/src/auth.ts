@@ -1,6 +1,6 @@
 import type { Role } from "./types";
 
-type PinHashVerifier = (pin: string, pinHash: string) => boolean | Promise<boolean>;
+export type PinHashVerifier = (pin: string, pinHash: string) => boolean | Promise<boolean>;
 
 const permissions: Record<Role, readonly string[]> = {
   manager: ["*"],
