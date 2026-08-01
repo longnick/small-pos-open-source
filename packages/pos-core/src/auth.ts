@@ -12,7 +12,7 @@ const permissions: Record<Role, readonly string[]> = {
 const validAction = /^[a-z][a-z_]*\.[a-z][a-z_]*$/;
 
 export async function verifyPin(pin: string, pinHash?: string, verifier?: PinHashVerifier): Promise<boolean> {
-  if (typeof pin !== "string" || !/^\d{4}$/.test(pin) || !pinHash || !verifier) return false;
+  if (typeof pin !== "string" || typeof pinHash !== "string" || !pinHash || !/^\d{4}$/.test(pin) || !verifier) return false;
 
   try {
     return await verifier(pin, pinHash);
@@ -22,7 +22,7 @@ export async function verifyPin(pin: string, pinHash?: string, verifier?: PinHas
 }
 
 export function canAccess(role: string, action: string): boolean {
-  if (!validAction.test(action) || !Object.hasOwn(permissions, role)) return false;
+  if (typeof role !== "string" || typeof action !== "string" || !Object.hasOwn(permissions, role) || !validAction.test(action)) return false;
 
   return permissions[role as Role].some((permission) => permission === "*" || permission === action || (permission.endsWith(".*") && action.startsWith(permission.slice(0, -1))));
 }

@@ -54,6 +54,15 @@ test("fails closed for malformed actions and unknown roles", () => {
   expect(canAccess("__proto__", "order.create")).toBe(false);
 });
 
+test("fails closed without throwing for Symbol action input", () => {
+  expect(() => canAccess("manager", Symbol("order.create") as unknown as string)).not.toThrow();
+  expect(canAccess("manager", Symbol("order.create") as unknown as string)).toBe(false);
+});
+
+test("fails closed for boxed String action input", () => {
+  expect(canAccess("manager", new String("order.create") as unknown as string)).toBe(false);
+});
+
 test("verifies valid PIN with synchronous verifier", async () => {
   const verifier = vi.fn((pin: string, hash: string) => pin === "1234" && hash === "hash");
 
@@ -72,6 +81,20 @@ test("returns false without calling verifier for invalid PIN or hash", async () 
   await expect(verifyPin("123", "hash", verifier)).resolves.toBe(false);
   await expect(verifyPin("1234", "", verifier)).resolves.toBe(false);
   await expect(verifyPin("1234", undefined, verifier)).resolves.toBe(false);
+  expect(verifier).not.toHaveBeenCalled();
+});
+
+test("returns false without calling verifier for numeric hash input", async () => {
+  const verifier = vi.fn(() => true);
+
+  await expect(verifyPin("1234", 1234 as unknown as string, verifier)).resolves.toBe(false);
+  expect(verifier).not.toHaveBeenCalled();
+});
+
+test("returns false without calling verifier for boxed hash input", async () => {
+  const verifier = vi.fn(() => true);
+
+  await expect(verifyPin("1234", new String("hash") as unknown as string, verifier)).resolves.toBe(false);
   expect(verifier).not.toHaveBeenCalled();
 });
 

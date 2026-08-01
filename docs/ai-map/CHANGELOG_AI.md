@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-01 08:32 - Task 1.12 non-string auth inputs
+
+Repo: `/home/longnick/projects/small-pos`
+Branch: `main`
+Agent: Hermes Agent
+Summary: `verifyPin` now requires primitive non-empty string hash before verifier; `canAccess` now rejects non-primitive role/action input before permission lookup or regex evaluation.
+Files changed: `packages/pos-core/src/auth.ts`, `packages/pos-core/test/auth.test.ts`, bounded AI map records.
+Verification: RED target failed with Symbol `TypeError`, boxed action access, numeric/boxed hash verifier access; GREEN target passed 22 tests; final gate results recorded in commit.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-01-0832-task-1-12-non-string-auth-inputs.md`
+
 ## 2026-08-01 08:20 - Task 1.12 non-string PIN guard
 
 Repo: `/home/longnick/projects/small-pos`
