@@ -20,17 +20,43 @@ const hasDuplicate = <T extends { id: string }>(records: T[]) => new Set(records
 const isPrimitiveNonemptyString = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
-const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object";
-const hasRecordIdentity = (value: unknown): value is Record<string, unknown> & { id: string; tenantId: string } =>
-  isRecord(value) && isPrimitiveNonemptyString(value.id) && isPrimitiveNonemptyString(value.tenantId);
+const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+const isNonnegativeInteger = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0;
+const isTableNumber = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 10;
+const isOptionalString = (value: unknown): value is string | undefined => value === undefined || typeof value === "string";
 
-const isTenantData = (value: unknown): value is TenantData => {
-  if (!isPlainObject(value) || !Array.isArray(value.catalogGroups) || !Array.isArray(value.catalogItems) || !Array.isArray(value.tables)) return false;
-
-  return value.catalogGroups.every(hasRecordIdentity)
-    && value.catalogItems.every((record) => isRecord(record) && hasRecordIdentity(record) && isPrimitiveNonemptyString(record["groupId"]))
-    && value.tables.every((record) => isRecord(record) && hasRecordIdentity(record) && typeof record["number"] === "number" && Number.isFinite(record["number"]));
+const materializeRecord = (value: unknown): Record<string, unknown> | null => {
+  if (!isPlainObject(value)) return null;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  if (Reflect.ownKeys(descriptors).some((key) => !("value" in descriptors[key as keyof typeof descriptors]))) return null;
+  return Object.fromEntries(Reflect.ownKeys(descriptors).map((key) => [key, descriptors[key as keyof typeof descriptors].value]));
 };
+
+const hasRecordIdentity = (value: Record<string, unknown>): value is Record<string, unknown> & { id: string; tenantId: string } =>
+  isPrimitiveNonemptyString(value.id) && isPrimitiveNonemptyString(value.tenantId);
+
+const isCatalogGroup = (value: Record<string, unknown>): value is Record<string, unknown> & CatalogGroup =>
+  hasRecordIdentity(value) && isPrimitiveNonemptyString(value.name) && isFiniteNumber(value.sortOrder);
+
+const isCatalogItem = (value: Record<string, unknown>): value is Record<string, unknown> & CatalogItem =>
+  hasRecordIdentity(value)
+  && isPrimitiveNonemptyString(value.groupId)
+  && isPrimitiveNonemptyString(value.name)
+  && isNonnegativeInteger(value.price)
+  && typeof value.available === "boolean"
+  && isFiniteNumber(value.sortOrder)
+  && isFiniteNumber(value.createdAt)
+  && isFiniteNumber(value.updatedAt)
+  && isOptionalString(value.description)
+  && isOptionalString(value.imageUrl);
+
+const isPosTable = (value: Record<string, unknown>): value is Record<string, unknown> & PosTable =>
+  hasRecordIdentity(value)
+  && isPrimitiveNonemptyString(value.staffId)
+  && isTableNumber(value.number)
+  && (value.status === "empty" || value.status === "occupied" || value.status === "waiting_payment")
+  && isFiniteNumber(value.openedAt)
+  && isOptionalString(value.currentOrderId);
 
 export const useCatalogTableStore = create<CatalogTableState>((set, get) => ({
   tenantId: null,
@@ -39,28 +65,41 @@ export const useCatalogTableStore = create<CatalogTableState>((set, get) => ({
   tables: [],
   replaceTenantData: (tenantId, data) => {
     try {
-      if (!isPrimitiveNonemptyString(tenantId) || !isTenantData(data)) return false;
+      if (!isPrimitiveNonemptyString(tenantId) || !isPlainObject(data)) return false;
+      const { catalogGroups, catalogItems, tables } = data;
+      if (!Array.isArray(catalogGroups) || !Array.isArray(catalogItems) || !Array.isArray(tables)) return false;
+
+      const groups = catalogGroups.map(materializeRecord);
+      const items = catalogItems.map(materializeRecord);
+      const tenantTables = tables.map(materializeRecord);
+      if (groups.some((record) => !record || !isCatalogGroup(record))
+        || items.some((record) => !record || !isCatalogItem(record))
+        || tenantTables.some((record) => !record || !isPosTable(record))) return false;
+
+      const validGroups = groups as (Record<string, unknown> & CatalogGroup)[];
+      const validItems = items as (Record<string, unknown> & CatalogItem)[];
+      const validTables = tenantTables as (Record<string, unknown> & PosTable)[];
 
       if (
-        hasDuplicate(data.catalogGroups) ||
-        hasDuplicate(data.catalogItems) ||
-        hasDuplicate(data.tables) ||
-        data.catalogGroups.some((record) => record.tenantId !== tenantId) ||
-        data.catalogItems.some((record) => record.tenantId !== tenantId) ||
-        data.tables.some((record) => record.tenantId !== tenantId)
+        hasDuplicate(validGroups) ||
+        hasDuplicate(validItems) ||
+        hasDuplicate(validTables) ||
+        validGroups.some((record) => record.tenantId !== tenantId) ||
+        validItems.some((record) => record.tenantId !== tenantId) ||
+        validTables.some((record) => record.tenantId !== tenantId)
       ) return false;
 
-      const groupIds = new Set(data.catalogGroups.map(({ id }) => id));
+      const groupIds = new Set(validGroups.map(({ id }) => id));
       if (
-        data.catalogItems.some(({ groupId }) => !groupIds.has(groupId)) ||
-        new Set(data.tables.map(({ number }) => number)).size !== data.tables.length
+        validItems.some(({ groupId }) => !groupIds.has(groupId)) ||
+        new Set(validTables.map(({ number }) => number)).size !== validTables.length
       ) return false;
 
       set({
         tenantId,
-        catalogGroups: data.catalogGroups.map((record) => ({ ...record })),
-        catalogItems: data.catalogItems.map((record) => ({ ...record })),
-        tables: data.tables.map((record) => ({ ...record })),
+        catalogGroups: validGroups.map((record) => ({ ...record })),
+        catalogItems: validItems.map((record) => ({ ...record })),
+        tables: validTables.map((record) => ({ ...record })),
       });
       return true;
     } catch {

@@ -137,6 +137,64 @@ test.each([
   });
 });
 
+test("rejects inherited identity records and preserves prior state", () => {
+  const inherited = Object.create(group("inherited-group")) as CatalogGroup;
+  const prior = { catalogGroups: [group("prior-group")], catalogItems: [], tables: [table("prior-table", 9)] };
+  expect(useCatalogTableStore.getState().replaceTenantData(tenantId, prior)).toBe(true);
+  const before = useCatalogTableStore.getState();
+
+  expect(useCatalogTableStore.getState().replaceTenantData(tenantId, { catalogGroups: [inherited], catalogItems: [], tables: [] })).toBe(false);
+  expect(useCatalogTableStore.getState()).toMatchObject({ tenantId: before.tenantId, catalogGroups: before.catalogGroups, catalogItems: before.catalogItems, tables: before.tables });
+});
+
+test.each([
+  ["changing getter", Object.defineProperty({ ...group("group-1") }, "name", { enumerable: true, get: (() => { let reads = 0; return () => `name-${++reads}`; })() })],
+  ["throwing getter", Object.defineProperty({ ...group("group-1") }, "name", { enumerable: true, get: () => { throw new Error("hostile getter"); } })],
+])("rejects accessor record with %s and preserves prior state", (_reason, accessorRecord) => {
+  const prior = { catalogGroups: [group("prior-group")], catalogItems: [], tables: [table("prior-table", 9)] };
+  expect(useCatalogTableStore.getState().replaceTenantData(tenantId, prior)).toBe(true);
+  const before = useCatalogTableStore.getState();
+
+  let result: boolean | undefined;
+  expect(() => { result = useCatalogTableStore.getState().replaceTenantData(tenantId, { catalogGroups: [accessorRecord as CatalogGroup], catalogItems: [], tables: [] }); }).not.toThrow();
+  expect(result).toBe(false);
+  expect(useCatalogTableStore.getState()).toMatchObject({ tenantId: before.tenantId, catalogGroups: before.catalogGroups, catalogItems: before.catalogItems, tables: before.tables });
+});
+
+test.each([
+  ["group name", { catalogGroups: [{ ...group("group-1"), name: "" }], catalogItems: [], tables: [] }],
+  ["group sortOrder", { catalogGroups: [{ ...group("group-1"), sortOrder: Number.NaN }], catalogItems: [], tables: [] }],
+  ["item name", { catalogGroups: [group("group-1")], catalogItems: [item("item-1", "group-1", { name: "" })], tables: [] }],
+  ["item price", { catalogGroups: [group("group-1")], catalogItems: [item("item-1", "group-1", { price: 1.5 })], tables: [] }],
+  ["item available", { catalogGroups: [group("group-1")], catalogItems: [item("item-1", "group-1", { available: "true" as never })], tables: [] }],
+  ["item sortOrder", { catalogGroups: [group("group-1")], catalogItems: [item("item-1", "group-1", { sortOrder: Number.POSITIVE_INFINITY })], tables: [] }],
+  ["item createdAt", { catalogGroups: [group("group-1")], catalogItems: [item("item-1", "group-1", { createdAt: Number.NaN })], tables: [] }],
+  ["item updatedAt", { catalogGroups: [group("group-1")], catalogItems: [item("item-1", "group-1", { updatedAt: Number.NaN })], tables: [] }],
+  ["item description", { catalogGroups: [group("group-1")], catalogItems: [item("item-1", "group-1", { description: 1 as never })], tables: [] }],
+  ["item imageUrl", { catalogGroups: [group("group-1")], catalogItems: [item("item-1", "group-1", { imageUrl: 1 as never })], tables: [] }],
+  ["table number low", { catalogGroups: [], catalogItems: [], tables: [table("table-1", 0)] }],
+  ["table number high", { catalogGroups: [], catalogItems: [], tables: [table("table-1", 11)] }],
+  ["table status", { catalogGroups: [], catalogItems: [], tables: [{ ...table("table-1", 1), status: "closed" as never }] }],
+  ["table openedAt", { catalogGroups: [], catalogItems: [], tables: [{ ...table("table-1", 1), openedAt: Number.NaN }] }],
+  ["table staffId", { catalogGroups: [], catalogItems: [], tables: [{ ...table("table-1", 1), staffId: "" }] }],
+  ["table currentOrderId", { catalogGroups: [], catalogItems: [], tables: [{ ...table("table-1", 1), currentOrderId: 1 as never }] }],
+])("rejects invalid %s and preserves prior state", (_reason, data) => {
+  const prior = { catalogGroups: [group("prior-group")], catalogItems: [], tables: [table("prior-table", 9)] };
+  expect(useCatalogTableStore.getState().replaceTenantData(tenantId, prior)).toBe(true);
+  const before = useCatalogTableStore.getState();
+
+  expect(useCatalogTableStore.getState().replaceTenantData(tenantId, data)).toBe(false);
+  expect(useCatalogTableStore.getState()).toMatchObject({ tenantId: before.tenantId, catalogGroups: before.catalogGroups, catalogItems: before.catalogItems, tables: before.tables });
+});
+
+test("loads valid normal core-shaped records", () => {
+  expect(useCatalogTableStore.getState().replaceTenantData(tenantId, {
+    catalogGroups: [group("group-1", 3)],
+    catalogItems: [item("item-1", "group-1", { description: "desc", imageUrl: "https://example.test/image.png" })],
+    tables: [{ ...table("table-1", 10), status: "waiting_payment", currentOrderId: "order-1" }],
+  })).toBe(true);
+});
+
 test("clear removes tenant-scoped data", () => {
   useCatalogTableStore.getState().replaceTenantData(tenantId, { catalogGroups: [group("group-1")], catalogItems: [], tables: [table("table-1", 1)] });
 
