@@ -57,6 +57,39 @@ Related files:
   - depends on: `src/stores/catalog-table-store.ts` and POS core domain types.
   - used by: Vitest.
 
+## Module: Order and payment store (Task 2.3)
+
+Purpose: keep transient in-memory open order and payment list with full fail-closed input validation.
+
+Related files:
+
+- `src/stores/order-payment-store.ts`
+  - role: exports `useOrderPaymentStore` with createOpenOrder, selectOpenOrder, addItem, updateItemQuantity, removeItem, setDiscount, recordPayment, clearCurrentOrder.
+  - depends on: `packages/pos-core/src/types.ts`, `packages/pos-core/src/order-calc.ts`.
+  - used by: future order/payment UI adapters; no UI, Dexie, EventBus, or table/shift coupling in Task 2.3.
+
+- `src/stores/order-payment-store.test.ts`
+  - role: covers order/payment mutation, isolation, and hostile-input boundary.
+  - depends on: `src/stores/order-payment-store.ts`.
+  - used by: Vitest.
+
+## Module: Shift and audit store (Task 2.4)
+
+Purpose: keep transient in-memory current shift lifecycle and append-only audit log with full trust boundary.
+
+Related files:
+
+- `src/stores/shift-audit-store.ts`
+  - role: exports `useShiftAuditStore` with openShift, closeShift, appendAudit, auditsForEntity, clear. All public inputs are `unknown`; fail closed — returns false, no throw, preserves state on any invalid input.
+  - depends on: `packages/pos-core/src/types.ts` (Shift, AuditEntry only).
+  - used by: future shift UI adapters; no UI, Dexie, EventBus, report computation, order/payment coupling in Task 2.4.
+  - notes: materializeRecord uses structuredClone-on-input to detect Proxy (throws in V8/jsdom). Details deep-scanned for accessor properties and JSON.stringify-checked for cycles before cloning.
+
+- `src/stores/shift-audit-store.test.ts`
+  - role: 55 tests across 4 TDD slices: openShift (14), closeShift (13), appendAudit/auditsForEntity (16), trust/ownership boundary (12 + clear).
+  - depends on: `src/stores/shift-audit-store.ts`.
+  - used by: Vitest.
+
 ## Module: POS core
 
 - `packages/pos-core/src/order-calc.ts`, `shift-report.ts`, `event-bus.ts`

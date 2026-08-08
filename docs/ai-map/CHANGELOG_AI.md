@@ -1,5 +1,23 @@
 # AI Changelog
 
+## 2026-08-08 07:58 - Task 2.4 shift and audit Zustand store (strict TDD)
+
+Repo: `/tmp/small-pos-task24-strict-tdd`
+Base commit: `beda223`
+Summary: Added in-memory shift lifecycle + append-only audit log hook. Four TDD slices: openShift (state + open guard), closeShift (time/money/note validation), appendAudit/auditsForEntity (identity dedup, insertion order, detached results), trust/ownership boundary (Proxy via structuredClone-throw, cyclic details via JSON.stringify, deep accessor scan, caller mutation isolation). materializeRecord uses structuredClone on top-level input to detect transparent Proxy. Details validated with hasNoAccessorInGraph recursion + JSON cycle gate before structuredClone.
+Files changed: `src/stores/shift-audit-store.ts` (new), `src/stores/shift-audit-store.test.ts` (new), bounded AI map records.
+Verification: Slice 1 RED (module absent) → GREEN 14 tests. Slice 2 RED (5 fail closeShift stub) → GREEN 27. Slice 3 RED (7 fail audit stub) → GREEN 38. Slice 4 RED (4 fail Proxy/cyclic/accessor/cycle boundary) → GREEN 55. Full gates: typecheck ✓, npm test 199/199 ✓, build ✓, scan:leakage ✓, test:scan-leakage ✓, oxlint 6 warnings 0 errors ✓, git diff --check ✓, E2E 3/3 ✓.
+Known baseline: npm run lint exits 2 (ESLint JSON parse fail — pre-existing wrapper anomaly, not introduced here); direct oxlint passes.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-08-0758-task-2-4-strict-tdd.md`
+
+## 2026-08-02 09:28 - Task 2.3 order and payment Zustand store
+
+Repo: `/home/longnick/projects/small-pos`
+Branch: `main`
+Summary: Added bounded in-memory open order + payment list hook. Fail-closed validation on createOpenOrder, addItem, updateItemQuantity, removeItem, setDiscount, recordPayment. Pure order-calc delegation; no UI, Dexie, EventBus, or shift coupling.
+Files changed: `src/stores/order-payment-store.ts`, `src/stores/order-payment-store.test.ts`, bounded AI map records.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-02-0928-task-2.3.md`
+
 ## 2026-08-01 11:15 - Task 2.2 catalog/table ownership and hostile input safety
 
 Repo: `/home/longnick/projects/small-pos`

@@ -6,23 +6,23 @@ None.
 
 ## Next
 
-- Continue approved Phase 2 task after Task 2.2.
-- Keep catalog/table store in-memory and independently loaded; retain fail-closed public input guards and record-copy boundaries. Add UI, Dexie hydration, CRUD, and tenant/auth coupling only in approved later tasks.
+- Task 2.5: PIN Login screen (Lovable component + auth store).
+- Keep all stores in-memory until approved Dexie hydration phase.
 - Keep `verifyPin` adapter-injected; add bcrypt/cloud adapter only when persistence/auth integration phase requires it.
 
 ## Blocked
 
-- Notion public/integration unavailable. Task 2.2 record only; no auth attempt.
+- Notion public/integration unavailable. Task 2.4 record only; no auth attempt.
 
 ## Risks
 
-- Tenant/auth and catalog/table stores remain in-memory only; no UI, DB, Dexie hydration, raw seed conversion, order flow, or tenant/auth-store coupling by Task 2.2 scope.
+- All four stores remain in-memory only; no UI, DB, Dexie hydration, raw seed conversion, or inter-store coupling beyond what each task's scope allows.
 
 ## Done recently
 
+- Task 2.4 shift and audit Zustand store — `docs/ai-map/TASK_LOGS/2026-08-08-0758-task-2-4-strict-tdd.md`
+- Task 2.3 order and payment Zustand store — `docs/ai-map/TASK_LOGS/2026-08-02-0928-task-2.3.md`
 - Task 2.2 catalog/table ownership and hostile input safety — `docs/ai-map/TASK_LOGS/2026-08-01-1115-task-2-2-ownership-input-safety.md`
 - Task 2.2 catalog and table Zustand store — `docs/ai-map/TASK_LOGS/2026-08-01-1054-task-2-2-catalog-table-store.md`
 - Task 2.1 tenant auth session boundaries — `docs/ai-map/TASK_LOGS/2026-08-01-1040-task-2-1-auth-boundaries.md`
 - Task 2.1 tenant and auth Zustand store — `docs/ai-map/TASK_LOGS/2026-08-01-1020-task-2-1-tenant-auth-store.md`
-- Task 1.12 non-string PIN guard — `docs/ai-map/TASK_LOGS/2026-08-01-0820-task-1-12-non-string-pin-guard.md`
-- Task 1.12 PIN auth and RBAC — `docs/ai-map/TASK_LOGS/2026-08-01-0810-task-1-12-rbac.md`

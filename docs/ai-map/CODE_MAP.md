@@ -18,6 +18,16 @@
 
 - `src/stores/tenant-auth-store.ts` — Zustand tenant/current-staff session hook; delegates PIN and RBAC rules to POS core.
 - `src/stores/catalog-table-store.ts` — Zustand tenant-scoped catalog groups, catalog items, and tables hook; atomically accepts internally consistent input only.
+- `src/stores/order-payment-store.ts` — Zustand in-memory open order + payment list hook; fail-closed validation on all mutations; pure order-calc delegation. (Task 2.3)
+- `src/stores/shift-audit-store.ts` — Zustand in-memory current shift + audit log hook; openShift/closeShift/appendAudit/auditsForEntity with full descriptor-scan + structuredClone boundary hardening. (Task 2.4)
+
+## Tests
+
+- `packages/pos-core/test/*.test.ts` — Vitest unit tests for core behavior.
+- `src/stores/tenant-auth-store.test.ts` — Vitest unit tests for tenant/auth store behavior.
+- `src/stores/catalog-table-store.test.ts` — Vitest unit tests for catalog/table store validation and read helpers.
+- `src/stores/order-payment-store.test.ts` — Vitest unit tests for order/payment store mutations, isolation, and fail-closed boundary. (Task 2.3)
+- `src/stores/shift-audit-store.test.ts` — 55 Vitest unit tests across 4 TDD slices: openShift, closeShift, audit API, trust/ownership boundary. (Task 2.4)
 
 ## Commands
 
