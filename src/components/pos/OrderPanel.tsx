@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { ChefHat, Minus, Plus, Receipt, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useOrderPaymentStore } from "@/stores/order-payment-store";
 import { formatCurrency } from "@/lib/pos";
 import type { PosTable } from "../../../packages/pos-core/src/types";
+import { PaymentModal } from "./PaymentModal";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -22,6 +23,13 @@ export interface OrderPanelProps {
 
 export function OrderPanel({ selectedTable }: OrderPanelProps) {
   const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
+
+  // Local dialog state – no store write
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+
+  // Enabled only when there is an open order with at least one item
+  const canOpenPayment =
+    currentOrder?.status === "open" && currentOrder.items.length > 0;
 
   // Heading is always "Đơn hàng". Only the subtitle adapts to selectedTable.
   const headingText = "Đơn hàng";
@@ -134,12 +142,22 @@ export function OrderPanel({ selectedTable }: OrderPanelProps) {
         </Button>
         <Button
           className="h-12 bg-primary text-sm font-semibold text-primary-foreground shadow-sm"
-          disabled
+          disabled={!canOpenPayment}
+          onClick={canOpenPayment ? () => setIsPaymentOpen(true) : undefined}
         >
           <Receipt className="mr-2 h-4 w-4" aria-hidden="true" />
           Thanh toán
         </Button>
       </div>
+
+      {/* Payment modal – read-only; no store write */}
+      {isPaymentOpen && currentOrder && (
+        <PaymentModal
+          open={isPaymentOpen}
+          orderTotal={currentOrder.total}
+          onOpenChange={setIsPaymentOpen}
+        />
+      )}
     </div>
   );
 }

@@ -2,12 +2,12 @@
 
 ## Doing
 
-- Task 2.8: scoped order-panel unit passed executable gates. Screenshot pixel inspection is blocked by vision-provider credit; owner visual QA and commit/merge handoff remain. No deploy.
+- Task 2.9: minimal local read-only payment modal passed executable gates. Full payment execution is excluded; screenshot pixel inspection is blocked by vision-provider credit. Commit/owner handoff remains. No deploy.
 
 ## Next
 
-- Commit Task 2.8 from the release worktree after final scope review, then request owner visual QA/merge approval.
-- Task 2.9: Thanh toán modal (Lovable PaymentModal + payment logic), only after Task 2.8 commit/review.
+- Commit Task 2.9 from the release worktree after final scope review, then request owner visual QA/merge approval.
+- Full payment lifecycle: explicit approval required for `recordPayment`, identity/time/receipt/audit, error/retry semantics, paid state, and table/order lifecycle coupling.
 - Keep all stores in-memory until approved Dexie hydration phase.
 - Keep `verifyPin` adapter-injected; add bcrypt/cloud adapter only when persistence/auth integration phase requires it.
 

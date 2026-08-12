@@ -1150,3 +1150,167 @@ test.describe("Task 2.8 order empty state @ 1440×900", () => {
     await runOrderEmptyAcceptance(page, { width: 1440, height: 900 });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 2.9 Slice 3: payment safe boundary — null order after fixture UI sign-in
+//
+// The fixture auth adapter never populates the order-payment-store, so
+// currentOrder is null after sign-in. OrderPanel must render the Thanh toán
+// button disabled and must not open or expose any dialog named "Thanh toán".
+//
+// Auth flow: fixture UI only — select "Fixture Manager", fill PIN "2468",
+// click submit. No page.evaluate, no setState, no localStorage injection,
+// no order store mutation of any kind.
+//
+// Layout notes:
+//   - Mobile (390×844) and tablet (768×1024): POS view defaults to "tables"
+//     tab. Must click the "Đơn" tab trigger to bring OrderPanel into the
+//     active (visible) panel before asserting.
+//   - Desktop (1440×900): order panel is rendered directly in the 12-col
+//     desktop grid — no tab click required.
+//
+// Assertions per viewport:
+//   1. CafePOS heading visible (confirms PosShell rendered).
+//   2. All "Thanh toán" buttons in the DOM are disabled.
+//   3. No accessible dialog named "Thanh toán" exists (count 0).
+//   4. No horizontal overflow on documentElement / body.
+//   5. Screenshot saved as task-2-9-payment-safe-{tag}.png.
+//
+// Projects: mobile (390×844), tablet (768×1024), desktop (1440×900).
+// Each describe block skips all other projects so the test runs exactly once.
+// ---------------------------------------------------------------------------
+
+/**
+ * Authenticates via fixture UI flow, navigates to the order panel, and asserts
+ * the payment safe boundary (null order → Thanh toán disabled, dialog count 0).
+ * Shared helper for all three Task 2.9 Slice 3 describe blocks.
+ */
+async function runPaymentSafeBoundary(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  page: any,
+  viewport: { width: number; height: number },
+) {
+  const tag = `${viewport.width}x${viewport.height}`;
+
+  // ── Navigate ──────────────────────────────────────────────────────────────
+  await page.goto("/");
+  await page.bringToFront();
+
+  // ── Wait for login form ────────────────────────────────────────────────────
+  const loginHeading = page.getByRole("heading", { name: "Đăng nhập" });
+  await expect(loginHeading).toBeVisible({ timeout: 10_000 });
+
+  const staffSelect = page.locator('select[aria-label="Chọn nhân viên"]');
+  const pinInput = page.locator('input[type="password"]');
+  const submitBtn = page.getByRole("button", { name: "Đăng nhập" });
+
+  // ── Authenticate via fixture UI flow ──────────────────────────────────────
+  await staffSelect.selectOption({ label: "Fixture Manager" });
+  await pinInput.fill("2468");
+  await submitBtn.click();
+
+  // ── Wait for PosShell ─────────────────────────────────────────────────────
+  await expect(loginHeading).not.toBeAttached({ timeout: 10_000 });
+
+  // ── 1. CafePOS heading visible ────────────────────────────────────────────
+  const cafeHeading = page.getByRole("heading", {
+    name: "CafePOS",
+    exact: true,
+  });
+  await expect(cafeHeading).toBeVisible({ timeout: 10_000 });
+
+  // ── Navigate to order panel (mobile/tablet only) ──────────────────────────
+  // Mobile/tablet (< 1024 px): POS view defaults to "tables" tab; click "Đơn".
+  // Desktop (≥ 1024 px): order panel is always visible in the desktop grid.
+  if (viewport.width < 1024) {
+    const orderTab = page.getByRole("tab", { name: "Đơn", exact: true });
+    await expect(orderTab).toBeVisible({ timeout: 5_000 });
+    await orderTab.click();
+    await page.waitForSelector('[role="tabpanel"][data-state="active"]', {
+      timeout: 5_000,
+    });
+  }
+
+  // ── 2. All "Thanh toán" buttons are disabled ──────────────────────────────
+  // OrderPanel always renders a "Thanh toán" button. With currentOrder null the
+  // canOpenPayment guard is false, so the button carries the disabled attribute.
+  // Both layout branches (desktop hidden + active tabs panel) may produce two
+  // copies at narrow widths; every instance must be disabled.
+  const checkoutBtns = page.getByRole("button", { name: /Thanh toán/ });
+  // At least one instance must be present in the DOM.
+  await expect(checkoutBtns.first()).toBeAttached({ timeout: 5_000 });
+  const checkoutCount = await checkoutBtns.count();
+  for (let i = 0; i < checkoutCount; i++) {
+    await expect(checkoutBtns.nth(i)).toBeDisabled();
+  }
+
+  // ── 3. No accessible dialog named "Thanh toán" ────────────────────────────
+  // PaymentModal is conditionally rendered only when isPaymentOpen === true AND
+  // currentOrder !== null. With null order the modal must never mount.
+  await expect(
+    page.getByRole("dialog", { name: "Thanh toán" }),
+  ).toHaveCount(0);
+
+  // ── 4. No horizontal overflow ─────────────────────────────────────────────
+  const overflowResult = await page.evaluate(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    return {
+      htmlScrollWidth: html.scrollWidth,
+      htmlClientWidth: html.clientWidth,
+      bodyScrollWidth: body.scrollWidth,
+      bodyClientWidth: body.clientWidth,
+    };
+  });
+  expect(overflowResult.htmlScrollWidth).toBeLessThanOrEqual(
+    overflowResult.htmlClientWidth,
+  );
+  expect(overflowResult.bodyScrollWidth).toBeLessThanOrEqual(
+    overflowResult.bodyClientWidth,
+  );
+
+  // ── 5. Screenshot ─────────────────────────────────────────────────────────
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, `task-2-9-payment-safe-${tag}.png`),
+    fullPage: false,
+  });
+}
+
+// ── Task 2.9 Slice 3 test: 390×844 (mobile) ──────────────────────────────────
+test.describe("Task 2.9 payment safe boundary @ 390×844", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("Task 2.9 payment safe boundary", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile",
+      `Skipped in project "${testInfo.project.name}" — this test targets 390×844 (mobile only)`,
+    );
+    await runPaymentSafeBoundary(page, { width: 390, height: 844 });
+  });
+});
+
+// ── Task 2.9 Slice 3 test: 768×1024 (tablet) ─────────────────────────────────
+test.describe("Task 2.9 payment safe boundary @ 768×1024", () => {
+  test.use({ viewport: { width: 768, height: 1024 } });
+
+  test("Task 2.9 payment safe boundary", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "tablet",
+      `Skipped in project "${testInfo.project.name}" — this test targets 768×1024 (tablet only)`,
+    );
+    await runPaymentSafeBoundary(page, { width: 768, height: 1024 });
+  });
+});
+
+// ── Task 2.9 Slice 3 test: 1440×900 (desktop) ────────────────────────────────
+test.describe("Task 2.9 payment safe boundary @ 1440×900", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test("Task 2.9 payment safe boundary", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "desktop",
+      `Skipped in project "${testInfo.project.name}" — this test targets 1440×900 (desktop only)`,
+    );
+    await runPaymentSafeBoundary(page, { width: 1440, height: 900 });
+  });
+});

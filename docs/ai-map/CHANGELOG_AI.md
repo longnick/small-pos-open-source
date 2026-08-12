@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-12 03:40 - Task 2.9 minimal payment modal
+
+Repo: `/home/longnick/projects/small-pos-release-task25`
+Branch: `release/task-2-5-pin-login`
+Summary: Owner-approved local read-only payment modal. It opens only for populated open order, shows passed store total and local method selection, and closes without payment mutation. No payment execution.
+Verification: 314/314 unit; TypeScript/build/leakage/self-test; Task 2.9 safe-denial E2E at 390×844, 768×1024, 1440×900; normal dist fixture scan PASS. Terra removed a misleading paid-order test; paid-state executable proof deferred because safe public setup only selects open orders. Pixel inspection unavailable due vision-provider credit 402.
+Next: scoped commit; full payment lifecycle requires explicit approval. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-12-0340-task-2-9-payment-modal.md`
+
+
 ## 2026-08-12 03:00 - Task 2.8 order panel
 
 Repo: `/home/longnick/projects/small-pos-release-task25`

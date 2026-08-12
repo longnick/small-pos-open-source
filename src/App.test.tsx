@@ -598,3 +598,30 @@ test("2.8-s2: authenticated shell with null order state: shows 'Chọn món đ�
   guiBep.forEach((btn) => expect(btn).toBeDisabled());
   thanhToan.forEach((btn) => expect(btn).toBeDisabled());
 });
+
+// ---------------------------------------------------------------------------
+// Task 2.9 Slice 3 — payment safe boundary (null order, UI sign-in only)
+// ---------------------------------------------------------------------------
+
+test("2.9-s3: authenticated shell with null order — Thanh toán disabled and no dialog named Thanh toán", async () => {
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  // order-payment store is cleared in beforeEach (currentOrder = null)
+
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy()
+  );
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy()
+  );
+
+  // All "Thanh toán" buttons must be disabled (desktop + mobile panels both render one each)
+  const thanhToanBtns = screen.getAllByRole("button", { name: /Thanh toán/i });
+  expect(thanhToanBtns.length).toBeGreaterThan(0);
+  thanhToanBtns.forEach((btn) => expect(btn).toBeDisabled());
+
+  // No accessible dialog named "Thanh toán" must exist in the DOM
+  expect(screen.queryByRole("dialog", { name: "Thanh toán" })).toBeNull();
+});

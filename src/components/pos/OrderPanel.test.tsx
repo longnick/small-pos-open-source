@@ -1,6 +1,6 @@
 import React from "react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import type { PosTable } from "../../../packages/pos-core/src/types";
 import { useOrderPaymentStore } from "../../stores/order-payment-store";
 import { OrderPanel } from "./OrderPanel";
@@ -158,7 +158,11 @@ describe("OrderPanel", () => {
   // Controls must be disabled (no fake onClick)
   // -------------------------------------------------------------------------
 
-  it("renders disabled action buttons when currentOrder has items", () => {
+  // -------------------------------------------------------------------------
+  // Controls: Gửi bếp always disabled; Thanh toán enabled for valid orders
+  // -------------------------------------------------------------------------
+
+  it("renders 'Gửi bếp' button as always disabled when currentOrder has items", () => {
     useOrderPaymentStore.getState().selectOpenOrder({
       id: "order-1",
       tenantId: "tenant-1",
@@ -184,9 +188,10 @@ describe("OrderPanel", () => {
 
     render(<OrderPanel selectedTable={table} />);
 
-    // "Gửi bếp" and "Thanh toán" buttons must exist and be disabled
+    // "Gửi bếp" must remain disabled (feature not implemented yet)
     expect(screen.getByRole("button", { name: /Gửi bếp/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Thanh toán/i })).toBeDisabled();
+    // "Thanh toán" is now enabled for a valid open order with items
+    expect(screen.getByRole("button", { name: /Thanh toán/i })).not.toBeDisabled();
   });
 
   // -------------------------------------------------------------------------
@@ -222,5 +227,129 @@ describe("OrderPanel", () => {
     // Both subtotal and total render the same amount; use getAllByText.
     const totalMatches = screen.getAllByText(/50\.000/);
     expect(totalMatches.length).toBeGreaterThan(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // Thanh toán button eligibility
+  // -------------------------------------------------------------------------
+
+  it("Thanh toán button is disabled when currentOrder is null", () => {
+    render(<OrderPanel selectedTable={null} />);
+    expect(screen.getByRole("button", { name: /Thanh toán/i })).toBeDisabled();
+  });
+
+  it("Thanh toán button is disabled when currentOrder has no items (empty order)", () => {
+    useOrderPaymentStore.getState().selectOpenOrder({
+      id: "order-empty",
+      tenantId: "tenant-1",
+      tableId: "table-1",
+      staffId: "staff-1",
+      status: "open",
+      items: [],
+      subtotal: 0,
+      discount: 0,
+      discountType: "amount",
+      total: 0,
+      createdAt: 1,
+    });
+    render(<OrderPanel selectedTable={table} />);
+    expect(screen.getByRole("button", { name: /Thanh toán/i })).toBeDisabled();
+  });
+
+  it("Thanh toán button is enabled for a valid open order with items", () => {
+    useOrderPaymentStore.getState().selectOpenOrder({
+      id: "order-valid",
+      tenantId: "tenant-1",
+      tableId: "table-1",
+      staffId: "staff-1",
+      status: "open",
+      items: [
+        {
+          id: "line-1",
+          orderId: "order-valid",
+          catalogItemId: "c1",
+          name: "Cà phê đen",
+          price: 25_000,
+          quantity: 1,
+        },
+      ],
+      subtotal: 25_000,
+      discount: 0,
+      discountType: "amount",
+      total: 25_000,
+      createdAt: 1,
+    });
+    render(<OrderPanel selectedTable={table} />);
+    expect(screen.getByRole("button", { name: /Thanh toán/i })).not.toBeDisabled();
+  });
+
+  it("clicking Thanh toán on a valid order opens an accessible dialog named 'Thanh toán'", () => {
+    useOrderPaymentStore.getState().selectOpenOrder({
+      id: "order-valid",
+      tenantId: "tenant-1",
+      tableId: "table-1",
+      staffId: "staff-1",
+      status: "open",
+      items: [
+        {
+          id: "line-1",
+          orderId: "order-valid",
+          catalogItemId: "c1",
+          name: "Cà phê đen",
+          price: 25_000,
+          quantity: 1,
+        },
+      ],
+      subtotal: 25_000,
+      discount: 0,
+      discountType: "amount",
+      total: 25_000,
+      createdAt: 1,
+    });
+    render(<OrderPanel selectedTable={table} />);
+    fireEvent.click(screen.getByRole("button", { name: /Thanh toán/i }));
+    expect(
+      screen.getByRole("dialog", { name: "Thanh toán" }),
+    ).toBeInTheDocument();
+  });
+
+  it("dialog shows the exact stored order total when opened", () => {
+    useOrderPaymentStore.getState().selectOpenOrder({
+      id: "order-valid",
+      tenantId: "tenant-1",
+      tableId: "table-1",
+      staffId: "staff-1",
+      status: "open",
+      items: [
+        {
+          id: "line-1",
+          orderId: "order-valid",
+          catalogItemId: "c1",
+          name: "Trà sữa",
+          price: 35_000,
+          quantity: 2,
+        },
+      ],
+      subtotal: 70_000,
+      discount: 0,
+      discountType: "amount",
+      total: 70_000,
+      createdAt: 1,
+    });
+    render(<OrderPanel selectedTable={table} />);
+    fireEvent.click(screen.getByRole("button", { name: /Thanh toán/i }));
+    const dialog = screen.getByRole("dialog", { name: "Thanh toán" });
+    expect(dialog).toBeInTheDocument();
+    // 70 000 VND → "70.000 ₫" — scoped to the dialog to avoid ambiguity with panel totals
+    expect(within(dialog).getByText(/70\.000/)).toBeInTheDocument();
+  });
+
+  it("clicking Thanh toán does NOT open a dialog when currentOrder is null", () => {
+    render(<OrderPanel selectedTable={null} />);
+    // Button is disabled; no dialog should appear.
+    const btn = screen.getByRole("button", { name: /Thanh toán/i });
+    expect(btn).toBeDisabled();
+    fireEvent.click(btn);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
