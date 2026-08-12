@@ -26,14 +26,15 @@ export interface OrderPanelProps {
    * lifecycle actions (release table, clear order selection, clear UI selection).
    * Optional: when absent no post-payment lifecycle is triggered.
    */
-  onPaymentSuccess?: () => void;
+  onPaymentSuccess?: () => boolean | void;
+  onReceiptClose?: () => void;
 }
 
 // ---------------------------------------------------------------------------
 // OrderPanel
 // ---------------------------------------------------------------------------
 
-export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuccess }: OrderPanelProps) {
+export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuccess, onReceiptClose }: OrderPanelProps) {
   const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
 
   // Local dialog state – no store write
@@ -171,6 +172,7 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
           staffId={currentOrder.staffId}
           onBeforeConfirm={onBeforePaymentConfirm}
           onPaymentSuccess={onPaymentSuccess}
+          onReceiptClose={onReceiptClose}
           onOpenChange={setIsPaymentOpen}
         />
       )}

@@ -355,24 +355,45 @@ describe("PaymentModal – payment lifecycle (Task 2.10)", () => {
     expect(dialog).toBeInTheDocument();
   });
 
-  it("calls onOpenChange(false) after successful payment", () => {
+  it("keeps a successful payment open as a receipt until user closes it", () => {
     const onOpenChange = vi.fn();
-    const onPaymentSuccess = vi.fn();
     loadOrder();
-    render(
-      <PaymentModal
-        open={true}
-        orderTotal={50_000}
-        orderId="order-pay"
-        tenantId="tenant-1"
-        staffId="staff-1"
-        onOpenChange={onOpenChange}
-        onPaymentSuccess={onPaymentSuccess}
-      />,
-    );
+    render(<PaymentModal {...baseProps()} onOpenChange={onOpenChange} onPaymentSuccess={() => true} />);
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "60000" } });
+    fireEvent.click(screen.getByRole("button", { name: /xác nhận thanh toán/i }));
+    expect(screen.getByRole("region", { name: "Hóa đơn thanh toán" })).toBeInTheDocument();
+    expect(screen.getByText(/mã thanh toán/i)).toBeInTheDocument();
+    expect(screen.getByText(/tiền mặt/i)).toBeInTheDocument();
+    expect(screen.getByText(/10\.000/)).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("shows zero change on transfer receipt", () => {
+    loadOrder();
+    render(<PaymentModal {...baseProps()} onPaymentSuccess={() => true} />);
+    fireEvent.click(screen.getByRole("button", { name: "Chuyển khoản" }));
     fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "50000" } });
     fireEvent.click(screen.getByRole("button", { name: /xác nhận thanh toán/i }));
+    expect(screen.getByRole("region", { name: "Hóa đơn thanh toán" })).toHaveTextContent("Chuyển khoản");
+    expect(screen.getByRole("region", { name: "Hóa đơn thanh toán" })).toHaveTextContent(/Tiền thối:\s*0/);
+  });
+
+  it("prints receipt and closes it once", () => {
+    const onOpenChange = vi.fn();
+    const onReceiptClose = vi.fn();
+    const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    loadOrder();
+    render(<PaymentModal {...baseProps()} onOpenChange={onOpenChange} onPaymentSuccess={() => true} onReceiptClose={onReceiptClose} />);
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "50000" } });
+    fireEvent.click(screen.getByRole("button", { name: /xác nhận thanh toán/i }));
+    fireEvent.click(screen.getByRole("button", { name: "In hóa đơn" }));
+    expect(print).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
+    fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
+    expect(onReceiptClose).toHaveBeenCalledOnce();
+    expect(onOpenChange).toHaveBeenCalledOnce();
     expect(onOpenChange).toHaveBeenCalledWith(false);
+    print.mockRestore();
   });
 
   it("shows receipt success text after payment", () => {

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const screenshot = "/tmp/small-pos-table-released-390x844.png";
+const screenshot = "/tmp/small-pos-receipt-390x844.png";
 
 async function signIn(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -24,15 +24,19 @@ test("fixture payment releases matching table after cash payment", async ({ page
   await page.getByLabel("Số tiền khách đưa").fill("60000");
   await expect(page.getByText(/Tiền thối:.*10\.000/)).toBeVisible();
   await page.getByRole("button", { name: "Xác nhận thanh toán" }).click();
-  await expect(page.getByRole("dialog", { name: "Thanh toán" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Hóa đơn thanh toán" })).toBeVisible();
+  await expect(page.getByText(/mã thanh toán/i)).toBeVisible();
+  await expect(page.getByText(/tiền mặt/i)).toBeVisible();
+  await page.screenshot({ path: screenshot, fullPage: false });
 
+  await page.getByRole("button", { name: "Đóng" }).click();
+  await expect(page.getByRole("dialog", { name: "Thanh toán" })).toHaveCount(0);
   await page.getByRole("tab", { name: "Bàn", exact: true }).click();
   const releasedTable = page.getByRole("button", { name: /Bàn 1 Trống/ });
   await expect(releasedTable).toBeVisible();
   await expect(releasedTable).toHaveAttribute("aria-pressed", "false");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
   expect(overflow).toBe(true);
-  await page.screenshot({ path: screenshot, fullPage: false });
 });
 
 export { screenshot };

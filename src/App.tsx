@@ -77,18 +77,14 @@ function PosShell() {
     );
   };
 
-  /**
-   * Post-payment lifecycle: called after recordPayment succeeds.
-   * Releases the table, clears the current order, and clears the UI selection.
-   * Only proceeds if releaseTable returns true (table was actually released).
-   * If release fails, order and UI selection remain unchanged.
-   */
   const handlePaymentSuccess = (): boolean => {
     const order = useOrderPaymentStore.getState().currentOrder;
-    if (!order || !releaseTable(order.tableId, order.id)) return false;
+    return Boolean(order && releaseTable(order.tableId, order.id));
+  };
+
+  const handleReceiptClose = (): void => {
     clearCurrentOrder();
     setSelectedTableId(null);
-    return true;
   };
 
   // --- Panels ---
@@ -120,7 +116,7 @@ function PosShell() {
     <MenuGrid groups={catalogGroups} items={catalogItems} />
   );
 
-  const orderPanel = <OrderPanel selectedTable={selectedTable} onBeforePaymentConfirm={handleBeforePaymentConfirm} onPaymentSuccess={handlePaymentSuccess} />;
+  const orderPanel = <OrderPanel selectedTable={selectedTable} onBeforePaymentConfirm={handleBeforePaymentConfirm} onPaymentSuccess={handlePaymentSuccess} onReceiptClose={handleReceiptClose} />;
 
   return (
     <div className="flex h-screen flex-col bg-background">

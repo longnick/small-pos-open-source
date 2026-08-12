@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import type { PaymentMethod } from "../../../packages/pos-core/src/types";
 import { formatCurrency } from "@/lib/pos";
 import { useOrderPaymentStore } from "@/stores/order-payment-store";
@@ -9,25 +9,22 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "card", label: "Thẻ" },
   { value: "other", label: "Khác" },
 ];
+const methodLabel = (method: PaymentMethod) => PAYMENT_METHODS.find((entry) => entry.value === method)?.label ?? method;
+
+type Receipt = { id: string; method: PaymentMethod; total: number; tender: number; change: number; timestamp: number };
 
 export interface PaymentModalProps {
   open: boolean;
-  /** Store-provided integer VND total. Never recomputed here. */
   orderTotal: number;
   onOpenChange: (open: false) => void;
-  /** Omit identity props for Task 2.9 read-only preview. */
   orderId?: string;
   tenantId?: string;
   staffId?: string;
-  /**
-   * Optional pre-validation hook called synchronously before `recordPayment`.
-   * If it returns `false` the confirm action is aborted with no state change.
-   * Use this to validate cross-store preconditions (e.g. table is releasable)
-   * without mutating either store.
-   */
   onBeforeConfirm?: () => boolean;
-  /** Return false to keep modal open and suppress success UI. */
+  /** Return false when table release fails; receipt must not be shown. */
   onPaymentSuccess?: () => boolean | void;
+  /** Called once only when user closes a confirmed receipt. */
+  onReceiptClose?: () => void;
 }
 
 const parseTender = (value: string): number | null => {
@@ -36,11 +33,12 @@ const parseTender = (value: string): number | null => {
   return Number.isSafeInteger(tender) ? tender : null;
 };
 
-export function PaymentModal({ open, orderTotal, onOpenChange, orderId, tenantId, staffId, onBeforeConfirm, onPaymentSuccess }: PaymentModalProps) {
+export function PaymentModal({ open, orderTotal, onOpenChange, orderId, tenantId, staffId, onBeforeConfirm, onPaymentSuccess, onReceiptClose }: PaymentModalProps) {
   const recordPayment = useOrderPaymentStore((state) => state.recordPayment);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("cash");
   const [tenderInput, setTenderInput] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const receiptClosed = useRef(false);
   const tender = parseTender(tenderInput);
   const executable = Boolean(orderId && tenantId && staffId);
   const validTender = tender !== null && (selectedMethod === "cash" ? tender >= orderTotal : tender === orderTotal);
@@ -50,22 +48,39 @@ export function PaymentModal({ open, orderTotal, onOpenChange, orderId, tenantId
 
   const confirm = () => {
     if (!executable || !validTender || tender === null || !orderId || !tenantId || !staffId) return;
-    // Pre-validate cross-store preconditions (e.g. table releasable) before mutating payment store.
     if (onBeforeConfirm && !onBeforeConfirm()) return;
-    const createdAt = Date.now();
-    const id = globalThis.crypto?.randomUUID?.() ?? `${createdAt}-${Math.random()}`;
-    if (!recordPayment({ id, tenantId, orderId, amount: orderTotal, tender, method: selectedMethod, staffId, createdAt })) return;
+    const timestamp = Date.now();
+    const id = globalThis.crypto?.randomUUID?.() ?? `${timestamp}-${Math.random()}`;
+    if (!recordPayment({ id, tenantId, orderId, amount: orderTotal, tender, method: selectedMethod, staffId, createdAt: timestamp })) return;
     if (onPaymentSuccess?.() === false) return;
-    setSuccess(true);
+    setReceipt({ id, method: selectedMethod, total: orderTotal, tender, change: selectedMethod === "cash" ? tender - orderTotal : 0, timestamp });
+  };
+
+  const closeReceipt = () => {
+    if (!receipt || receiptClosed.current) return;
+    receiptClosed.current = true;
+    onReceiptClose?.();
     onOpenChange(false);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => onOpenChange(false)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => !receipt && onOpenChange(false)}>
       <div role="dialog" aria-modal="true" aria-label="Thanh toán" className="relative w-full max-w-sm rounded-2xl bg-background p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
-        <h2 className="mb-4 text-lg font-bold text-foreground">Thanh toán</h2>
-        {success ? (
-          <p role="status" className="rounded-xl bg-primary/10 p-4 font-semibold text-primary">Thanh toán thành công</p>
+        <h2 className="mb-4 text-lg font-bold text-foreground">{receipt ? "Hóa đơn" : "Thanh toán"}</h2>
+        {receipt ? (
+          <section aria-label="Hóa đơn thanh toán" className="space-y-3 rounded-xl border border-border bg-muted/40 p-4 text-sm">
+            <p role="status" className="font-semibold text-primary">Thanh toán thành công</p>
+            <p>Mã thanh toán: <strong>{receipt.id}</strong></p>
+            <p>Phương thức: <strong>{methodLabel(receipt.method)}</strong></p>
+            <p>Tổng thanh toán: <strong>{formatCurrency(receipt.total)}</strong></p>
+            <p>Khách đưa: <strong>{formatCurrency(receipt.tender)}</strong></p>
+            <p>Tiền thối: <strong>{formatCurrency(receipt.change)}</strong></p>
+            <p>Thời điểm: <time dateTime={new Date(receipt.timestamp).toISOString()}>{new Date(receipt.timestamp).toLocaleString("vi-VN")}</time></p>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button onClick={() => window.print()} className="rounded-lg border border-input bg-background py-2.5 font-semibold">In hóa đơn</button>
+              <button onClick={closeReceipt} className="rounded-lg bg-primary py-2.5 font-semibold text-primary-foreground">Đóng</button>
+            </div>
+          </section>
         ) : (
           <>
             <div className="rounded-xl border border-border bg-muted/40 p-4"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Tổng cộng</span><span className="text-xl font-bold text-primary">{formatCurrency(orderTotal)}</span></div></div>

@@ -12,9 +12,9 @@ Small POS is a reference starter. Roadmap items are not promises and should not 
 
 ## Next: public demo and workflow coverage
 
-- [ ] Fixture-safe end-to-end open-order → payment → receipt → paid-order-deny flow.
-- [ ] Local table transition rules around payment completion.
-- [ ] Accessible receipt view and printable local-only receipt data.
+- [x] Fixture-safe end-to-end open-order → payment → receipt → paid-order-deny flow.
+- [x] Local table transition rules around payment completion.
+- [x] Accessible receipt view and printable local-only receipt data.
 - [ ] More mobile/tablet visual regression evidence.
 - [ ] Issue templates, triage labels, and first contributor tasks.
 
