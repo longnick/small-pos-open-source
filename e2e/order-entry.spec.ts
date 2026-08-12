@@ -160,7 +160,7 @@ test("order-entry: order-line controls – increment, decrement, remove-at-1, tr
   // ── 9. Coffee: trash button → removes the last line → empty state ─────────
   // Re-query cafeLine in case the DOM was updated after tea removal.
   const cafeLineAfter = orderTab.locator('[class*="rounded-xl"]', { hasText: "Cà phê đen" });
-  await cafeLineAfter.getByRole("button", { name: "Xóa món" }).click();
+  await cafeLineAfter.getByRole("button", { name: "Xóa Cà phê đen khỏi đơn" }).click();
 
   // ── 10. Assert empty state ───────────────────────────────────────────────
   await expect(orderTab.locator("p", { hasText: "Chọn món để thêm vào đơn" })).toBeVisible();
@@ -187,6 +187,143 @@ test("order-entry: order-line controls – increment, decrement, remove-at-1, tr
 
   // ── 14. Screenshot after empty state ─────────────────────────────────────
   await page.screenshot({ path: controlsScreenshot, fullPage: false });
+});
+
+// ---------------------------------------------------------------------------
+// Microtask 4 – keyboard / accessibility flow (390 × 844)
+//
+// RED spec (documented before upstream source existed):
+//   - Buttons must carry exact role-accessible names so that screen-reader
+//     users and keyboard-only users can operate each order-line control by
+//     name alone (no class/positional selectors).
+//   - Activating Tăng/Giảm via keyboard (Enter / Space) must leave focus on
+//     the activated button so the user does not have to re-navigate.
+//   - The live region (role="status") must surface the updated quantity or
+//     deletion message immediately after each action.
+//   - After the last item is deleted, focus must land on the empty-state
+//     container (tabIndex=-1) so keyboard users receive tactile confirmation.
+//   - Checkout must be disabled and no horizontal scroll must appear.
+//
+// Current source already satisfies all of these contracts; the test verifies
+// the contract is upheld on every subsequent change.
+// ---------------------------------------------------------------------------
+test("order-entry: keyboard/a11y – Tab to controls, Enter/Space activate, focus stays, live-region announced, empty-state focused", async ({
+  page,
+}) => {
+  const a11yScreenshot = "/tmp/small-pos-order-a11y-390x844.png";
+
+  // ── 1. Sign in ──────────────────────────────────────────────────────────
+  await signIn(page);
+
+  // ── 2. Select Bàn 1 ─────────────────────────────────────────────────────
+  const ban1Button = page.getByRole("button", { name: /Bàn 1/ });
+  await ban1Button.click();
+  await expect(ban1Button).toContainText("Có khách");
+
+  // ── 3. Add Cà phê đen × 2 + Trà chanh × 1 via Thực đơn tab ─────────────
+  await page.getByRole("tab", { name: /^Thực đơn/ }).click();
+  await page.getByRole("button", { name: "+ Cà phê đen" }).click();
+  await page.getByRole("button", { name: "+ Cà phê đen" }).click();
+  await page.getByRole("button", { name: "+ Trà chanh" }).click();
+
+  // ── 4. Open Đơn tab ──────────────────────────────────────────────────────
+  await page.getByRole("tab", { name: /^Đơn/ }).click();
+
+  const orderTab = page.locator('[role="tabpanel"][data-state="active"]');
+
+  // Confirm starting state: coffee qty=2, tea qty=1.
+  const cafeLine = orderTab.locator('[class*="rounded-xl"]', { hasText: "Cà phê đen" });
+  const teaLine  = orderTab.locator('[class*="rounded-xl"]', { hasText: "Trà chanh" });
+  await expect(cafeLine.locator("span.font-semibold")).toHaveText("2");
+  await expect(teaLine.locator("span.font-semibold")).toHaveText("1");
+
+  // ── 5. Tab until `Tăng số lượng Cà phê đen` is focused ──────────────────
+  // The first interactive element in the order panel is the Đơn tab itself.
+  // We focus the Đơn tab and then Tab forward through the panel to reach the
+  // plus button of the coffee line.
+  // DOM order per line: Giảm → (hidden span) → Tăng → Xóa
+  // Two lines: coffee-minus, coffee-plus, coffee-trash, tea-minus, tea-plus, tea-trash.
+  // We start focus at the Đơn tab and Tab until the plus button for coffee is active.
+
+  const coffeePlusBtn = page.getByRole("button", { name: "Tăng số lượng Cà phê đen" });
+  const coffeeMinusBtn = page.getByRole("button", { name: "Giảm số lượng Cà phê đen" });
+
+  // Move focus into the page and Tab until the coffee plus button is reached.
+  await page.getByRole("tab", { name: /^Đơn/ }).focus();
+  // Tab forward repeatedly until coffeePlusBtn receives focus.
+  for (let i = 0; i < 20; i++) {
+    await page.keyboard.press("Tab");
+    const focused = await page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
+    if (focused === "Tăng số lượng Cà phê đen") break;
+  }
+  await expect(coffeePlusBtn).toBeFocused();
+
+  // ── 6. Enter on plus → qty 3, focus remains on plus ──────────────────────
+  const liveRegion = orderTab.locator('[role="status"]');
+
+  await page.keyboard.press("Enter");
+  await expect(cafeLine.locator("span.font-semibold")).toHaveText("3");
+  // Live region must announce the new quantity.
+  await expect(liveRegion).toContainText("Cà phê đen, số lượng 3");
+  // Focus must stay on the plus button.
+  await expect(coffeePlusBtn).toBeFocused();
+
+  // ── 7. Space on `Giảm số lượng Cà phê đen` → qty 2, focus stays on minus ─
+  // Focus the minus button directly (role + name locator only).
+  await coffeeMinusBtn.focus();
+  await page.keyboard.press("Space");
+  await expect(cafeLine.locator("span.font-semibold")).toHaveText("2");
+  // Live region must announce the decremented quantity.
+  await expect(liveRegion).toContainText("Cà phê đen, số lượng 2");
+  // Focus must stay on the minus button.
+  await expect(coffeeMinusBtn).toBeFocused();
+
+  // ── 8. Focus `Xóa Cà phê đen khỏi đơn`, Enter → coffee removed ───────────
+  const coffeeTrashBtn = page.getByRole("button", { name: "Xóa Cà phê đen khỏi đơn" });
+  await coffeeTrashBtn.focus();
+  await page.keyboard.press("Enter");
+
+  // Coffee line must be gone.
+  await expect(cafeLine).not.toBeVisible();
+
+  // After deletion the focus target is computed by computeFocusTarget:
+  // snapshot=[coffee, tea], deletedIndex=0 → remaining=[tea] → target=remaining[0]=tea.
+  // So focus must move to `Xóa Trà chanh khỏi đơn`.
+  const teaTrashBtn = page.getByRole("button", { name: "Xóa Trà chanh khỏi đơn" });
+  await expect(teaTrashBtn).toBeFocused();
+
+  // Live region must announce one item remains.
+  await expect(liveRegion).toContainText("Đã xóa Cà phê đen khỏi đơn. Còn 1 món.");
+
+  // ── 9. Space on `Xóa Trà chanh khỏi đơn` → empty state ──────────────────
+  // teaTrashBtn already has focus from the previous step.
+  await page.keyboard.press("Space");
+
+  // Tea line must be gone.
+  await expect(teaLine).not.toBeVisible();
+
+  // Empty-state container (tabIndex=-1) must receive programmatic focus.
+  const emptyState = orderTab.locator('[data-testid="order-empty-state"]');
+  await expect(emptyState).toBeVisible();
+  await expect(emptyState).toBeFocused();
+
+  // Live region must announce the order is empty.
+  await expect(liveRegion).toContainText("Đã xóa Trà chanh khỏi đơn. Đơn hàng trống.");
+
+  // ── 10. Checkout must be disabled ────────────────────────────────────────
+  const checkoutBtn = orderTab.getByRole("button", { name: "Thanh toán" });
+  await expect(checkoutBtn).toBeDisabled();
+
+  // ── 11. No horizontal overflow ────────────────────────────────────────────
+  const noOverflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth <=
+      document.documentElement.clientWidth,
+  );
+  expect(noOverflow).toBe(true);
+
+  // ── 12. Screenshot ────────────────────────────────────────────────────────
+  await page.screenshot({ path: a11yScreenshot, fullPage: false });
 });
 
 export { screenshot };

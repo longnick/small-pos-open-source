@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useLayoutEffect } from "react";
 import { ChefHat, Minus, Plus, Receipt, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -42,6 +42,48 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
   // Local dialog state – no store write
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
+  // Local live-region announcement state – no store write
+  const [announcement, setAnnouncement] = useState("");
+
+  // ---------------------------------------------------------------------------
+  // Focus recovery refs (microtask 3)
+  // ---------------------------------------------------------------------------
+
+  // Map of item id → trash button element
+  const trashRefs = useRef<Map<string, HTMLButtonElement | null>>(new Map());
+
+  // Ref for the empty-state container (programmatic focus only, tabIndex=-1)
+  const emptyStateRef = useRef<HTMLDivElement | null>(null);
+
+  // Pending focus target set synchronously on delete; consumed by useLayoutEffect.
+  // "empty-state" is a sentinel for focusing the empty-state element.
+  // Any other string is the item id whose trash button should receive focus.
+  const [pendingFocusTarget, setPendingFocusTarget] = useState<string | null>(null);
+
+  // After the DOM has updated (removed row is gone, new rows rendered),
+  // focus the appropriate element and clear the pending target.
+  useLayoutEffect(() => {
+    if (pendingFocusTarget === null) return;
+    if (pendingFocusTarget === "empty-state") {
+      emptyStateRef.current?.focus();
+    } else {
+      trashRefs.current.get(pendingFocusTarget)?.focus();
+    }
+    setPendingFocusTarget(null);
+  }, [pendingFocusTarget]);
+
+  // Helper: compute focus target from snapshot + deleted index
+  function computeFocusTarget(
+    snapshot: typeof currentOrder extends null | undefined ? never : NonNullable<typeof currentOrder>["items"],
+    deletedIndex: number,
+  ): string {
+    const remaining = snapshot.filter((_, i) => i !== deletedIndex);
+    if (remaining.length === 0) return "empty-state";
+    // Prefer next (same index in remaining), fallback to previous
+    const target = remaining[deletedIndex] ?? remaining[deletedIndex - 1];
+    return target.id;
+  }
+
   // Enabled only when there is an open order with at least one item
   const canOpenPayment =
     currentOrder?.status === "open" && currentOrder.items.length > 0;
@@ -75,14 +117,19 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
       {/* Order item list / empty state */}
       <ScrollArea className="flex-1 -mx-1 px-1">
         {isEmpty ? (
-          <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+          <div
+            ref={emptyStateRef}
+            data-testid="order-empty-state"
+            tabIndex={-1}
+            className="flex flex-col items-center justify-center py-10 text-muted-foreground"
+          >
             <Receipt className="mb-2 h-10 w-10 opacity-40" aria-hidden="true" />
             <p className="text-sm">Chọn món để thêm vào đơn</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            {currentOrder!.items.map((item) => (
-              <div
+          <ul className="flex flex-col gap-3 list-none m-0 p-0">
+            {currentOrder!.items.map((item, index) => (
+              <li
                 key={item.id}
                 className="flex items-center justify-between rounded-xl border border-border bg-card p-3"
               >
@@ -99,33 +146,78 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    aria-label="Giảm số lượng"
-                    onClick={item.quantity === 1 ? () => removeItem(item.id) : () => updateItemQuantity(item.id, item.quantity - 1)}
+                    aria-label={`Giảm số lượng ${item.name}`}
+                    onClick={() => {
+                      if (item.quantity === 1) {
+                        // Snapshot items and index before removal
+                        const snapshot = currentOrder!.items;
+                        const deletedIndex = index;
+                        const ok = removeItem(item.id);
+                        if (ok) {
+                          const remaining = snapshot.length - 1;
+                          setAnnouncement(
+                            remaining === 0
+                              ? `Đã xóa ${item.name} khỏi đơn. Đơn hàng trống.`
+                              : `Đã xóa ${item.name} khỏi đơn. Còn ${remaining} món.`,
+                          );
+                          setPendingFocusTarget(computeFocusTarget(snapshot, deletedIndex));
+                        }
+                      } else {
+                        const ok = updateItemQuantity(item.id, item.quantity - 1);
+                        if (ok) {
+                          setAnnouncement(`${item.name}, số lượng ${item.quantity - 1}`);
+                        }
+                      }
+                    }}
                     className="flex h-7 w-7 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors disabled:opacity-40"
                   >
                     <Minus className="h-3 w-3" aria-hidden="true" />
                   </button>
-                  <span className="w-5 text-center text-sm font-semibold">
+                  <span className="w-5 text-center text-sm font-semibold" aria-hidden="true">
                     {item.quantity}
                   </span>
+                  <span className="sr-only">{`Số lượng ${item.name}: ${item.quantity}`}</span>
                   <button
-                    aria-label="Tăng số lượng"
-                    onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
+                    aria-label={`Tăng số lượng ${item.name}`}
+                    onClick={() => {
+                      const ok = updateItemQuantity(item.id, item.quantity + 1);
+                      if (ok) {
+                        setAnnouncement(`${item.name}, số lượng ${item.quantity + 1}`);
+                      }
+                    }}
                     className="flex h-7 w-7 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors disabled:opacity-40"
                   >
                     <Plus className="h-3 w-3" aria-hidden="true" />
                   </button>
                   <button
-                    aria-label="Xóa món"
-                    onClick={() => removeItem(item.id)}
+                    ref={(el) => {
+                      trashRefs.current.set(item.id, el);
+                      return () => { trashRefs.current.delete(item.id); };
+                    }}
+                    aria-label={`Xóa ${item.name} khỏi đơn`}
+                    onClick={() => {
+                      // Snapshot items and index before removal
+                      const snapshot = currentOrder!.items;
+                      const deletedIndex = index;
+                      const remaining = snapshot.length - 1;
+                      const ok = removeItem(item.id);
+                      if (ok) {
+                        setAnnouncement(
+                          remaining === 0
+                            ? `Đã xóa ${item.name} khỏi đơn. Đơn hàng trống.`
+                            : `Đã xóa ${item.name} khỏi đơn. Còn ${remaining} món.`,
+                        );
+                        setPendingFocusTarget(computeFocusTarget(snapshot, deletedIndex));
+                      }
+                    }}
                     className="ml-1 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </ScrollArea>
 
@@ -178,6 +270,16 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
           onOpenChange={setIsPaymentOpen}
         />
       )}
+
+      {/* Always-mounted live region for screen-reader announcements */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {announcement}
+      </div>
     </div>
   );
 }

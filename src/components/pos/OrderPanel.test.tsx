@@ -1,6 +1,6 @@
 import React from "react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import type { PosTable } from "../../../packages/pos-core/src/types";
 import { useOrderPaymentStore } from "../../stores/order-payment-store";
 import { OrderPanel } from "./OrderPanel";
@@ -388,8 +388,8 @@ describe("OrderPanel", () => {
     render(<OrderPanel selectedTable={table} />);
 
     // Scope click to the specific item row
-    const itemRow = screen.getByText("Cà phê đen").closest("div.rounded-xl") as HTMLElement;
-    const minusBtn = within(itemRow).getByRole("button", { name: "Giảm số lượng" });
+    const itemRow = screen.getByText("Cà phê đen").closest("li") as HTMLElement;
+    const minusBtn = within(itemRow).getByRole("button", { name: "Giảm số lượng Cà phê đen" });
 
     expect(minusBtn).not.toBeDisabled();
     fireEvent.click(minusBtn);
@@ -438,8 +438,8 @@ describe("OrderPanel", () => {
 
     render(<OrderPanel selectedTable={table} />);
 
-    const itemRow = screen.getByText("Cà phê đen").closest("div.rounded-xl") as HTMLElement;
-    const minusBtn = within(itemRow).getByRole("button", { name: "Giảm số lượng" });
+    const itemRow = screen.getByText("Cà phê đen").closest("li") as HTMLElement;
+    const minusBtn = within(itemRow).getByRole("button", { name: "Giảm số lượng Cà phê đen" });
 
     // Minus must be ENABLED at qty 1 (not disabled)
     expect(minusBtn).not.toBeDisabled();
@@ -502,8 +502,8 @@ describe("OrderPanel", () => {
     render(<OrderPanel selectedTable={table} />);
 
     // Scope the trash click to Trà chanh row only
-    const teaRow = screen.getByText("Trà chanh").closest("div.rounded-xl") as HTMLElement;
-    const trashBtn = within(teaRow).getByRole("button", { name: "Xóa món" });
+    const teaRow = screen.getByText("Trà chanh").closest("li") as HTMLElement;
+    const trashBtn = within(teaRow).getByRole("button", { name: "Xóa Trà chanh khỏi đơn" });
 
     expect(trashBtn).not.toBeDisabled();
     fireEvent.click(trashBtn);
@@ -512,7 +512,7 @@ describe("OrderPanel", () => {
     expect(screen.queryByText("Trà chanh")).not.toBeInTheDocument();
     expect(screen.getByText("Cà phê đen")).toBeInTheDocument();
 
-    const coffeeRow = screen.getByText("Cà phê đen").closest("div.rounded-xl") as HTMLElement;
+    const coffeeRow = screen.getByText("Cà phê đen").closest("li") as HTMLElement;
     expect(within(coffeeRow).getByText("2")).toBeInTheDocument();
 
     // Store: 1 item remaining, subtotal and total 50,000
@@ -556,8 +556,8 @@ describe("OrderPanel", () => {
 
     render(<OrderPanel selectedTable={table} />);
 
-    const coffeeRow = screen.getByText("Cà phê đen").closest("div.rounded-xl") as HTMLElement;
-    const trashBtn = within(coffeeRow).getByRole("button", { name: "Xóa món" });
+    const coffeeRow = screen.getByText("Cà phê đen").closest("li") as HTMLElement;
+    const trashBtn = within(coffeeRow).getByRole("button", { name: "Xóa Cà phê đen khỏi đơn" });
 
     expect(trashBtn).not.toBeDisabled();
     fireEvent.click(trashBtn);
@@ -577,6 +577,68 @@ describe("OrderPanel", () => {
 
     // Thanh toán disabled
     expect(screen.getByRole("button", { name: /Thanh toán/i })).toBeDisabled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Accessible list semantics and contextual labels (Issue #2 microtask 1)
+  // -------------------------------------------------------------------------
+
+  it("renders open-order items as a semantic list with listitem roles", () => {
+    useOrderPaymentStore.getState().selectOpenOrder({
+      id: "order-a11y-1",
+      tenantId: "tenant-1",
+      tableId: "table-1",
+      staffId: "staff-1",
+      status: "open",
+      items: [
+        {
+          id: "line-coffee",
+          orderId: "order-a11y-1",
+          catalogItemId: "c1",
+          name: "Cà phê đen",
+          price: 25_000,
+          quantity: 2,
+        },
+        {
+          id: "line-tea",
+          orderId: "order-a11y-1",
+          catalogItemId: "c2",
+          name: "Trà chanh",
+          price: 20_000,
+          quantity: 1,
+        },
+      ],
+      subtotal: 70_000,
+      discount: 0,
+      discountType: "amount",
+      total: 70_000,
+      createdAt: 1,
+    });
+
+    render(<OrderPanel selectedTable={table} />);
+
+    // Semantic list must be present
+    const list = screen.getByRole("list");
+    expect(list).toBeInTheDocument();
+
+    // Each item must be a listitem inside that list
+    const items = within(list).getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+
+    // Contextual button labels for Cà phê đen row (tied to item.id, not index)
+    const coffeeRow = items.find((li) => within(li).queryByText("Cà phê đen") !== null)!;
+    expect(within(coffeeRow).getByRole("button", { name: "Giảm số lượng Cà phê đen" })).toBeInTheDocument();
+    expect(within(coffeeRow).getByRole("button", { name: "Tăng số lượng Cà phê đen" })).toBeInTheDocument();
+    expect(within(coffeeRow).getByRole("button", { name: "Xóa Cà phê đen khỏi đơn" })).toBeInTheDocument();
+
+    // Contextual button labels for Trà chanh row
+    const teaRow = items.find((li) => within(li).queryByText("Trà chanh") !== null)!;
+    expect(within(teaRow).getByRole("button", { name: "Giảm số lượng Trà chanh" })).toBeInTheDocument();
+    expect(within(teaRow).getByRole("button", { name: "Tăng số lượng Trà chanh" })).toBeInTheDocument();
+    expect(within(teaRow).getByRole("button", { name: "Xóa Trà chanh khỏi đơn" })).toBeInTheDocument();
+
+    // Accessible quantity for Cà phê đen
+    expect(within(coffeeRow).getByText("Số lượng Cà phê đen: 2")).toBeInTheDocument();
   });
 
   it("clicking 'Tăng số lượng' for an item increments its quantity and updates store subtotal and total to 75,000", () => {
@@ -606,8 +668,8 @@ describe("OrderPanel", () => {
     render(<OrderPanel selectedTable={table} />);
 
     // Find the item row then scope the button query to that row
-    const itemRow = screen.getByText("Cà phê đen").closest("div.rounded-xl") as HTMLElement;
-    const plusBtn = within(itemRow).getByRole("button", { name: "Tăng số lượng" });
+    const itemRow = screen.getByText("Cà phê đen").closest("li") as HTMLElement;
+    const plusBtn = within(itemRow).getByRole("button", { name: "Tăng số lượng Cà phê đen" });
 
     expect(plusBtn).not.toBeDisabled();
     fireEvent.click(plusBtn);
@@ -623,5 +685,469 @@ describe("OrderPanel", () => {
     // UI totals must also show 75,000
     const totalMatches = screen.getAllByText(/75\.000/);
     expect(totalMatches.length).toBeGreaterThan(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // Live region announcements (Issue #2 microtask 2)
+  // -------------------------------------------------------------------------
+
+  describe("live region announcements", () => {
+    it("always mounts exactly one live region with role=status, aria-live=polite, aria-atomic=true", () => {
+      render(<OrderPanel selectedTable={null} />);
+      const regions = screen.getAllByRole("status");
+      expect(regions).toHaveLength(1);
+      expect(regions[0]).toHaveAttribute("aria-live", "polite");
+      expect(regions[0]).toHaveAttribute("aria-atomic", "true");
+    });
+
+    it("live region is present even when currentOrder has items", () => {
+      useOrderPaymentStore.getState().selectOpenOrder({
+        id: "order-lr-1",
+        tenantId: "tenant-1",
+        tableId: "table-1",
+        staffId: "staff-1",
+        status: "open",
+        items: [
+          {
+            id: "line-1",
+            orderId: "order-lr-1",
+            catalogItemId: "c1",
+            name: "Cà phê đen",
+            price: 25_000,
+            quantity: 2,
+          },
+        ],
+        subtotal: 50_000,
+        discount: 0,
+        discountType: "amount",
+        total: 50_000,
+        createdAt: 1,
+      });
+      render(<OrderPanel selectedTable={table} />);
+      expect(screen.getAllByRole("status")).toHaveLength(1);
+    });
+
+    it("announces 'Cà phê đen, số lượng 3' after clicking plus on qty 2 item", () => {
+      useOrderPaymentStore.getState().selectOpenOrder({
+        id: "order-lr-plus",
+        tenantId: "tenant-1",
+        tableId: "table-1",
+        staffId: "staff-1",
+        status: "open",
+        items: [
+          {
+            id: "line-1",
+            orderId: "order-lr-plus",
+            catalogItemId: "c1",
+            name: "Cà phê đen",
+            price: 25_000,
+            quantity: 2,
+          },
+        ],
+        subtotal: 50_000,
+        discount: 0,
+        discountType: "amount",
+        total: 50_000,
+        createdAt: 1,
+      });
+      render(<OrderPanel selectedTable={table} />);
+
+      const itemRow = screen.getByText("Cà phê đen").closest("li") as HTMLElement;
+      const plusBtn = within(itemRow).getByRole("button", { name: "Tăng số lượng Cà phê đen" });
+      fireEvent.click(plusBtn);
+
+      expect(screen.getByRole("status")).toHaveTextContent("Cà phê đen, số lượng 3");
+    });
+
+    it("announces 'Cà phê đen, số lượng 2' after clicking minus on qty 3 item (non-delete)", () => {
+      useOrderPaymentStore.getState().selectOpenOrder({
+        id: "order-lr-minus",
+        tenantId: "tenant-1",
+        tableId: "table-1",
+        staffId: "staff-1",
+        status: "open",
+        items: [
+          {
+            id: "line-1",
+            orderId: "order-lr-minus",
+            catalogItemId: "c1",
+            name: "Cà phê đen",
+            price: 25_000,
+            quantity: 3,
+          },
+        ],
+        subtotal: 75_000,
+        discount: 0,
+        discountType: "amount",
+        total: 75_000,
+        createdAt: 1,
+      });
+      render(<OrderPanel selectedTable={table} />);
+
+      const itemRow = screen.getByText("Cà phê đen").closest("li") as HTMLElement;
+      const minusBtn = within(itemRow).getByRole("button", { name: "Giảm số lượng Cà phê đen" });
+      fireEvent.click(minusBtn);
+
+      expect(screen.getByRole("status")).toHaveTextContent("Cà phê đen, số lượng 2");
+    });
+
+    it("announces delete message with remaining count when trash removes a non-last item", () => {
+      useOrderPaymentStore.getState().selectOpenOrder({
+        id: "order-lr-trash-1",
+        tenantId: "tenant-1",
+        tableId: "table-1",
+        staffId: "staff-1",
+        status: "open",
+        items: [
+          {
+            id: "line-coffee",
+            orderId: "order-lr-trash-1",
+            catalogItemId: "c1",
+            name: "Cà phê đen",
+            price: 25_000,
+            quantity: 2,
+          },
+          {
+            id: "line-tea",
+            orderId: "order-lr-trash-1",
+            catalogItemId: "c2",
+            name: "Trà chanh",
+            price: 20_000,
+            quantity: 1,
+          },
+        ],
+        subtotal: 70_000,
+        discount: 0,
+        discountType: "amount",
+        total: 70_000,
+        createdAt: 1,
+      });
+      render(<OrderPanel selectedTable={table} />);
+
+      const teaRow = screen.getByText("Trà chanh").closest("li") as HTMLElement;
+      const trashBtn = within(teaRow).getByRole("button", { name: "Xóa Trà chanh khỏi đơn" });
+      fireEvent.click(trashBtn);
+
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Đã xóa Trà chanh khỏi đơn. Còn 1 món.",
+      );
+    });
+
+    it("announces delete message with empty-order text when minus at qty 1 removes the last item", () => {
+      useOrderPaymentStore.getState().selectOpenOrder({
+        id: "order-lr-minus-last",
+        tenantId: "tenant-1",
+        tableId: "table-1",
+        staffId: "staff-1",
+        status: "open",
+        items: [
+          {
+            id: "line-1",
+            orderId: "order-lr-minus-last",
+            catalogItemId: "c1",
+            name: "Cà phê đen",
+            price: 25_000,
+            quantity: 1,
+          },
+        ],
+        subtotal: 25_000,
+        discount: 0,
+        discountType: "amount",
+        total: 25_000,
+        createdAt: 1,
+      });
+      render(<OrderPanel selectedTable={table} />);
+
+      const itemRow = screen.getByText("Cà phê đen").closest("li") as HTMLElement;
+      const minusBtn = within(itemRow).getByRole("button", { name: "Giảm số lượng Cà phê đen" });
+      fireEvent.click(minusBtn);
+
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Đã xóa Cà phê đen khỏi đơn. Đơn hàng trống.",
+      );
+    });
+
+    it("announces delete message with empty-order text when trash removes the last item", () => {
+      useOrderPaymentStore.getState().selectOpenOrder({
+        id: "order-lr-trash-last",
+        tenantId: "tenant-1",
+        tableId: "table-1",
+        staffId: "staff-1",
+        status: "open",
+        items: [
+          {
+            id: "line-1",
+            orderId: "order-lr-trash-last",
+            catalogItemId: "c1",
+            name: "Cà phê đen",
+            price: 25_000,
+            quantity: 2,
+          },
+        ],
+        subtotal: 50_000,
+        discount: 0,
+        discountType: "amount",
+        total: 50_000,
+        createdAt: 1,
+      });
+      render(<OrderPanel selectedTable={table} />);
+
+      const coffeeRow = screen.getByText("Cà phê đen").closest("li") as HTMLElement;
+      const trashBtn = within(coffeeRow).getByRole("button", { name: "Xóa Cà phê đen khỏi đơn" });
+      fireEvent.click(trashBtn);
+
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Đã xóa Cà phê đen khỏi đơn. Đơn hàng trống.",
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Focus recovery after line removal (Issue #2 microtask 3)
+  // -------------------------------------------------------------------------
+
+  describe("focus recovery after line removal", () => {
+    const threeItemOrder = () =>
+      useOrderPaymentStore.getState().selectOpenOrder({
+        id: "order-focus-3",
+        tenantId: "tenant-1",
+        tableId: "table-1",
+        staffId: "staff-1",
+        status: "open",
+        items: [
+          {
+            id: "line-a",
+            orderId: "order-focus-3",
+            catalogItemId: "c1",
+            name: "Món A",
+            price: 10_000,
+            quantity: 2,
+          },
+          {
+            id: "line-b",
+            orderId: "order-focus-3",
+            catalogItemId: "c2",
+            name: "Món B",
+            price: 10_000,
+            quantity: 2,
+          },
+          {
+            id: "line-c",
+            orderId: "order-focus-3",
+            catalogItemId: "c3",
+            name: "Món C",
+            price: 10_000,
+            quantity: 2,
+          },
+        ],
+        subtotal: 60_000,
+        discount: 0,
+        discountType: "amount",
+        total: 60_000,
+        createdAt: 1,
+      });
+
+    it("deleting the first of three items moves focus to trash of the next remaining item (Món B)", async () => {
+      threeItemOrder();
+      render(<OrderPanel selectedTable={table} />);
+
+      const rowA = screen.getByText("Món A").closest("li") as HTMLElement;
+      const trashA = within(rowA).getByRole("button", { name: "Xóa Món A khỏi đơn" });
+      fireEvent.click(trashA);
+
+      await waitFor(() => {
+        const rowB = screen.getByText("Món B").closest("li") as HTMLElement;
+        const trashB = within(rowB).getByRole("button", { name: "Xóa Món B khỏi đơn" });
+        expect(document.activeElement).toBe(trashB);
+      });
+    });
+
+    it("deleting the last of three items moves focus to trash of the previous remaining item (Món B)", async () => {
+      threeItemOrder();
+      render(<OrderPanel selectedTable={table} />);
+
+      const rowC = screen.getByText("Món C").closest("li") as HTMLElement;
+      const trashC = within(rowC).getByRole("button", { name: "Xóa Món C khỏi đơn" });
+      fireEvent.click(trashC);
+
+      await waitFor(() => {
+        const rowB = screen.getByText("Món B").closest("li") as HTMLElement;
+        const trashB = within(rowB).getByRole("button", { name: "Xóa Món B khỏi đơn" });
+        expect(document.activeElement).toBe(trashB);
+      });
+    });
+
+    it("deleting the middle of three items prefers focus on the next remaining item (Món C)", async () => {
+      threeItemOrder();
+      render(<OrderPanel selectedTable={table} />);
+
+      const rowB = screen.getByText("Món B").closest("li") as HTMLElement;
+      const trashB = within(rowB).getByRole("button", { name: "Xóa Món B khỏi đơn" });
+      fireEvent.click(trashB);
+
+      await waitFor(() => {
+        const rowC = screen.getByText("Món C").closest("li") as HTMLElement;
+        const trashC = within(rowC).getByRole("button", { name: "Xóa Món C khỏi đơn" });
+        expect(document.activeElement).toBe(trashC);
+      });
+    });
+
+    it("qty-1 minus (which removes the first item) moves focus to trash of the next remaining item (Món B)", async () => {
+      useOrderPaymentStore.getState().selectOpenOrder({
+        id: "order-focus-minus-3",
+        tenantId: "tenant-1",
+        tableId: "table-1",
+        staffId: "staff-1",
+        status: "open",
+        items: [
+          {
+            id: "line-a",
+            orderId: "order-focus-minus-3",
+            catalogItemId: "c1",
+            name: "Món A",
+            price: 10_000,
+            quantity: 1,
+          },
+          {
+            id: "line-b",
+            orderId: "order-focus-minus-3",
+            catalogItemId: "c2",
+            name: "Món B",
+            price: 10_000,
+            quantity: 2,
+          },
+          {
+            id: "line-c",
+            orderId: "order-focus-minus-3",
+            catalogItemId: "c3",
+            name: "Món C",
+            price: 10_000,
+            quantity: 2,
+          },
+        ],
+        subtotal: 50_000,
+        discount: 0,
+        discountType: "amount",
+        total: 50_000,
+        createdAt: 1,
+      });
+      render(<OrderPanel selectedTable={table} />);
+
+      const rowA = screen.getByText("Món A").closest("li") as HTMLElement;
+      const minusA = within(rowA).getByRole("button", { name: "Giảm số lượng Món A" });
+      fireEvent.click(minusA);
+
+      await waitFor(() => {
+        const rowB = screen.getByText("Món B").closest("li") as HTMLElement;
+        const trashB = within(rowB).getByRole("button", { name: "Xóa Món B khỏi đơn" });
+        expect(document.activeElement).toBe(trashB);
+      });
+    });
+
+    it("deleting the only remaining line moves focus to the empty-state element", async () => {
+      useOrderPaymentStore.getState().selectOpenOrder({
+        id: "order-focus-only",
+        tenantId: "tenant-1",
+        tableId: "table-1",
+        staffId: "staff-1",
+        status: "open",
+        items: [
+          {
+            id: "line-only",
+            orderId: "order-focus-only",
+            catalogItemId: "c1",
+            name: "Món Duy Nhất",
+            price: 10_000,
+            quantity: 2,
+          },
+        ],
+        subtotal: 20_000,
+        discount: 0,
+        discountType: "amount",
+        total: 20_000,
+        createdAt: 1,
+      });
+      render(<OrderPanel selectedTable={table} />);
+
+      const row = screen.getByText("Món Duy Nhất").closest("li") as HTMLElement;
+      const trash = within(row).getByRole("button", { name: "Xóa Món Duy Nhất khỏi đơn" });
+      fireEvent.click(trash);
+
+      await waitFor(() => {
+        const emptyState = screen.getByTestId("order-empty-state");
+        expect(document.activeElement).toBe(emptyState);
+      });
+    });
+
+    it("clicking plus (qty > 1 stays) does not move focus away from the plus button", async () => {
+      useOrderPaymentStore.getState().selectOpenOrder({
+        id: "order-focus-plus",
+        tenantId: "tenant-1",
+        tableId: "table-1",
+        staffId: "staff-1",
+        status: "open",
+        items: [
+          {
+            id: "line-1",
+            orderId: "order-focus-plus",
+            catalogItemId: "c1",
+            name: "Cà phê đen",
+            price: 25_000,
+            quantity: 2,
+          },
+        ],
+        subtotal: 50_000,
+        discount: 0,
+        discountType: "amount",
+        total: 50_000,
+        createdAt: 1,
+      });
+      render(<OrderPanel selectedTable={table} />);
+
+      const itemRow = screen.getByText("Cà phê đen").closest("li") as HTMLElement;
+      const plusBtn = within(itemRow).getByRole("button", { name: "Tăng số lượng Cà phê đen" });
+      plusBtn.focus();
+      fireEvent.click(plusBtn);
+
+      // After a brief tick, focus must still be on plus (or at minimum NOT on empty state / another trash)
+      await waitFor(() => {
+        expect(document.activeElement).toBe(plusBtn);
+      });
+    });
+
+    it("clicking minus at qty > 1 (no delete) does not move focus away from the minus button", async () => {
+      useOrderPaymentStore.getState().selectOpenOrder({
+        id: "order-focus-minus-nodelete",
+        tenantId: "tenant-1",
+        tableId: "table-1",
+        staffId: "staff-1",
+        status: "open",
+        items: [
+          {
+            id: "line-1",
+            orderId: "order-focus-minus-nodelete",
+            catalogItemId: "c1",
+            name: "Cà phê đen",
+            price: 25_000,
+            quantity: 3,
+          },
+        ],
+        subtotal: 75_000,
+        discount: 0,
+        discountType: "amount",
+        total: 75_000,
+        createdAt: 1,
+      });
+      render(<OrderPanel selectedTable={table} />);
+
+      const itemRow = screen.getByText("Cà phê đen").closest("li") as HTMLElement;
+      const minusBtn = within(itemRow).getByRole("button", { name: "Giảm số lượng Cà phê đen" });
+      minusBtn.focus();
+      fireEvent.click(minusBtn);
+
+      await waitFor(() => {
+        expect(document.activeElement).toBe(minusBtn);
+      });
+    });
   });
 });
