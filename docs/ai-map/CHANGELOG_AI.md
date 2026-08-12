@@ -1,5 +1,33 @@
 # AI Changelog
 
+## 2026-08-12 01:10 - Task 2.5 clean release reconstruction
+
+Repo: `/home/longnick/projects/small-pos-release-task25`
+Branch: `release/task-2-5-pin-login`
+Summary: Reconstructed Task 2.5 only from dirty source into isolated release worktree. Excluded Task 2.4, package/lockfile, normal Vite config, storage, routing, and production data paths.
+Verification: Fresh `npm ci`; focused unit 53/53; full unit 253/253; TypeScript; Vite build; leakage/self-test; whitespace; E-1 through E-6 and full Playwright all PASS. Normal production `dist` fixture identifier scan PASS.
+Next: explicit-path commit and owner merge approval. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-12-0110-task-2-5-clean-release-review.md`
+
+
+## 2026-08-11 00:50 - Task 2.5 Strict Slice E gate normalization
+
+Repo: `/home/longnick/projects/small-pos`
+Branch: `main` (dirty; no commit/deploy)
+Summary: Renamed existing credential-isolated Playwright acceptance tests to the approved E-1 through E-6 gate labels. No production behavior, fixture behavior, Vite configuration, or package configuration changed.
+Verification: E-1 workers=1 PASS 3; E-1 workers=2 PASS 3; E-1..E-6 workers=2 PASS 7 / FAIL 0 / SKIP 8; full Playwright PASS 10 / FAIL 0 / SKIP 8; full unit 253/253; TypeScript/build/diff check and fixture-dist scan PASS.
+Next: reconstruct and independently review a clean scoped Task 2.5 release unit before merge/deploy approval.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-11-0050-task-2-5-strict-slice-e-gate.md`
+
+
+## 2026-08-08 — Task 2.5 PIN Login
+
+Summary: Added in-memory Web Crypto PBKDF2 demo-auth adapter, accessible staff-select/masked-PIN login, and fail-closed app shell gate. Existing POS shell only renders after bootstrap-local successful sign-in for matching tenant/staff; no persistence, Dexie, routing, event bus, or other-store coupling.
+Files: `src/auth/demo-auth-adapter.ts`, `src/components/auth/PinLogin.tsx`, `src/App.tsx`, focused adapter/component/App tests, task screenshots, bounded AI-map records.
+Verification: 238 unit tests, TypeScript, Vite build, leakage scan/self-test, oxlint 0 errors, Playwright 3/3, 390×844 browser proof and diff check PASS. Historical strict TDD evidence partly interrupted by Kiro rate limit and Luna tool stall; controller regression RED→GREEN recorded in task log.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-08-0832-task-2-5-pin-login.md`
+
+
 ## 2026-08-08 07:58 - Task 2.4 shift and audit Zustand store (strict TDD)
 
 Repo: `/tmp/small-pos-task24-strict-tdd`

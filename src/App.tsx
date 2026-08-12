@@ -1,4 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { bootstrapDemoAuth } from "@/auth/demo-auth-adapter";
+import { PinLoginScreen } from "@/components/auth/PinLogin";
+import { useTenantAuthStore } from "@/stores/tenant-auth-store";
+import type { Staff, Tenant } from "../packages/pos-core/src/types";
+import type { PinHashVerifier } from "../packages/pos-core/src/auth";
 import {
   Coffee,
   Plus,
@@ -164,9 +169,9 @@ function QuantityButton({
   );
 }
 
-// --- Main Page ---
+// --- Main Page (existing Lovable shell — do not modify) ---
 
-function App() {
+function PosShell() {
   const [selectedTableId, setSelectedTableId] = useState<number>(1);
   const tables = INITIAL_TABLES;
   const [activeCategory, setActiveCategory] = useState<string>("coffee");
@@ -517,5 +522,131 @@ function App() {
   );
 }
 
+
+// --- Bootstrap gate ---
+//
+// ponytail: ephemeral demo verifier only; replace with approved bcrypt/cloud
+// adapter at persistence/auth integration.
+
+type BootstrapState = "loading" | "fatal" | "ready";
+
+function App() {
+  const [bootState, setBootState] = useState<BootstrapState>("loading");
+  // Store the exact Tenant object reference returned by bootstrap.
+  // isAuthenticated requires `tenant === bootTenant` (reference equality), so a
+  // same-id impostor tenant injected via the store cannot pass the gate.
+  const [bootTenant, setBootTenant] = useState<Tenant | null>(null);
+  // Store the exact bootstrap-authenticated staff object reference, not just id.
+  // isAuthenticated requires signedInStaff to be this exact object (reference equality),
+  // so an external store replacement — even with a same-id impostor — cannot unlock the shell.
+  const [authenticatedStaff, setAuthenticatedStaff] = useState<Staff | null>(null);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const verifierRef = useRef<PinHashVerifier | null>(null);
+
+  const { tenant, staff: signedInStaff, setTenant, signIn } = useTenantAuthStore();
+
+  // Synchronous revocation boundary.
+  // Zustand subscribe() fires synchronously inside set(), before React can batch
+  // a follow-up setState into the same render. By counting revocations in a ref,
+  // we capture signOut() before a same-object staff reinsert in the same act() batch
+  // can unlock the gate — without relying on an async useEffect seeing null.
+  const revokedCountRef = useRef<number>(0);
+  const [authedAtRevCount, setAuthedAtRevCount] = useState<number | null>(null);
+
+  // Subscribe once to watch for staff → null transitions (signOut / tenant change).
+  // The subscriber runs synchronously during Zustand set(), so revokedCountRef is
+  // already bumped before React flushes any batched updates.
+  useEffect(() => {
+    let prevStaff = useTenantAuthStore.getState().staff;
+    const unsub = useTenantAuthStore.subscribe((state) => {
+      if (prevStaff !== null && state.staff === null) {
+        revokedCountRef.current += 1;
+      }
+      prevStaff = state.staff;
+    });
+    return unsub;
+  }, []);
+
+  // Clear local marker whenever the store session is revoked (e.g. signOut).
+  // This prevents an external setState repopulation from bypassing the UI PIN gate.
+  useEffect(() => {
+    if (signedInStaff === null) {
+      setAuthenticatedStaff(null);
+    }
+  }, [signedInStaff]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAuthenticatedStaff(null);
+    bootstrapDemoAuth()
+      .then(({ tenant: t, staff: s, verifier: v }) => {
+        if (cancelled) return;
+        verifierRef.current = v;
+        setTenant(t);
+        setBootTenant(t);
+        setStaffList(s);
+        setBootState("ready");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        verifierRef.current = null;
+        setAuthenticatedStaff(null);
+        setBootTenant(null);
+        setStaffList([]);
+        setTenant(null);
+        setBootState("fatal");
+      });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const isAuthenticated =
+    bootState === "ready" &&
+    bootTenant !== null &&
+    tenant !== null &&
+    signedInStaff !== null &&
+    authenticatedStaff !== null &&
+    // Reference equality: tenant must be the exact object returned by bootstrap —
+    // a same-id impostor object injected via the store cannot pass this gate.
+    tenant === bootTenant &&
+    // Reference equality: signedInStaff must be the exact object returned by the bootstrap
+    // PIN flow — not a same-id replacement injected from outside.
+    signedInStaff === authenticatedStaff &&
+    signedInStaff.tenantId === tenant.id &&
+    // Revocation counter: revokedCountRef is incremented synchronously by the Zustand
+    // subscriber whenever staff transitions to null (signOut/tenant change). If the
+    // counter has advanced since sign-in, the session was revoked — even if the same
+    // staff object was reinserted in the same batch before React re-rendered.
+    authedAtRevCount !== null &&
+    revokedCountRef.current === authedAtRevCount;
+
+  async function handleSignIn(staffId: string, pin: string): Promise<boolean> {
+    const verifier = verifierRef.current;
+    if (!verifier) return false;
+    const candidate = staffList.find((s) => s.id === staffId);
+    if (!candidate || candidate.tenantId !== tenant?.id) return false;
+    const ok = await signIn(pin, candidate, verifier);
+    if (ok) {
+      setAuthenticatedStaff(candidate);
+      // Snapshot the revocation counter at the moment of successful sign-in.
+      // isAuthenticated checks this against revokedCountRef; any subsequent
+      // signOut() increments the ref synchronously, closing the gate.
+      setAuthedAtRevCount(revokedCountRef.current);
+    }
+    return ok;
+  }
+
+  if (isAuthenticated) {
+    return <PosShell />;
+  }
+
+  return (
+    <PinLoginScreen
+      state={bootState}
+      staff={staffList}
+      onSignIn={handleSignIn}
+    />
+  );
+}
 
 export default App;

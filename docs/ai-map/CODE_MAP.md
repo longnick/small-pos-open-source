@@ -27,7 +27,11 @@
 - `src/stores/tenant-auth-store.test.ts` — Vitest unit tests for tenant/auth store behavior.
 - `src/stores/catalog-table-store.test.ts` — Vitest unit tests for catalog/table store validation and read helpers.
 - `src/stores/order-payment-store.test.ts` — Vitest unit tests for order/payment store mutations, isolation, and fail-closed boundary. (Task 2.3)
-- `src/stores/shift-audit-store.test.ts` — 55 Vitest unit tests across 4 TDD slices: openShift, closeShift, audit API, trust/ownership boundary. (Task 2.4)
+- `src/stores/shift-audit-store.test.ts` — 56 Vitest unit tests across 4 TDD slices: openShift, closeShift, audit API, trust/ownership boundary. (Task 2.4)
+- `src/auth/demo-auth-adapter.ts` — in-memory Web Crypto PBKDF2 adapter from demo seed to core tenant/staff/verifier; no persistence. (Task 2.5)
+- `src/auth/demo-auth-adapter.test.ts` — adapter mapping, verification, malformed-hash, and raw-PIN boundary tests. (Task 2.5)
+- `src/components/auth/PinLogin.tsx` — accessible staff-select and masked PIN screen; no seed/store knowledge. (Task 2.5)
+- `src/components/auth/PinLogin.test.tsx`, `src/App.test.tsx` — login behavior and fail-closed shell-gate tests. (Task 2.5)
 
 ## Commands
 

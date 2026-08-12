@@ -2,11 +2,12 @@
 
 ## Doing
 
-None.
+- Task 2.5: clean scoped release unit reconstructed and gates rerun. Commit/review handoff remains; no merge or deploy.
 
 ## Next
 
-- Task 2.5: PIN Login screen (Lovable component + auth store).
+- Commit Task 2.5 from the release worktree with explicit paths, then request owner merge approval.
+- Task 2.6: Sơ đồ bàn screen (Lovable TableGrid + table store), only after Task 2.5 commit/review.
 - Keep all stores in-memory until approved Dexie hydration phase.
 - Keep `verifyPin` adapter-injected; add bcrypt/cloud adapter only when persistence/auth integration phase requires it.
 
@@ -20,6 +21,7 @@ None.
 
 ## Done recently
 
+- Task 2.5 PIN Login — `docs/ai-map/TASK_LOGS/2026-08-08-0832-task-2-5-pin-login.md` (implementation/gates verified; strict historical TDD evidence partially interrupted by Kiro rate limit and Luna tool stall).
 - Task 2.4 shift and audit Zustand store — `docs/ai-map/TASK_LOGS/2026-08-08-0758-task-2-4-strict-tdd.md`
 - Task 2.3 order and payment Zustand store — `docs/ai-map/TASK_LOGS/2026-08-02-0928-task-2.3.md`
 - Task 2.2 catalog/table ownership and hostile input safety — `docs/ai-map/TASK_LOGS/2026-08-01-1115-task-2-2-ownership-input-safety.md`

@@ -90,6 +90,16 @@ Related files:
   - depends on: `src/stores/shift-audit-store.ts`.
   - used by: Vitest.
 
+## Module: PIN login UI (Task 2.5)
+
+Purpose: create ephemeral demo auth records and gate the Lovable POS shell behind a matching authenticated tenant/staff session.
+
+- `src/auth/demo-auth-adapter.ts` — maps demo seed into core records and injected native Web Crypto verifier; no storage or raw PIN output.
+- `src/components/auth/PinLogin.tsx` — presentation-only accessible staff/PIN form with generic error and synchronous submit lock.
+- `src/App.tsx` — bootstraps adapter, delegates sign-in to tenant auth store, and renders shell only after bootstrap-local successful session.
+- `src/auth/demo-auth-adapter.test.ts`, `src/components/auth/PinLogin.test.tsx`, `src/App.test.tsx` — adapter, form, and fail-closed gate coverage.
+- Scope: no Dexie, routing, event bus, persistence, or other-store coupling.
+
 ## Module: POS core
 
 - `packages/pos-core/src/order-calc.ts`, `shift-report.ts`, `event-bus.ts`
