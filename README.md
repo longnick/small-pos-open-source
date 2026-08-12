@@ -1,87 +1,125 @@
-# Small POS
+# Small POS · POS nhẹ cho quán nhỏ
 
-**Small POS** is an offline-first, Vietnamese-first point-of-sale starter for independent cafés and small restaurants. It is a public reference project for safe local order, payment, table, catalog, and staff workflows—not a production-ready payment system.
+[![CI](https://github.com/longnick/small-pos-open-source/actions/workflows/ci.yml/badge.svg)](https://github.com/longnick/small-pos-open-source/actions/workflows/ci.yml)
+[![MIT License](https://img.shields.io/github/license/longnick/small-pos-open-source)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/longnick/small-pos-open-source?style=flat)](https://github.com/longnick/small-pos-open-source/stargazers)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
 
-## Why it exists
+> **Offline-first, Vietnamese-first POS starter for small cafés and restaurants.**
+> Build clear local order, payment, table, and receipt workflows before adding costly cloud infrastructure.
 
-Small venues need understandable workflows before they need enterprise infrastructure. This project explores a small, auditable POS core with:
+<p align="center">
+  <img src="docs/screenshots/payment-receipt-mobile.png" alt="Small POS mobile receipt after a cash payment" width="300" />
+</p>
 
-- integer-VND calculations and safe input boundaries;
-- local-first state and an intentionally staged persistence path;
-- payment guards that reject unsafe or ambiguous transactions;
-- responsive React UI for desktop, tablet, and mobile;
-- executable unit, browser, typecheck, build, and leakage-scan gates.
+Small POS is a public MIT-licensed reference implementation—not production payment software. It is for independent F&B teams, food stalls, and developers who want a small, inspectable foundation instead of an enterprise POS.
 
-## Current capabilities
+[Tiếng Việt](#tiếng-việt) · [Features](#features) · [Quick start](#quick-start) · [Contributing](#contributing)
 
-- PIN-gated demo session with fixture-only E2E authentication.
-- Local catalog, table, staff, shift, and audit foundations.
-- Open-order item totals and discounts calculated in `packages/pos-core`.
-- Local payment lifecycle:
-  - cash tender with calculated change;
-  - transfer/card/other require an exact amount;
-  - immutable local receipt and audit entry;
-  - underpayment, invalid tender, duplicate payment ID, and paid-order denial.
-- Responsive POS shell with table, menu, order, kitchen, report, and staff views.
+## Features
 
-## Deliberate non-goals
+- **Local order and table workflow** — menu, tables, staff, kitchen, reports, and order UI foundations.
+- **Safe integer-VND totals** — subtotal and discount calculations live in a small domain core.
+- **Local payment flow** — cash calculates change; transfer, card, and other methods require an exact amount.
+- **Receipt before release** — payment receipt shows payment ID, method, total, tender, change, and timestamp; users can print it with the browser print dialog.
+- **Table lifecycle guard** — a matching occupied/waiting-payment table is released only after verified payment; invalid state/order combinations fail closed.
+- **Responsive UI** — exercised at mobile, tablet, and desktop viewports.
+- **Executable quality gates** — unit/component tests, Playwright browser tests, typecheck, build, and source-leakage scan.
 
-This repository does **not** yet provide production payment processing, cloud sync, Firebase integration, electronic invoicing, refunds, real staff credentials, multi-device concurrency, or deployment instructions. Its demo PIN verifier is intentionally ephemeral and must not be used for real authentication.
+## Demo evidence
 
-See [ROADMAP.md](ROADMAP.md) for sequencing and [SECURITY.md](SECURITY.md) before testing or deploying anything derived from this code.
-
-## Architecture
+The screenshot above is produced by the fixture-only mobile payment E2E flow:
 
 ```text
-packages/pos-core/     Pure domain types and integer-VND calculations
-src/stores/            Local Zustand application state and trust-boundary guards
-src/components/        React POS UI
-src/auth/              Demo-only local authentication adapter
-e2e/                   Fixture-authenticated Playwright smoke tests
-scripts/               Leakage scanner and verification helpers
+select occupied table → cash tender → local receipt → close receipt → table released
 ```
+
+It uses fake data and a build-time E2E auth fixture. It never uses customer records, a real gateway, or production credentials.
+
+## Tech stack
+
+| Area | Technology |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS |
+| Local state | Zustand |
+| UI primitives | Radix UI, Lucide |
+| Planned local persistence | Dexie / IndexedDB — not wired into production flow yet |
+| Tests | Vitest, Testing Library, Playwright |
+| Automation | GitHub Actions |
 
 ## Quick start
 
-Requirements: Node.js 22 and npm.
+**Requirements:** Node.js 22 and npm.
 
 ```bash
 git clone https://github.com/longnick/small-pos-open-source.git
 cd small-pos-open-source
 npm ci
-npm run ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. The app uses demo data only.
+Open URL printed by Vite. Demo data only.
 
-## Verification
+Run full local verification:
 
 ```bash
-npm test                 # unit and component tests
-npm run typecheck        # TypeScript
-npm run build            # production bundle
-npm run scan:leakage     # source/brand/config leakage guard
-npm run test:e2e         # Playwright fixture E2E
-npm run ci               # typecheck + unit + build + leakage scan
+npm run ci
+npm run test:e2e
+npm run test:e2e:payment
 ```
 
-The E2E suite uses a test-only auth adapter. It does not connect to a real backend or require production credentials.
+## Project boundaries
+
+This repository deliberately does **not** include:
+
+- production payment processing, VietQR/QR integration, or card handling;
+- Firebase, cloud sync, live revenue/inventory reporting, or multi-device concurrency;
+- electronic invoices, refunds, payroll, taxes, or production deployment guidance;
+- real staff credentials or customer data.
+
+The demo PIN verifier is ephemeral. Do not use it as production authentication. See [ROADMAP.md](ROADMAP.md) and [SECURITY.md](SECURITY.md) before extending this project.
+
+## Architecture
+
+```text
+packages/pos-core/     Pure domain types and integer-VND calculations
+src/stores/            Local Zustand state and trust-boundary guards
+src/components/        React POS UI
+src/auth/              Demo-only local authentication adapter
+e2e/                   Fixture-authenticated Playwright tests
+scripts/               Leakage scanner and verification helpers
+```
 
 ## Contributing
 
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then choose an issue with the `good first issue` or `help wanted` label. Please keep changes small, test-backed, and within the roadmap boundary.
+Issues, docs improvements, accessibility work, test coverage, and small workflow fixes are welcome.
 
-## Security and support
+1. Read [CONTRIBUTING.md](CONTRIBUTING.md).
+2. Search existing Issues and Discussions.
+3. Choose a focused `good first issue` or `help wanted` task.
+4. Keep changes test-backed; run `npm run ci` and relevant E2E tests.
 
-- Report vulnerabilities privately: [SECURITY.md](SECURITY.md)
-- Ask usage questions or propose ideas: GitHub Discussions or Issues
+Please do not include credentials, customer data, payment data, or real business configuration in issues or pull requests.
+
+## Security, community, and license
+
+- Security reports: [SECURITY.md](SECURITY.md)
 - Community expectations: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- License: [MIT](LICENSE)
+- Ideas and usage questions: [GitHub Discussions](https://github.com/longnick/small-pos-open-source/discussions)
 
-## License
+## Tiếng Việt
 
-[MIT](LICENSE)
+**Small POS** là mã nguồn mở cho quán ăn, quán cà phê, xe đồ ăn và mô hình F&B nhỏ. Mục tiêu: có luồng bán hàng cục bộ, dễ đọc và dễ kiểm thử trước khi thêm hạ tầng cloud tốn chi phí.
+
+Hiện có: chọn bàn, đơn hàng, tính tiền VND an toàn, tiền thừa tiền mặt, thanh toán đúng số với chuyển khoản/thẻ, hóa đơn local có thể in, và trả bàn sau thanh toán hợp lệ.
+
+Chưa có: VietQR, Firebase, cloud sync, tồn kho/doanh thu thời gian thực, cổng thanh toán, hoàn tiền, hóa đơn điện tử, hay hướng dẫn deploy production. Đây là các giới hạn có chủ đích để giữ core nhỏ và an toàn.
+
+Nếu dự án hữu ích, hãy mở Issue/Discussion hoặc cho repo một Star để giúp nhiều người tìm thấy nó hơn.
 
 ## Maintainer use of Codex
 
-Codex is intended to assist with bounded maintenance work: reproducing issues, extending tests, reviewing local state transitions, documenting public APIs, and drafting small PRs. Every change still requires maintainer review and the repository verification gates.
+Codex may help reproduce issues, extend tests, review local state transitions, document public APIs, and draft bounded PRs. Maintainer review and repository verification gates remain required before merge.
