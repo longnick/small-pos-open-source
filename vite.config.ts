@@ -4,6 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 export default defineConfig({
+  // GitHub Pages serves this project under /small-pos-open-source/.
+  base: "/small-pos-open-source/",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
