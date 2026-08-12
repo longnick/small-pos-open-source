@@ -15,13 +15,25 @@ import { PaymentModal } from "./PaymentModal";
 export interface OrderPanelProps {
   /** Presentation-only. Drives the heading subtitle only. No store writes. */
   selectedTable: PosTable | null;
+  /**
+   * Called synchronously before `recordPayment` to validate cross-store
+   * preconditions (table releasable).  Return `false` to abort payment.
+   * Optional: when absent no pre-validation is performed.
+   */
+  onBeforePaymentConfirm?: () => boolean;
+  /**
+   * Called after a successful payment so the parent can perform post-payment
+   * lifecycle actions (release table, clear order selection, clear UI selection).
+   * Optional: when absent no post-payment lifecycle is triggered.
+   */
+  onPaymentSuccess?: () => void;
 }
 
 // ---------------------------------------------------------------------------
 // OrderPanel
 // ---------------------------------------------------------------------------
 
-export function OrderPanel({ selectedTable }: OrderPanelProps) {
+export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuccess }: OrderPanelProps) {
   const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
 
   // Local dialog state – no store write
@@ -157,6 +169,8 @@ export function OrderPanel({ selectedTable }: OrderPanelProps) {
           orderId={currentOrder.id}
           tenantId={currentOrder.tenantId}
           staffId={currentOrder.staffId}
+          onBeforeConfirm={onBeforePaymentConfirm}
+          onPaymentSuccess={onPaymentSuccess}
           onOpenChange={setIsPaymentOpen}
         />
       )}

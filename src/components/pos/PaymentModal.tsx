@@ -19,7 +19,15 @@ export interface PaymentModalProps {
   orderId?: string;
   tenantId?: string;
   staffId?: string;
-  onPaymentSuccess?: () => void;
+  /**
+   * Optional pre-validation hook called synchronously before `recordPayment`.
+   * If it returns `false` the confirm action is aborted with no state change.
+   * Use this to validate cross-store preconditions (e.g. table is releasable)
+   * without mutating either store.
+   */
+  onBeforeConfirm?: () => boolean;
+  /** Return false to keep modal open and suppress success UI. */
+  onPaymentSuccess?: () => boolean | void;
 }
 
 const parseTender = (value: string): number | null => {
@@ -28,7 +36,7 @@ const parseTender = (value: string): number | null => {
   return Number.isSafeInteger(tender) ? tender : null;
 };
 
-export function PaymentModal({ open, orderTotal, onOpenChange, orderId, tenantId, staffId, onPaymentSuccess }: PaymentModalProps) {
+export function PaymentModal({ open, orderTotal, onOpenChange, orderId, tenantId, staffId, onBeforeConfirm, onPaymentSuccess }: PaymentModalProps) {
   const recordPayment = useOrderPaymentStore((state) => state.recordPayment);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("cash");
   const [tenderInput, setTenderInput] = useState("");
@@ -42,11 +50,13 @@ export function PaymentModal({ open, orderTotal, onOpenChange, orderId, tenantId
 
   const confirm = () => {
     if (!executable || !validTender || tender === null || !orderId || !tenantId || !staffId) return;
+    // Pre-validate cross-store preconditions (e.g. table releasable) before mutating payment store.
+    if (onBeforeConfirm && !onBeforeConfirm()) return;
     const createdAt = Date.now();
     const id = globalThis.crypto?.randomUUID?.() ?? `${createdAt}-${Math.random()}`;
     if (!recordPayment({ id, tenantId, orderId, amount: orderTotal, tender, method: selectedMethod, staffId, createdAt })) return;
+    if (onPaymentSuccess?.() === false) return;
     setSuccess(true);
-    onPaymentSuccess?.();
     onOpenChange(false);
   };
 

@@ -13,6 +13,18 @@ type CatalogTableState = TenantData & {
   clear: () => void;
   itemsForGroup: (groupId: string) => CatalogItem[];
   tableById: (id: string) => PosTable | null;
+  /**
+   * Release a table back to `empty` after a matching paid order.
+   *
+   * Accepts only when:
+   *   - `tableId` identifies an existing table in the store;
+   *   - that table's `currentOrderId` equals `orderId`;
+   *   - the table's `status` is `"occupied"` or `"waiting_payment"`.
+   *
+   * Returns `true` and resets `{status:'empty', currentOrderId:undefined}` on
+   * success.  Returns `false` with **no state change** on any mismatch.
+   */
+  releaseTable: (tableId: string, orderId: string) => boolean;
 };
 
 const hasDuplicate = <T extends { id: string }>(records: T[]) => new Set(records.map(({ id }) => id)).size !== records.length;
@@ -114,5 +126,19 @@ export const useCatalogTableStore = create<CatalogTableState>((set, get) => ({
   tableById: (id) => {
     const table = get().tables.find((record) => record.id === id);
     return table ? { ...table } : null;
+  },
+  releaseTable: (tableId, orderId) => {
+    const table = get().tables.find((t) => t.id === tableId);
+    if (!table) return false;
+    if (table.status !== "occupied" && table.status !== "waiting_payment") return false;
+    if (table.currentOrderId !== orderId) return false;
+    set({
+      tables: get().tables.map((t) =>
+        t.id === tableId
+          ? { ...t, status: "empty" as const, currentOrderId: undefined }
+          : { ...t },
+      ),
+    });
+    return true;
   },
 }));

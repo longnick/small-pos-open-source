@@ -54,6 +54,7 @@ function TableCard({ table, selected, onClick }: TableCardProps) {
   return (
     <button
       onClick={onClick}
+      aria-pressed={selected}
       className={`relative flex flex-col items-start justify-between rounded-xl border-2 p-3 text-left transition-all active:scale-95 sm:p-4 ${
         selected ? "border-primary ring-2 ring-primary/30" : "border-border"
       } ${statusColor}`}

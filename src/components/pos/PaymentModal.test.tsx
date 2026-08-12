@@ -394,6 +394,31 @@ describe("PaymentModal – payment lifecycle (Task 2.10)", () => {
     expect(screen.getByText(/thanh toán thành công|thành công/i)).toBeInTheDocument();
   });
 
+  it("does not record or close when cross-store prevalidation rejects", () => {
+    const onOpenChange = vi.fn();
+    const onPaymentSuccess = vi.fn();
+    loadOrder();
+    render(<PaymentModal {...baseProps()} onOpenChange={onOpenChange} onBeforeConfirm={() => false} onPaymentSuccess={onPaymentSuccess} />);
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "50000" } });
+    fireEvent.click(screen.getByRole("button", { name: /xác nhận thanh toán/i }));
+    expect(useOrderPaymentStore.getState().currentOrder?.status).toBe("open");
+    expect(useOrderPaymentStore.getState().payments).toHaveLength(0);
+    expect(onPaymentSuccess).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps modal open and suppresses success UI when post-payment lifecycle returns false", () => {
+    const onOpenChange = vi.fn();
+    loadOrder();
+    render(<PaymentModal {...baseProps()} onOpenChange={onOpenChange} onPaymentSuccess={() => false} />);
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "50000" } });
+    fireEvent.click(screen.getByRole("button", { name: /xác nhận thanh toán/i }));
+    expect(useOrderPaymentStore.getState().currentOrder?.status).toBe("paid");
+    expect(screen.getByRole("dialog", { name: "Thanh toán" })).toBeInTheDocument();
+    expect(screen.queryByText(/thanh toán thành công/i)).not.toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it("does not call onOpenChange if store recordPayment returns false (no current order)", () => {
     const onPaymentSuccess = vi.fn();
     const onOpenChange = vi.fn();

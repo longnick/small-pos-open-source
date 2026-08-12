@@ -47,8 +47,11 @@ function PosShell() {
   const tables = useCatalogTableStore((state) => state.tables);
   const catalogGroups = useCatalogTableStore((state) => state.catalogGroups);
   const catalogItems = useCatalogTableStore((state) => state.catalogItems);
+  const releaseTable = useCatalogTableStore((state) => state.releaseTable);
+  const clearCurrentOrder = useOrderPaymentStore((state) => state.clearCurrentOrder);
   const [view, setView] = useState<ViewId>("pos");
   const orderItemCount = useOrderPaymentStore((state) => state.currentOrder?.items.length ?? 0);
+  const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
 
   // Clear selection when the selected table no longer exists in the store
   useEffect(() => {
@@ -58,6 +61,35 @@ function PosShell() {
   }, [tables, selectedTableId]);
 
   const selectedTable = tables.find((t) => t.id === selectedTableId) ?? null;
+
+  /**
+   * Pre-validation hook: called synchronously *before* recordPayment.
+   * Verifies the table is releasable without mutating any store.
+   * Returns false → abort payment; true → proceed.
+   */
+  const handleBeforePaymentConfirm = (): boolean => {
+    if (!currentOrder) return false;
+    const table = useCatalogTableStore.getState().tableById(currentOrder.tableId);
+    if (!table) return false;
+    return (
+      (table.status === "occupied" || table.status === "waiting_payment") &&
+      table.currentOrderId === currentOrder.id
+    );
+  };
+
+  /**
+   * Post-payment lifecycle: called after recordPayment succeeds.
+   * Releases the table, clears the current order, and clears the UI selection.
+   * Only proceeds if releaseTable returns true (table was actually released).
+   * If release fails, order and UI selection remain unchanged.
+   */
+  const handlePaymentSuccess = (): boolean => {
+    const order = useOrderPaymentStore.getState().currentOrder;
+    if (!order || !releaseTable(order.tableId, order.id)) return false;
+    clearCurrentOrder();
+    setSelectedTableId(null);
+    return true;
+  };
 
   // --- Panels ---
 
@@ -88,7 +120,7 @@ function PosShell() {
     <MenuGrid groups={catalogGroups} items={catalogItems} />
   );
 
-  const orderPanel = <OrderPanel selectedTable={selectedTable} />;
+  const orderPanel = <OrderPanel selectedTable={selectedTable} onBeforePaymentConfirm={handleBeforePaymentConfirm} onPaymentSuccess={handlePaymentSuccess} />;
 
   return (
     <div className="flex h-screen flex-col bg-background">
