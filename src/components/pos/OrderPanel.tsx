@@ -36,6 +36,8 @@ export interface OrderPanelProps {
 
 export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuccess, onReceiptClose }: OrderPanelProps) {
   const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
+  const updateItemQuantity = useOrderPaymentStore((state) => state.updateItemQuantity);
+  const removeItem = useOrderPaymentStore((state) => state.removeItem);
 
   // Local dialog state – no store write
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -97,8 +99,8 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    disabled
                     aria-label="Giảm số lượng"
+                    onClick={item.quantity === 1 ? () => removeItem(item.id) : () => updateItemQuantity(item.id, item.quantity - 1)}
                     className="flex h-7 w-7 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors disabled:opacity-40"
                   >
                     <Minus className="h-3 w-3" aria-hidden="true" />
@@ -107,16 +109,16 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
                     {item.quantity}
                   </span>
                   <button
-                    disabled
                     aria-label="Tăng số lượng"
+                    onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
                     className="flex h-7 w-7 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors disabled:opacity-40"
                   >
                     <Plus className="h-3 w-3" aria-hidden="true" />
                   </button>
                   <button
-                    disabled
                     aria-label="Xóa món"
-                    className="ml-1 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground disabled:opacity-40"
+                    onClick={() => removeItem(item.id)}
+                    className="ml-1 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>

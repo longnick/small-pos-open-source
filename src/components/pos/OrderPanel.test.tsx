@@ -352,4 +352,276 @@ describe("OrderPanel", () => {
     fireEvent.click(btn);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
+
+  // -------------------------------------------------------------------------
+  // Tăng số lượng – increment quantity via plus button
+  // -------------------------------------------------------------------------
+
+  // -------------------------------------------------------------------------
+  // Giảm số lượng – decrement quantity via minus button
+  // -------------------------------------------------------------------------
+
+  it("clicking 'Giảm số lượng' for qty 3 decrements to 2 and updates store subtotal and total to 50,000", () => {
+    useOrderPaymentStore.getState().selectOpenOrder({
+      id: "order-1",
+      tenantId: "tenant-1",
+      tableId: "table-1",
+      staffId: "staff-1",
+      status: "open",
+      items: [
+        {
+          id: "line-1",
+          orderId: "order-1",
+          catalogItemId: "c1",
+          name: "Cà phê đen",
+          price: 25_000,
+          quantity: 3,
+        },
+      ],
+      subtotal: 75_000,
+      discount: 0,
+      discountType: "amount",
+      total: 75_000,
+      createdAt: 1,
+    });
+
+    render(<OrderPanel selectedTable={table} />);
+
+    // Scope click to the specific item row
+    const itemRow = screen.getByText("Cà phê đen").closest("div.rounded-xl") as HTMLElement;
+    const minusBtn = within(itemRow).getByRole("button", { name: "Giảm số lượng" });
+
+    expect(minusBtn).not.toBeDisabled();
+    fireEvent.click(minusBtn);
+
+    // UI must reflect qty 2, line must still be present
+    expect(within(itemRow).getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("Cà phê đen")).toBeInTheDocument();
+
+    // Store subtotal and total must be 50,000
+    const { currentOrder } = useOrderPaymentStore.getState();
+    expect(currentOrder?.subtotal).toBe(50_000);
+    expect(currentOrder?.total).toBe(50_000);
+
+    // UI totals must also show 50,000
+    const totalMatches = screen.getAllByText(/50\.000/);
+    expect(totalMatches.length).toBeGreaterThan(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // Giảm số lượng at qty 1 – removes item entirely (removeItem)
+  // -------------------------------------------------------------------------
+
+  it("clicking 'Giảm số lượng' at qty 1 removes the item and shows empty state with subtitle '0 món', subtotal/total 0, Thanh toán disabled", () => {
+    useOrderPaymentStore.getState().selectOpenOrder({
+      id: "order-1",
+      tenantId: "tenant-1",
+      tableId: "table-1",
+      staffId: "staff-1",
+      status: "open",
+      items: [
+        {
+          id: "line-1",
+          orderId: "order-1",
+          catalogItemId: "c1",
+          name: "Cà phê đen",
+          price: 25_000,
+          quantity: 1,
+        },
+      ],
+      subtotal: 25_000,
+      discount: 0,
+      discountType: "amount",
+      total: 25_000,
+      createdAt: 1,
+    });
+
+    render(<OrderPanel selectedTable={table} />);
+
+    const itemRow = screen.getByText("Cà phê đen").closest("div.rounded-xl") as HTMLElement;
+    const minusBtn = within(itemRow).getByRole("button", { name: "Giảm số lượng" });
+
+    // Minus must be ENABLED at qty 1 (not disabled)
+    expect(minusBtn).not.toBeDisabled();
+
+    fireEvent.click(minusBtn);
+
+    // Item is gone – empty state shown
+    expect(screen.getByText("Chọn món để thêm vào đơn")).toBeInTheDocument();
+    expect(screen.queryByText("Cà phê đen")).not.toBeInTheDocument();
+
+    // Subtitle shows "0 món"
+    expect(screen.getByText("0 món")).toBeInTheDocument();
+
+    // Store items array is empty, subtotal and total are 0
+    const { currentOrder } = useOrderPaymentStore.getState();
+    expect(currentOrder?.items).toEqual([]);
+    expect(currentOrder?.subtotal).toBe(0);
+    expect(currentOrder?.total).toBe(0);
+
+    // Thanh toán button is disabled
+    expect(screen.getByRole("button", { name: /Thanh toán/i })).toBeDisabled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Xóa món – trash button removes a single item row
+  // -------------------------------------------------------------------------
+
+  it("clicking 'Xóa món' on Trà chanh row removes only that item, coffee qty 2 remains, subtotal/total 50,000, Thanh toán enabled", () => {
+    useOrderPaymentStore.getState().selectOpenOrder({
+      id: "order-trash-1",
+      tenantId: "tenant-1",
+      tableId: "table-1",
+      staffId: "staff-1",
+      status: "open",
+      items: [
+        {
+          id: "line-coffee",
+          orderId: "order-trash-1",
+          catalogItemId: "c1",
+          name: "Cà phê đen",
+          price: 25_000,
+          quantity: 2,
+        },
+        {
+          id: "line-tea",
+          orderId: "order-trash-1",
+          catalogItemId: "c2",
+          name: "Trà chanh",
+          price: 20_000,
+          quantity: 1,
+        },
+      ],
+      subtotal: 70_000,
+      discount: 0,
+      discountType: "amount",
+      total: 70_000,
+      createdAt: 1,
+    });
+
+    render(<OrderPanel selectedTable={table} />);
+
+    // Scope the trash click to Trà chanh row only
+    const teaRow = screen.getByText("Trà chanh").closest("div.rounded-xl") as HTMLElement;
+    const trashBtn = within(teaRow).getByRole("button", { name: "Xóa món" });
+
+    expect(trashBtn).not.toBeDisabled();
+    fireEvent.click(trashBtn);
+
+    // Trà chanh is gone; Cà phê đen row remains with qty 2
+    expect(screen.queryByText("Trà chanh")).not.toBeInTheDocument();
+    expect(screen.getByText("Cà phê đen")).toBeInTheDocument();
+
+    const coffeeRow = screen.getByText("Cà phê đen").closest("div.rounded-xl") as HTMLElement;
+    expect(within(coffeeRow).getByText("2")).toBeInTheDocument();
+
+    // Store: 1 item remaining, subtotal and total 50,000
+    const { currentOrder } = useOrderPaymentStore.getState();
+    expect(currentOrder?.items).toHaveLength(1);
+    expect(currentOrder?.items[0].name).toBe("Cà phê đen");
+    expect(currentOrder?.subtotal).toBe(50_000);
+    expect(currentOrder?.total).toBe(50_000);
+
+    // UI totals show 50,000
+    const totalMatches = screen.getAllByText(/50\.000/);
+    expect(totalMatches.length).toBeGreaterThan(0);
+
+    // Thanh toán enabled (order still has items)
+    expect(screen.getByRole("button", { name: /Thanh toán/i })).not.toBeDisabled();
+  });
+
+  it("clicking 'Xóa món' on the last item (Cà phê đen qty 2) shows empty state, subtitle '0 món', totals 0, Thanh toán disabled", () => {
+    useOrderPaymentStore.getState().selectOpenOrder({
+      id: "order-trash-2",
+      tenantId: "tenant-1",
+      tableId: "table-1",
+      staffId: "staff-1",
+      status: "open",
+      items: [
+        {
+          id: "line-coffee",
+          orderId: "order-trash-2",
+          catalogItemId: "c1",
+          name: "Cà phê đen",
+          price: 25_000,
+          quantity: 2,
+        },
+      ],
+      subtotal: 50_000,
+      discount: 0,
+      discountType: "amount",
+      total: 50_000,
+      createdAt: 1,
+    });
+
+    render(<OrderPanel selectedTable={table} />);
+
+    const coffeeRow = screen.getByText("Cà phê đen").closest("div.rounded-xl") as HTMLElement;
+    const trashBtn = within(coffeeRow).getByRole("button", { name: "Xóa món" });
+
+    expect(trashBtn).not.toBeDisabled();
+    fireEvent.click(trashBtn);
+
+    // Empty state shown
+    expect(screen.getByText("Chọn món để thêm vào đơn")).toBeInTheDocument();
+    expect(screen.queryByText("Cà phê đen")).not.toBeInTheDocument();
+
+    // Subtitle shows "0 món"
+    expect(screen.getByText("0 món")).toBeInTheDocument();
+
+    // Store: empty items, totals 0
+    const { currentOrder } = useOrderPaymentStore.getState();
+    expect(currentOrder?.items).toEqual([]);
+    expect(currentOrder?.subtotal).toBe(0);
+    expect(currentOrder?.total).toBe(0);
+
+    // Thanh toán disabled
+    expect(screen.getByRole("button", { name: /Thanh toán/i })).toBeDisabled();
+  });
+
+  it("clicking 'Tăng số lượng' for an item increments its quantity and updates store subtotal and total to 75,000", () => {
+    useOrderPaymentStore.getState().selectOpenOrder({
+      id: "order-1",
+      tenantId: "tenant-1",
+      tableId: "table-1",
+      staffId: "staff-1",
+      status: "open",
+      items: [
+        {
+          id: "line-1",
+          orderId: "order-1",
+          catalogItemId: "c1",
+          name: "Cà phê đen",
+          price: 25_000,
+          quantity: 2,
+        },
+      ],
+      subtotal: 50_000,
+      discount: 0,
+      discountType: "amount",
+      total: 50_000,
+      createdAt: 1,
+    });
+
+    render(<OrderPanel selectedTable={table} />);
+
+    // Find the item row then scope the button query to that row
+    const itemRow = screen.getByText("Cà phê đen").closest("div.rounded-xl") as HTMLElement;
+    const plusBtn = within(itemRow).getByRole("button", { name: "Tăng số lượng" });
+
+    expect(plusBtn).not.toBeDisabled();
+    fireEvent.click(plusBtn);
+
+    // UI must reflect qty 3
+    expect(within(itemRow).getByText("3")).toBeInTheDocument();
+
+    // Store subtotal and total must be 75,000 (recomputed by the store, not the UI)
+    const { currentOrder } = useOrderPaymentStore.getState();
+    expect(currentOrder?.subtotal).toBe(75_000);
+    expect(currentOrder?.total).toBe(75_000);
+
+    // UI totals must also show 75,000
+    const totalMatches = screen.getAllByText(/75\.000/);
+    expect(totalMatches.length).toBeGreaterThan(0);
+  });
 });
