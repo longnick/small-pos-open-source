@@ -1,0 +1,43 @@
+name: Bug report
+description: Report reproducible behavior in Small POS
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include credentials, personal data, real payment details, or security exploit details. Use private vulnerability reporting for security issues."
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. …\n2. …"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit, branch, or browser
+      placeholder: "main at abc1234; Chrome 123"
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed credentials, personal data, and payment data.
+          required: true
+        - label: This is not a security vulnerability report.
+          required: true
