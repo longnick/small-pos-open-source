@@ -48,10 +48,13 @@ function PosShell() {
   const catalogGroups = useCatalogTableStore((state) => state.catalogGroups);
   const catalogItems = useCatalogTableStore((state) => state.catalogItems);
   const releaseTable = useCatalogTableStore((state) => state.releaseTable);
+  const occupyTable = useCatalogTableStore((state) => state.occupyTable);
   const clearCurrentOrder = useOrderPaymentStore((state) => state.clearCurrentOrder);
+  const createOpenOrder = useOrderPaymentStore((state) => state.createOpenOrder);
   const [view, setView] = useState<ViewId>("pos");
   const orderItemCount = useOrderPaymentStore((state) => state.currentOrder?.items.length ?? 0);
   const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
+  const { tenant, staff } = useTenantAuthStore();
 
   // Clear selection when the selected table no longer exists in the store
   useEffect(() => {
@@ -61,6 +64,60 @@ function PosShell() {
   }, [tables, selectedTableId]);
 
   const selectedTable = tables.find((t) => t.id === selectedTableId) ?? null;
+
+  /**
+   * Atomic table-selection handler.
+   *
+   * If the selected table is empty and no currentOrder exists:
+   *   1. Construct a safe order ID and timestamp.
+   *   2. occupyTable first (writes the table state).
+   *   3. createOpenOrder — if it fails, rollback by releasing the just-occupied table.
+   * Any other condition (occupied table, currentOrder already present, missing
+   * tenant/staff) leaves all stores unchanged.
+   */
+  const handleTableSelect = (id: string): void => {
+    // Never replace an existing order.
+    if (currentOrder !== null) {
+      setSelectedTableId(id);
+      return;
+    }
+    const table = useCatalogTableStore.getState().tableById(id);
+    if (!table || table.status !== "empty") {
+      // Selecting an occupied/invalid table must not mutate anything.
+      return;
+    }
+    if (!tenant || !staff) return;
+
+    const now = Date.now();
+    const orderId = `order-${id}-${now}-${Math.random().toString(36).slice(2, 9)}`;
+
+    // Step 1: occupy the table first.
+    const occupied = occupyTable(id, orderId, tenant.id);
+    if (!occupied) return;
+
+    // Step 2: create the open order.
+    const created = createOpenOrder({
+      id: orderId,
+      tenantId: tenant.id,
+      tableId: id,
+      staffId: staff.id,
+      status: "open",
+      items: [],
+      subtotal: 0,
+      discount: 0,
+      discountType: "amount",
+      total: 0,
+      createdAt: now,
+    });
+
+    if (!created) {
+      // Rollback: return the table to empty.
+      releaseTable(id, orderId);
+      return;
+    }
+
+    setSelectedTableId(id);
+  };
 
   /**
    * Pre-validation hook: called synchronously *before* recordPayment.
@@ -107,7 +164,7 @@ function PosShell() {
       <TableMap
         tables={tables}
         selectedTableId={selectedTableId}
-        onSelect={(id) => setSelectedTableId(id)}
+        onSelect={(id) => handleTableSelect(id)}
       />
     </div>
   );

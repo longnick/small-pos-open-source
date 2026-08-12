@@ -14,6 +14,19 @@ type CatalogTableState = TenantData & {
   itemsForGroup: (groupId: string) => CatalogItem[];
   tableById: (id: string) => PosTable | null;
   /**
+   * Mark an empty table as occupied for the given order.
+   *
+   * Accepts only when:
+   *   - `tableId`, `orderId`, and `tenantId` are all non-empty strings;
+   *   - `tenantId` matches the store's loaded tenant;
+   *   - a table with `tableId` exists and belongs to `tenantId`;
+   *   - that table's `status` is `"empty"`.
+   *
+   * Returns `true` and sets `{status:'occupied', currentOrderId}` on success.
+   * Returns `false` with **no state change** on any mismatch.
+   */
+  occupyTable: (tableId: string, orderId: string, tenantId: string) => boolean;
+  /**
    * Release a table back to `empty` after a matching paid order.
    *
    * Accepts only when:
@@ -126,6 +139,22 @@ export const useCatalogTableStore = create<CatalogTableState>((set, get) => ({
   tableById: (id) => {
     const table = get().tables.find((record) => record.id === id);
     return table ? { ...table } : null;
+  },
+  occupyTable: (tableId, orderId, tenantId) => {
+    if (!isPrimitiveNonemptyString(tableId) || !isPrimitiveNonemptyString(orderId) || !isPrimitiveNonemptyString(tenantId)) return false;
+    if (get().tenantId !== tenantId) return false;
+    const table = get().tables.find((t) => t.id === tableId);
+    if (!table) return false;
+    if (table.tenantId !== tenantId) return false;
+    if (table.status !== "empty") return false;
+    set({
+      tables: get().tables.map((t) =>
+        t.id === tableId
+          ? { ...t, status: "occupied" as const, currentOrderId: orderId }
+          : { ...t },
+      ),
+    });
+    return true;
   },
   releaseTable: (tableId, orderId) => {
     const table = get().tables.find((t) => t.id === tableId);

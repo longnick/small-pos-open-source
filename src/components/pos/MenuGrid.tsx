@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Search, Plus } from "lucide-react";
 import type { CatalogGroup, CatalogItem } from "../../../packages/pos-core/src/types";
 import { cn } from "@/lib/utils";
+import { useOrderPaymentStore } from "../../stores/order-payment-store";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -51,6 +52,8 @@ export function MenuGrid({ groups, items }: MenuGridProps) {
   );
   const [search, setSearch] = useState("");
 
+  const { currentOrder, addItem, updateItemQuantity } = useOrderPaymentStore();
+
   // Reconcile: if the active group was removed, reset to first current group.
   useEffect(() => {
     if (orderedGroups.length === 0) {
@@ -62,6 +65,28 @@ export function MenuGrid({ groups, items }: MenuGridProps) {
       setActiveGroupId(orderedGroups[0].id);
     }
   }, [orderedGroups, activeGroupId]);
+
+  function handleAddItem(catalogItem: CatalogItem) {
+    if (!currentOrder || currentOrder.status !== "open") return;
+
+    const existingLine = currentOrder.items.find(
+      (line) => line.catalogItemId === catalogItem.id,
+    );
+
+    if (existingLine) {
+      updateItemQuantity(existingLine.id, existingLine.quantity + 1);
+    } else {
+      const lineId = `${currentOrder.id}-${catalogItem.id}-${Date.now()}`;
+      addItem({
+        id: lineId,
+        orderId: currentOrder.id,
+        catalogItemId: catalogItem.id,
+        name: catalogItem.name,
+        price: catalogItem.price,
+        quantity: 1,
+      });
+    }
+  }
 
   const visibleItems = useMemo<CatalogItem[]>(() => {
     if (!activeGroupId) return [];
@@ -150,6 +175,7 @@ export function MenuGrid({ groups, items }: MenuGridProps) {
                   <button
                     type="button"
                     aria-label={`+ ${item.name}`}
+                    onClick={() => handleAddItem(item)}
                     className={cn(
                       "flex h-7 w-7 items-center justify-center rounded-full",
                       "bg-primary text-primary-foreground",
