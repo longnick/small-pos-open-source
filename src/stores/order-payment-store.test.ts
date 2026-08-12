@@ -18,7 +18,11 @@ const order = (): Order => ({
 
 beforeEach(() => {
   useOrderPaymentStore.getState().clearCurrentOrder();
-  useOrderPaymentStore.setState({ payments: Object.freeze([]) as unknown as Payment[] });
+  useOrderPaymentStore.setState({
+    payments: Object.freeze([]) as unknown as Payment[],
+    auditEntries: [],
+    lastReceipt: null,
+  });
 });
 
 test("selects valid open order without retaining caller record", () => {
@@ -53,7 +57,7 @@ test("drops unknown nested fields from accepted order, item, and payment input",
   expect(useOrderPaymentStore.getState().currentOrder!.items[1]).not.toHaveProperty("extra");
 
   const paymentExtra = { nested: { value: "payment" } };
-  expect(useOrderPaymentStore.getState().recordPayment({ id: "payment-extra", tenantId: "tenant-1", orderId: "order-1", amount: 15_000, method: "cash", staffId: "staff-1", createdAt: 2, extra: paymentExtra })).toBe(true);
+  expect(useOrderPaymentStore.getState().recordPayment({ id: "payment-extra", tenantId: "tenant-1", orderId: "order-1", amount: 15_000, method: "cash", staffId: "staff-1", createdAt: 2, tender: 15_000, extra: paymentExtra })).toBe(true);
   paymentExtra.nested.value = "changed";
   expect(useOrderPaymentStore.getState().payments[0]).not.toHaveProperty("extra");
 });
@@ -75,7 +79,7 @@ test("prevents external mutation of stored orders and payments", () => {
   expect(useOrderPaymentStore.getState().currentOrder).toMatchObject({ items: [{ quantity: 1 }], subtotal: 10_000, total: 10_000 });
 
   const payment: Payment = { id: "payment-immutable", tenantId: "tenant-1", orderId: "order-1", amount: 10_000, method: "cash", staffId: "staff-1", createdAt: 2 };
-  expect(useOrderPaymentStore.getState().recordPayment(payment)).toBe(true);
+  expect(useOrderPaymentStore.getState().recordPayment({ ...payment, tender: 10_000 })).toBe(true);
   const storedPayments = useOrderPaymentStore.getState().payments;
   expect(() => { storedPayments[0].amount = 1; }).toThrow();
   expect(() => { storedPayments.push(payment); }).toThrow();
@@ -101,7 +105,7 @@ test("records valid payment only when amount covers order total", () => {
   useOrderPaymentStore.getState().selectOpenOrder({ ...order(), items: [{ id: "line-1", orderId: "order-1", catalogItemId: "coffee", name: "Coffee", price: 50_000, quantity: 1 }], subtotal: 50_000, discount: 0, total: 50_000 });
   const payment: Payment = { id: "payment-1", tenantId: "tenant-1", orderId: "order-1", amount: 50_000, method: "cash", staffId: "staff-1", createdAt: 2 };
 
-  expect(useOrderPaymentStore.getState().recordPayment(payment)).toBe(true);
+  expect(useOrderPaymentStore.getState().recordPayment({ ...payment, tender: 50_000 })).toBe(true);
   expect(useOrderPaymentStore.getState()).toMatchObject({ currentOrder: { status: "paid", paidAt: 2 }, payments: [payment] });
   expect(useOrderPaymentStore.getState().setDiscount("amount", 1)).toBe(false);
 });
@@ -111,13 +115,13 @@ test("rejects second valid unique payment after current order is paid without st
   const first: Payment = { id: "payment-first", tenantId: "tenant-1", orderId: "order-1", amount: 50_000, method: "cash", staffId: "staff-1", createdAt: 2 };
   const second: Payment = { ...first, id: "payment-second", createdAt: 3 };
 
-  expect(useOrderPaymentStore.getState().recordPayment(first)).toBe(true);
+  expect(useOrderPaymentStore.getState().recordPayment({ ...first, tender: 50_000 })).toBe(true);
   const afterFirst = structuredClone({
     currentOrder: useOrderPaymentStore.getState().currentOrder,
     payments: useOrderPaymentStore.getState().payments,
   });
 
-  expect(useOrderPaymentStore.getState().recordPayment(second)).toBe(false);
+  expect(useOrderPaymentStore.getState().recordPayment({ ...second, tender: 50_000 })).toBe(false);
   expect({ currentOrder: useOrderPaymentStore.getState().currentOrder, payments: useOrderPaymentStore.getState().payments }).toEqual(afterFirst);
 });
 
@@ -129,7 +133,7 @@ test("rejects malformed totals, invalid mutations, and underpayment without stat
   expect(useOrderPaymentStore.getState().addItem({ id: "bad", orderId: "order-1", catalogItemId: "coffee", name: "Coffee", price: 1.5, quantity: 1 })).toBe(false);
   expect(useOrderPaymentStore.getState().updateItemQuantity("missing", 0)).toBe(false);
   expect(useOrderPaymentStore.getState().setDiscount("percent", 101)).toBe(false);
-  expect(useOrderPaymentStore.getState().recordPayment({ id: "short", tenantId: "tenant-1", orderId: "order-1", amount: 9_999, method: "cash", staffId: "staff-1", createdAt: 2 })).toBe(false);
+  expect(useOrderPaymentStore.getState().recordPayment({ id: "short", tenantId: "tenant-1", orderId: "order-1", amount: 9_999, method: "cash", staffId: "staff-1", createdAt: 2, tender: 9_999 })).toBe(false);
   expect(useOrderPaymentStore.getState().currentOrder).toEqual(before);
 });
 
@@ -210,3 +214,184 @@ test("recordPayment rejects hostile Proxy records without state change", () => {
   expect(() => expect(useOrderPaymentStore.getState().recordPayment(payment)).toBe(false)).not.toThrow();
   expect({ currentOrder: useOrderPaymentStore.getState().currentOrder, payments: useOrderPaymentStore.getState().payments }).toEqual(before);
 });
+
+// ---------------------------------------------------------------------------
+// Task 2.10: payment lifecycle – RED tests added before implementation
+// ---------------------------------------------------------------------------
+
+const orderWithItem = (): Order => ({
+  id: "order-pay",
+  tenantId: "tenant-1",
+  tableId: "table-1",
+  staffId: "staff-1",
+  status: "open",
+  items: [{ id: "line-pay", orderId: "order-pay", catalogItemId: "coffee", name: "Coffee", price: 50_000, quantity: 1 }],
+  subtotal: 50_000,
+  discount: 0,
+  discountType: "amount",
+  total: 50_000,
+  createdAt: 1,
+});
+
+test("recordPayment sets lastReceipt with paymentId/orderId/tenantId/staffId/method/paidTotal/change/timestamp after success", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(orderWithItem());
+  const ok = useOrderPaymentStore.getState().recordPayment({
+    id: "pay-receipt-1",
+    tenantId: "tenant-1",
+    orderId: "order-pay",
+    amount: 50_000,
+    tender: 60_000,
+    method: "cash",
+    staffId: "staff-1",
+    createdAt: 100,
+  });
+  expect(ok).toBe(true);
+  const receipt = useOrderPaymentStore.getState().lastReceipt;
+  expect(receipt).not.toBeNull();
+  expect(receipt).toMatchObject({
+    paymentId: "pay-receipt-1",
+    orderId: "order-pay",
+    tenantId: "tenant-1",
+    staffId: "staff-1",
+    method: "cash",
+    paidTotal: 50_000,
+    change: 10_000,
+    timestamp: 100,
+  });
+  expect(useOrderPaymentStore.getState().auditEntries).toMatchObject([{
+    id: "payment:pay-receipt-1", action: "payment.recorded", entityType: "order", entityId: "order-pay",
+    details: { paymentId: "pay-receipt-1", tender: 60_000, change: 10_000 }, timestamp: 100,
+  }]);
+});
+
+test("recordPayment clears lastReceipt when it returns false (underpayment)", () => {
+  // Ensure lastReceipt starts null (store reset via beforeEach clears currentOrder only; we also reset lastReceipt here)
+  useOrderPaymentStore.setState({ lastReceipt: null });
+  useOrderPaymentStore.getState().selectOpenOrder(orderWithItem());
+  const ok = useOrderPaymentStore.getState().recordPayment({
+    id: "pay-short",
+    tenantId: "tenant-1",
+    orderId: "order-pay",
+    amount: 40_000,
+    tender: 40_000,
+    method: "cash",
+    staffId: "staff-1",
+    createdAt: 100,
+  });
+  expect(ok).toBe(false);
+  expect(useOrderPaymentStore.getState().lastReceipt).toBeNull();
+});
+
+test("cash: recordPayment accepts over-tender and stores change in lastReceipt", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(orderWithItem());
+  const ok = useOrderPaymentStore.getState().recordPayment({
+    id: "pay-cash-over",
+    tenantId: "tenant-1",
+    orderId: "order-pay",
+    amount: 50_000,
+    tender: 100_000,
+    method: "cash",
+    staffId: "staff-1",
+    createdAt: 200,
+  });
+  expect(ok).toBe(true);
+  expect(useOrderPaymentStore.getState().lastReceipt?.change).toBe(50_000);
+  expect(useOrderPaymentStore.getState().lastReceipt?.paidTotal).toBe(50_000);
+});
+
+test("non-cash: recordPayment rejects over-tender and leaves order open", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(orderWithItem());
+  const ok = useOrderPaymentStore.getState().recordPayment({
+    id: "pay-transfer-over",
+    tenantId: "tenant-1",
+    orderId: "order-pay",
+    amount: 50_000,
+    tender: 60_000,
+    method: "transfer",
+    staffId: "staff-1",
+    createdAt: 200,
+  });
+  expect(ok).toBe(false);
+  expect(useOrderPaymentStore.getState().currentOrder?.status).toBe("open");
+  expect(useOrderPaymentStore.getState().lastReceipt).toBeNull();
+});
+
+test("non-cash: recordPayment accepts exact tender and sets change to 0", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(orderWithItem());
+  const ok = useOrderPaymentStore.getState().recordPayment({
+    id: "pay-card-exact",
+    tenantId: "tenant-1",
+    orderId: "order-pay",
+    amount: 50_000,
+    tender: 50_000,
+    method: "card",
+    staffId: "staff-1",
+    createdAt: 300,
+  });
+  expect(ok).toBe(true);
+  expect(useOrderPaymentStore.getState().lastReceipt?.change).toBe(0);
+});
+
+test("recordPayment rejects non-integer tender without state change", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(orderWithItem());
+  const before = structuredClone({ currentOrder: useOrderPaymentStore.getState().currentOrder, payments: useOrderPaymentStore.getState().payments });
+  const ok = useOrderPaymentStore.getState().recordPayment({
+    id: "pay-bad-tender",
+    tenantId: "tenant-1",
+    orderId: "order-pay",
+    amount: 50_000,
+    tender: 50_000.5,
+    method: "cash",
+    staffId: "staff-1",
+    createdAt: 400,
+  });
+  expect(ok).toBe(false);
+  expect({ currentOrder: useOrderPaymentStore.getState().currentOrder, payments: useOrderPaymentStore.getState().payments }).toEqual(before);
+});
+
+test("recordPayment rejects negative tender without state change", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(orderWithItem());
+  const before = structuredClone({ currentOrder: useOrderPaymentStore.getState().currentOrder, payments: useOrderPaymentStore.getState().payments });
+  const ok = useOrderPaymentStore.getState().recordPayment({
+    id: "pay-neg-tender",
+    tenantId: "tenant-1",
+    orderId: "order-pay",
+    amount: 50_000,
+    tender: -1,
+    method: "cash",
+    staffId: "staff-1",
+    createdAt: 500,
+  });
+  expect(ok).toBe(false);
+  expect({ currentOrder: useOrderPaymentStore.getState().currentOrder, payments: useOrderPaymentStore.getState().payments }).toEqual(before);
+});
+
+test("idempotency: repeat recordPayment with same id does not create second payment or mutate paid order", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(orderWithItem());
+  const payInput = {
+    id: "pay-idem",
+    tenantId: "tenant-1",
+    orderId: "order-pay",
+    amount: 50_000,
+    tender: 50_000,
+    method: "cash" as const,
+    staffId: "staff-1",
+    createdAt: 600,
+  };
+  expect(useOrderPaymentStore.getState().recordPayment(payInput)).toBe(true);
+  const afterFirst = structuredClone({
+    currentOrder: useOrderPaymentStore.getState().currentOrder,
+    payments: useOrderPaymentStore.getState().payments,
+    lastReceipt: useOrderPaymentStore.getState().lastReceipt,
+  });
+  // Second call: identical id → must fail
+  expect(useOrderPaymentStore.getState().recordPayment(payInput)).toBe(false);
+  expect(structuredClone({
+    currentOrder: useOrderPaymentStore.getState().currentOrder,
+    payments: useOrderPaymentStore.getState().payments,
+  })).toEqual({ currentOrder: afterFirst.currentOrder, payments: afterFirst.payments });
+});
+
+// ---------------------------------------------------------------------------
+// Task 2.10: PaymentModal lifecycle – RED tests (store + UI integration)
+// ---------------------------------------------------------------------------

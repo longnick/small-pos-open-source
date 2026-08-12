@@ -88,8 +88,10 @@ export interface Payment {
   id: string;
   tenantId: string;
   orderId: string;
-  /** Integer VND. */
+  /** Amount recorded against the order, integer VND. */
   amount: number;
+  /** Amount received from customer, integer VND. Required at payment-record boundary. */
+  tender?: number;
   method: PaymentMethod;
   staffId: string;
   /** Epoch milliseconds. */
@@ -110,6 +112,24 @@ export interface Shift {
   /** Integer VND. */
   closingCash?: number;
   note?: string;
+}
+
+/**
+ * Immutable local receipt produced after a successful in-memory payment.
+ * Returned via store.lastReceipt and shown to the user before the dialog closes.
+ */
+export interface PaymentReceipt {
+  paymentId: string;
+  orderId: string;
+  tenantId: string;
+  staffId: string;
+  method: PaymentMethod;
+  /** Integer VND paid (= order total). */
+  paidTotal: number;
+  /** Integer VND change given back to customer (0 for non-cash). */
+  change: number;
+  /** Epoch milliseconds of the payment. */
+  timestamp: number;
 }
 
 export interface AuditEntry {

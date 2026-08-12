@@ -1,11 +1,14 @@
 import { create } from "zustand";
 import { computeDiscount, computeSubtotal, computeTotal } from "../../packages/pos-core/src/order-calc";
-import type { Order, OrderItem, Payment } from "../../packages/pos-core/src/types";
+import type { AuditEntry, Order, OrderItem, Payment, PaymentReceipt } from "../../packages/pos-core/src/types";
 
 type DiscountType = Order["discountType"];
 type OrderPaymentState = {
   currentOrder: Order | null;
   payments: Payment[];
+  auditEntries: AuditEntry[];
+  /** Populated after a successful recordPayment; null otherwise. Read by UI to show receipt. */
+  lastReceipt: PaymentReceipt | null;
   createOpenOrder: (order: unknown) => boolean;
   selectOpenOrder: (order: unknown) => boolean;
   clearCurrentOrder: () => void;
@@ -39,7 +42,7 @@ const isOrderItem = (value: Record<string, unknown>): value is Record<string, un
   && (value.cancelReason === undefined || typeof value.cancelReason === "string");
 const isPayment = (value: Record<string, unknown>): value is Record<string, unknown> & Payment =>
   isNonemptyString(value.id) && isNonemptyString(value.tenantId) && isNonemptyString(value.orderId)
-  && isMoney(value.amount) && (value.method === "cash" || value.method === "transfer" || value.method === "card" || value.method === "other")
+  && isMoney(value.amount) && isMoney(value.tender) && (value.method === "cash" || value.method === "transfer" || value.method === "card" || value.method === "other")
   && isNonemptyString(value.staffId) && isSafeInteger(value.createdAt) && (value.note === undefined || typeof value.note === "string");
 const canonicalItem = (item: OrderItem): OrderItem => ({
   id: item.id, orderId: item.orderId, catalogItemId: item.catalogItemId, name: item.name, price: item.price, quantity: item.quantity,
@@ -48,9 +51,10 @@ const canonicalItem = (item: OrderItem): OrderItem => ({
   ...(item.cancelReason !== undefined ? { cancelReason: item.cancelReason } : {}),
 });
 const canonicalPayment = (payment: Payment): Payment => ({
-  id: payment.id, tenantId: payment.tenantId, orderId: payment.orderId, amount: payment.amount, method: payment.method, staffId: payment.staffId, createdAt: payment.createdAt,
+  id: payment.id, tenantId: payment.tenantId, orderId: payment.orderId, amount: payment.amount, tender: payment.tender, method: payment.method, staffId: payment.staffId, createdAt: payment.createdAt,
   ...(payment.note !== undefined ? { note: payment.note } : {}),
 });
+const freezeAuditEntries = (entries: AuditEntry[]): AuditEntry[] => Object.freeze(entries.map((entry) => Object.freeze({ ...entry, details: Object.freeze({ ...entry.details }) }))) as AuditEntry[];
 
 const materializeOpenOrder = (value: unknown): Order | null => {
   const order = materializeRecord(value);
@@ -92,6 +96,8 @@ const recalculated = (order: Order, type: DiscountType, value: number): Order =>
 export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
   currentOrder: null,
   payments: freezePayments([]),
+  auditEntries: freezeAuditEntries([]),
+  lastReceipt: null,
   createOpenOrder: (order) => !get().currentOrder && get().selectOpenOrder(order),
   selectOpenOrder: (order) => {
     try {
@@ -139,8 +145,31 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
     try {
       const order = get().currentOrder;
       const validPayment = materializeRecord(payment);
-      if (!order || order.status !== "open" || !validPayment || !isPayment(validPayment) || validPayment.tenantId !== order.tenantId || validPayment.orderId !== order.id || validPayment.staffId !== order.staffId || validPayment.amount < order.total || get().payments.some(({ id }) => id === validPayment.id)) return false;
-      set({ currentOrder: freezeOrder({ ...order, status: "paid", paidAt: validPayment.createdAt }), payments: freezePayments([...get().payments, canonicalPayment(validPayment)]) });
+      if (!order || order.status !== "open" || !validPayment || !isPayment(validPayment)) return false;
+      // Identity checks
+      if (validPayment.tenantId !== order.tenantId || validPayment.orderId !== order.id || validPayment.staffId !== order.staffId) return false;
+      // Idempotency: reject duplicate payment id
+      if (get().payments.some(({ id }) => id === validPayment.id)) return false;
+      const tender = validPayment.tender;
+      if (!isMoney(tender) || validPayment.amount !== order.total) return false;
+      if (validPayment.method === "cash" ? tender < order.total : tender !== order.total) return false;
+      const change = validPayment.method === "cash" ? tender - order.total : 0;
+      const receipt: PaymentReceipt = Object.freeze({
+        paymentId: validPayment.id, orderId: validPayment.orderId, tenantId: validPayment.tenantId,
+        staffId: validPayment.staffId, method: validPayment.method, paidTotal: order.total, change, timestamp: validPayment.createdAt,
+      });
+      const audit: AuditEntry = {
+        id: `payment:${validPayment.id}`, tenantId: order.tenantId, staffId: order.staffId,
+        action: "payment.recorded", entityType: "order", entityId: order.id,
+        details: { paymentId: validPayment.id, method: validPayment.method, paidTotal: order.total, tender, change },
+        timestamp: validPayment.createdAt,
+      };
+      set({
+        currentOrder: freezeOrder({ ...order, status: "paid", paidAt: validPayment.createdAt }),
+        payments: freezePayments([...get().payments, canonicalPayment(validPayment)]),
+        auditEntries: freezeAuditEntries([...get().auditEntries, audit]),
+        lastReceipt: receipt,
+      });
       return true;
     } catch { return false; }
   },

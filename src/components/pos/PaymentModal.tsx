@@ -1,113 +1,69 @@
 import React, { useState } from "react";
+import type { PaymentMethod } from "../../../packages/pos-core/src/types";
 import { formatCurrency } from "@/lib/pos";
+import { useOrderPaymentStore } from "@/stores/order-payment-store";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type PaymentMethod = "cash" | "transfer" | "card" | "other";
-
-interface MethodConfig {
-  value: PaymentMethod;
-  label: string;
-}
-
-const PAYMENT_METHODS: MethodConfig[] = [
+const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "cash", label: "Tiền mặt" },
   { value: "transfer", label: "Chuyển khoản" },
   { value: "card", label: "Thẻ" },
   { value: "other", label: "Khác" },
 ];
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
 export interface PaymentModalProps {
-  /** Whether the dialog is visible. */
   open: boolean;
-  /** Order total (integer VND) read directly from the store – never recomputed here. */
+  /** Store-provided integer VND total. Never recomputed here. */
   orderTotal: number;
-  /** Called with `false` when the dialog should close. */
   onOpenChange: (open: false) => void;
+  /** Omit identity props for Task 2.9 read-only preview. */
+  orderId?: string;
+  tenantId?: string;
+  staffId?: string;
+  onPaymentSuccess?: () => void;
 }
 
-// ---------------------------------------------------------------------------
-// PaymentModal
-// ---------------------------------------------------------------------------
+const parseTender = (value: string): number | null => {
+  if (!/^\d+$/.test(value)) return null;
+  const tender = Number(value);
+  return Number.isSafeInteger(tender) ? tender : null;
+};
 
-/**
- * Read-only payment summary dialog with local payment-method selection.
- * Displays the order total and four method buttons (aria-pressed).
- * No payment execution, no store writes, no store imports.
- */
-export function PaymentModal({ open, orderTotal, onOpenChange }: PaymentModalProps) {
-  // Local selection state – never written to any store
+export function PaymentModal({ open, orderTotal, onOpenChange, orderId, tenantId, staffId, onPaymentSuccess }: PaymentModalProps) {
+  const recordPayment = useOrderPaymentStore((state) => state.recordPayment);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("cash");
+  const [tenderInput, setTenderInput] = useState("");
+  const [success, setSuccess] = useState(false);
+  const tender = parseTender(tenderInput);
+  const executable = Boolean(orderId && tenantId && staffId);
+  const validTender = tender !== null && (selectedMethod === "cash" ? tender >= orderTotal : tender === orderTotal);
+  const change = selectedMethod === "cash" && tender !== null && tender >= orderTotal ? tender - orderTotal : null;
 
   if (!open) return null;
 
+  const confirm = () => {
+    if (!executable || !validTender || tender === null || !orderId || !tenantId || !staffId) return;
+    const createdAt = Date.now();
+    const id = globalThis.crypto?.randomUUID?.() ?? `${createdAt}-${Math.random()}`;
+    if (!recordPayment({ id, tenantId, orderId, amount: orderTotal, tender, method: selectedMethod, staffId, createdAt })) return;
+    setSuccess(true);
+    onPaymentSuccess?.();
+    onOpenChange(false);
+  };
+
   return (
-    /* Backdrop */
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={() => onOpenChange(false)}
-    >
-      {/* Dialog panel */}
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Thanh toán"
-        className="relative w-full max-w-sm rounded-2xl bg-background p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => onOpenChange(false)}>
+      <div role="dialog" aria-modal="true" aria-label="Thanh toán" className="relative w-full max-w-sm rounded-2xl bg-background p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
         <h2 className="mb-4 text-lg font-bold text-foreground">Thanh toán</h2>
-
-        {/* Order total – passed from store; never recomputed */}
-        <div className="rounded-xl border border-border bg-muted/40 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Tổng cộng</span>
-            <span className="text-xl font-bold text-primary">
-              {formatCurrency(orderTotal)}
-            </span>
-          </div>
-        </div>
-
-        {/* Payment-method selection – local state only, no store write */}
-        <div className="mt-4">
-          <p className="mb-2 text-sm font-medium text-foreground">
-            Phương thức thanh toán
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            {PAYMENT_METHODS.map(({ value, label }) => (
-              <button
-                key={value}
-                aria-pressed={selectedMethod === value}
-                onClick={() => setSelectedMethod(value)}
-                className={[
-                  "rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors",
-                  selectedMethod === value
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-input bg-background text-foreground hover:bg-muted",
-                ].join(" ")}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Cancel/close action – calls onOpenChange(false); no payment execution */}
-        <div className="mt-5">
-          <button
-            aria-label="Hủy"
-            onClick={() => onOpenChange(false)}
-            className="w-full rounded-lg border border-input bg-background py-2.5 text-sm font-semibold text-foreground hover:bg-muted"
-          >
-            Hủy
-          </button>
-        </div>
+        {success ? (
+          <p role="status" className="rounded-xl bg-primary/10 p-4 font-semibold text-primary">Thanh toán thành công</p>
+        ) : (
+          <>
+            <div className="rounded-xl border border-border bg-muted/40 p-4"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Tổng cộng</span><span className="text-xl font-bold text-primary">{formatCurrency(orderTotal)}</span></div></div>
+            <div className="mt-4"><p className="mb-2 text-sm font-medium text-foreground">Phương thức thanh toán</p><div className="grid grid-cols-2 gap-2">{PAYMENT_METHODS.map(({ value, label }) => <button key={value} aria-pressed={selectedMethod === value} onClick={() => setSelectedMethod(value)} className={["rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors", selectedMethod === value ? "border-primary bg-primary/10 text-primary" : "border-input bg-background text-foreground hover:bg-muted"].join(" ")}>{label}</button>)}</div></div>
+            {executable && <div className="mt-4"><label htmlFor="payment-tender" className="mb-2 block text-sm font-medium text-foreground">Số tiền khách đưa</label><input id="payment-tender" type="number" inputMode="numeric" min="0" step="1" value={tenderInput} onChange={(event) => setTenderInput(event.target.value)} className="w-full rounded-lg border border-input bg-background p-2.5" />{change !== null && <p className="mt-2 text-sm text-muted-foreground">Tiền thối: {formatCurrency(change)}</p>}</div>}
+            <div className="mt-5 grid grid-cols-2 gap-2">{executable && <button disabled={!validTender} onClick={confirm} className="rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40">Xác nhận thanh toán</button>}<button aria-label="Hủy" onClick={() => onOpenChange(false)} className="rounded-lg border border-input bg-background py-2.5 text-sm font-semibold text-foreground hover:bg-muted">Hủy</button></div>
+          </>
+        )}
       </div>
     </div>
   );

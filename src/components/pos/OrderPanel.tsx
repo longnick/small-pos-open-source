@@ -150,11 +150,13 @@ export function OrderPanel({ selectedTable }: OrderPanelProps) {
         </Button>
       </div>
 
-      {/* Payment modal – read-only; no store write */}
       {isPaymentOpen && currentOrder && (
         <PaymentModal
           open={isPaymentOpen}
           orderTotal={currentOrder.total}
+          orderId={currentOrder.id}
+          tenantId={currentOrder.tenantId}
+          staffId={currentOrder.staffId}
           onOpenChange={setIsPaymentOpen}
         />
       )}
