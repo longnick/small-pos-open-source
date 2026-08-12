@@ -22,7 +22,7 @@ Small POS is a public MIT-licensed reference implementation—not production pay
 
 ## Features
 
-- **Local order and table workflow** — menu, tables, staff, kitchen, reports, and order UI foundations.
+- **Local order and table workflow** — select an empty table, create a local open order, add menu items, and adjust or remove order lines.
 - **Safe integer-VND totals** — subtotal and discount calculations live in a small domain core.
 - **Local payment flow** — cash calculates change; transfer, card, and other methods require an exact amount.
 - **Receipt before release** — payment receipt shows payment ID, method, total, tender, change, and timestamp; users can print it with the browser print dialog.
