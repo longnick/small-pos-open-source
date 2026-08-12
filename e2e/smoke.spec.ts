@@ -485,3 +485,166 @@ test.describe("E-6 authenticated shell + PIN leak boundary @ 1440×900", () => {
     await runAuthenticatedAcceptance(page, { width: 1440, height: 900 });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 2.6 Slice 3: authenticated table-map intentional empty state
+//
+// The fixture auth adapter sets tableCount:2 on the tenant but never calls
+// replaceTenantData(), so catalog-table-store.tables stays [] after sign-in.
+// TableMap renders the empty state "Chưa có bàn để hiển thị" whenever its
+// `tables` prop is empty — implemented in Slice 2.
+//
+// TDD note: Slice 2 already delivers the empty-state render; these browser
+// assertions are expected to be GREEN on first run (inherited GREEN). No code,
+// fixture, or production source is modified to produce a RED run.
+//
+// Auth flow: fixture UI only — select "Fixture Manager", fill PIN "2468",
+// click submit. No page.evaluate store injection. No catalog/table fixture.
+//
+// Assertions per viewport:
+//   1. CafePOS heading visible (confirms PosShell rendered)
+//   2. Exact text "Chưa có bàn để hiển thị" visible
+//   3. No button matching "Bàn 1" (confirms table grid is absent)
+//   4. No horizontal overflow on documentElement / body
+//   5. Screenshot saved as task-2-6-table-map-empty-{tag}.png
+//
+// Projects: mobile (390×844), tablet (768×1024), desktop (1440×900).
+// Each describe block skips all other projects so the test runs exactly once.
+// ---------------------------------------------------------------------------
+
+/**
+ * Authenticates via fixture UI flow and asserts the table-map empty state.
+ * Shared helper called by all three Task 2.6 Slice 3 describe blocks.
+ */
+async function runTableMapEmptyAcceptance(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  page: any,
+  viewport: { width: number; height: number },
+) {
+  const tag = `${viewport.width}x${viewport.height}`;
+
+  // ── Navigate ──────────────────────────────────────────────────────────────
+  await page.goto("/");
+  await page.bringToFront();
+
+  // ── Wait for login form ────────────────────────────────────────────────────
+  const loginHeading = page.getByRole("heading", { name: "Đăng nhập" });
+  await expect(loginHeading).toBeVisible({ timeout: 10_000 });
+
+  const staffSelect = page.locator('select[aria-label="Chọn nhân viên"]');
+  const pinInput = page.locator('input[type="password"]');
+  const submitBtn = page.getByRole("button", { name: "Đăng nhập" });
+
+  // ── Authenticate via fixture UI flow ──────────────────────────────────────
+  await staffSelect.selectOption({ label: "Fixture Manager" });
+  await pinInput.fill("2468");
+  await submitBtn.click();
+
+  // ── Wait for PosShell ─────────────────────────────────────────────────────
+  await expect(loginHeading).not.toBeAttached({ timeout: 10_000 });
+
+  // ── 1. CafePOS heading visible ────────────────────────────────────────────
+  const cafeHeading = page.getByRole("heading", {
+    name: "CafePOS",
+    exact: true,
+  });
+  await expect(cafeHeading).toBeVisible({ timeout: 10_000 });
+
+  // ── 2. Empty-state text visible ───────────────────────────────────────────
+  // Both the mobile/tablet Tabs layout and the desktop grid layout render the
+  // same TableMap component; at widths below lg the desktop grid is CSS-hidden
+  // (display:none via "hidden ... lg:grid" classes) but still in the DOM,
+  // producing two matching <p> elements. The desktop grid appears first in JSX
+  // order, so .first() returns the hidden one. We assert at least one match is
+  // visible using toBeAttached + a visible-count evaluation instead of strict
+  // getByText, to reliably cover all three viewport widths.
+  const emptyTextLocator = page.locator("p", {
+    hasText: "Chưa có bàn để hiển thị",
+  });
+  // At least one instance must be present in the DOM.
+  await expect(emptyTextLocator.first()).toBeAttached({ timeout: 5_000 });
+  // At least one instance must be visible (the one in the active panel).
+  const visibleCount: number = await emptyTextLocator.evaluateAll(
+    (els: Element[]) =>
+      els.filter((el) => {
+        // Walk ancestors; if any has display:none or visibility:hidden the
+        // element is not visible.
+        let node: Element | null = el;
+        while (node) {
+          const style = window.getComputedStyle(node);
+          if (style.display === "none" || style.visibility === "hidden") {
+            return false;
+          }
+          node = node.parentElement;
+        }
+        return true;
+      }).length,
+  );
+  expect(visibleCount).toBeGreaterThanOrEqual(1);
+
+  // ── 3. No button matching "Bàn 1" ────────────────────────────────────────
+  await expect(page.getByRole("button", { name: "Bàn 1" })).toHaveCount(0);
+
+  // ── 4. No horizontal overflow ─────────────────────────────────────────────
+  const overflowResult = await page.evaluate(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    return {
+      htmlScrollWidth: html.scrollWidth,
+      htmlClientWidth: html.clientWidth,
+      bodyScrollWidth: body.scrollWidth,
+      bodyClientWidth: body.clientWidth,
+    };
+  });
+  expect(overflowResult.htmlScrollWidth).toBeLessThanOrEqual(
+    overflowResult.htmlClientWidth,
+  );
+  expect(overflowResult.bodyScrollWidth).toBeLessThanOrEqual(
+    overflowResult.bodyClientWidth,
+  );
+
+  // ── 5. Screenshot ─────────────────────────────────────────────────────────
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, `task-2-6-table-map-empty-${tag}.png`),
+    fullPage: false,
+  });
+}
+
+// ── Task 2.6 Slice 3 test: 390×844 (mobile) ──────────────────────────────────
+test.describe("Task 2.6 table-map empty state @ 390×844", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("Task 2.6 table-map empty state", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile",
+      `Skipped in project "${testInfo.project.name}" — this test targets 390×844 (mobile only)`,
+    );
+    await runTableMapEmptyAcceptance(page, { width: 390, height: 844 });
+  });
+});
+
+// ── Task 2.6 Slice 3 test: 768×1024 (tablet) ─────────────────────────────────
+test.describe("Task 2.6 table-map empty state @ 768×1024", () => {
+  test.use({ viewport: { width: 768, height: 1024 } });
+
+  test("Task 2.6 table-map empty state", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "tablet",
+      `Skipped in project "${testInfo.project.name}" — this test targets 768×1024 (tablet only)`,
+    );
+    await runTableMapEmptyAcceptance(page, { width: 768, height: 1024 });
+  });
+});
+
+// ── Task 2.6 Slice 3 test: 1440×900 (desktop) ────────────────────────────────
+test.describe("Task 2.6 table-map empty state @ 1440×900", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test("Task 2.6 table-map empty state", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "desktop",
+      `Skipped in project "${testInfo.project.name}" — this test targets 1440×900 (desktop only)`,
+    );
+    await runTableMapEmptyAcceptance(page, { width: 1440, height: 900 });
+  });
+});

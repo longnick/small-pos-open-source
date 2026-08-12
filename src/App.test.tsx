@@ -5,6 +5,7 @@ import type { Staff, Tenant } from "../packages/pos-core/src/types";
 import type { PinHashVerifier } from "../packages/pos-core/src/auth";
 import type { DemoAuthBootstrap } from "./auth/demo-auth-adapter";
 import { useTenantAuthStore } from "./stores/tenant-auth-store";
+import { useCatalogTableStore } from "./stores/catalog-table-store";
 
 // ---------------------------------------------------------------------------
 // Hoisted mock — per-test implementation via mockImplementation
@@ -89,6 +90,7 @@ async function signInViaUI(staffId: string, pin: string) {
 
 beforeEach(() => {
   useTenantAuthStore.setState({ tenant: null, staff: null });
+  useCatalogTableStore.setState({ tenantId: null, catalogGroups: [], catalogItems: [], tables: [] });
   bootstrap.create.mockClear();
   // Default: bootstrap never resolves (pending forever)
   bootstrap.create.mockImplementation(() => new Promise<DemoAuthBootstrap>(() => {}));
@@ -376,4 +378,93 @@ test("remount after signOut: fresh mount starts at non-shell boundary", async ()
     expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy()
   );
   expect(screen.queryByRole("heading", { name: "CafePOS" })).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// Task 2.6 Slice 2 — catalog table store as sole table-map source
+// ---------------------------------------------------------------------------
+
+test("authenticated shell with empty catalog-table store: shows empty state text and no Bàn 1 card", async () => {
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  // catalog-table store is empty (cleared in beforeEach)
+
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy()
+  );
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy()
+  );
+
+  // Must show exact empty-state text (desktop + mobile layouts each render once)
+  expect(screen.getAllByText("Chưa có bàn để hiển thị").length).toBeGreaterThan(0);
+  // Must NOT show any Bàn 1 table card
+  expect(screen.queryByRole("button", { name: /Bàn 1/i })).toBeNull();
+});
+
+test("authenticated shell: select Bàn 2 then replace store omitting its ID — selection clears and stale Bàn 2 does not remain", async () => {
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+
+  const baseTables = [
+    {
+      id: "t1",
+      tenantId: tenant.id,
+      number: 1,
+      status: "empty" as const,
+      openedAt: 0,
+      staffId: "s1",
+    },
+    {
+      id: "t2",
+      tenantId: tenant.id,
+      number: 2,
+      status: "empty" as const,
+      openedAt: 0,
+      staffId: "s1",
+    },
+  ];
+
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy()
+  );
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy()
+  );
+
+  // Load two tables into the catalog store
+  act(() => {
+    useCatalogTableStore.getState().replaceTenantData(tenant.id, {
+      catalogGroups: [],
+      catalogItems: [],
+      tables: baseTables,
+    });
+  });
+
+  // Bàn 2 should now be visible (desktop + mobile layouts); click the first one to select
+  await waitFor(() =>
+    expect(screen.getAllByRole("button", { name: /Bàn 2/i }).length).toBeGreaterThan(0)
+  );
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 2/i })[0]);
+
+  // Replace store with only Bàn 1 (omitting t2 / Bàn 2)
+  act(() => {
+    useCatalogTableStore.getState().replaceTenantData(tenant.id, {
+      catalogGroups: [],
+      catalogItems: [],
+      tables: [baseTables[0]],
+    });
+  });
+
+  await waitFor(() =>
+    expect(screen.queryByRole("button", { name: /Bàn 2/i })).toBeNull()
+  );
+
+  // Selection must have cleared — no stale Bàn 2 state in the order panel
+  // (order panel is neutral / presentation-only when nothing is selected)
+  expect(screen.queryByText(/Đơn Bàn 2/)).toBeNull();
 });

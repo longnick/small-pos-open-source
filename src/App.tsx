@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { bootstrapDemoAuth } from "@/auth/demo-auth-adapter";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
+import { useCatalogTableStore } from "@/stores/catalog-table-store";
 import type { Staff, Tenant } from "../packages/pos-core/src/types";
 import type { PinHashVerifier } from "../packages/pos-core/src/auth";
 import {
@@ -31,21 +32,13 @@ import { MenuManagement } from "@/components/pos/MenuManagement";
 import { ReportsPanel } from "@/components/pos/ReportsPanel";
 import { StaffManagement } from "@/components/pos/StaffManagement";
 import { KitchenPanel } from "@/components/pos/KitchenPanel";
+import { TableMap } from "@/components/pos/TableMap";
 import {
   CATEGORIES,
   INITIAL_MENU_ITEMS,
   formatCurrency,
   type MenuItem,
-  type TableInfo,
-  type TableStatus,
 } from "@/lib/pos";
-
-const INITIAL_TABLES: TableInfo[] = Array.from({ length: 10 }, (_, i) => ({
-  id: i + 1,
-  name: `Bàn ${i + 1}`,
-  status: i < 3 ? "occupied" : i === 3 ? "pending" : "free",
-  guests: i < 3 ? 2 + i : undefined,
-}));
 
 const VIEWS = [
   { id: "pos", name: "Bán hàng", icon: LayoutGrid },
@@ -57,61 +50,7 @@ const VIEWS = [
 
 type ViewId = (typeof VIEWS)[number]["id"];
 
-// --- Helpers ---
-
-function getStatusLabel(status: TableStatus) {
-  switch (status) {
-    case "free":
-      return "Trống";
-    case "occupied":
-      return "Có khách";
-    case "pending":
-      return "Chờ thanh toán";
-  }
-}
-
-
 // --- Components ---
-
-function TableCard({
-  table,
-  selected,
-  onClick,
-}: {
-  table: TableInfo;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  const statusColor =
-    table.status === "free"
-      ? "border-success bg-success/10 text-success-foreground"
-      : table.status === "occupied"
-        ? "border-primary bg-primary/10 text-espresso"
-        : "border-warning bg-warning/10 text-espresso";
-
-  return (
-    <button
-      onClick={onClick}
-      className={`relative flex flex-col items-start justify-between rounded-xl border-2 p-3 text-left transition-all active:scale-95 sm:p-4 ${
-        selected ? "border-primary ring-2 ring-primary/30" : "border-border"
-      } ${statusColor}`}
-    >
-      <span className="text-sm font-semibold sm:text-base">{table.name}</span>
-      <span className="mt-1 text-xs font-medium opacity-90">
-        {getStatusLabel(table.status)}
-      </span>
-      {table.guests ? (
-        <span className="mt-2 inline-flex items-center gap-1 text-xs opacity-80">
-          <User className="h-3 w-3" />
-          {table.guests}
-        </span>
-      ) : null}
-      {table.status === "occupied" && (
-        <span className="absolute right-2 top-2 flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-      )}
-    </button>
-  );
-}
 
 function MenuItemCard({ item }: { item: MenuItem }) {
   return (
@@ -172,13 +111,20 @@ function QuantityButton({
 // --- Main Page (existing Lovable shell — do not modify) ---
 
 function PosShell() {
-  const [selectedTableId, setSelectedTableId] = useState<number>(1);
-  const tables = INITIAL_TABLES;
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const tables = useCatalogTableStore((state) => state.tables);
   const [activeCategory, setActiveCategory] = useState<string>("coffee");
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewId>("pos");
 
-  const selectedTable = tables.find((t) => t.id === selectedTableId)!;
+  // Clear selection when the selected table no longer exists in the store
+  useEffect(() => {
+    if (selectedTableId !== null && !tables.some((t) => t.id === selectedTableId)) {
+      setSelectedTableId(null);
+    }
+  }, [tables, selectedTableId]);
+
+  const selectedTable = tables.find((t) => t.id === selectedTableId) ?? null;
   const currentOrder = [
     { itemId: "c1", name: "Cà phê đen", price: 25000, quantity: 2, sentQty: 2 },
     { itemId: "f1", name: "Cơm gà", price: 55000, quantity: 1, note: "Ít cơm", sentQty: 1 },
@@ -208,16 +154,11 @@ function PosShell() {
           </span>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
-        {tables.map((table) => (
-          <TableCard
-            key={table.id}
-            table={table}
-            selected={table.id === selectedTableId}
-            onClick={() => setSelectedTableId(table.id)}
-          />
-        ))}
-      </div>
+      <TableMap
+        tables={tables}
+        selectedTableId={selectedTableId}
+        onSelect={(id) => setSelectedTableId(id)}
+      />
     </div>
   );
 
@@ -277,14 +218,13 @@ function PosShell() {
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-foreground">
-            Đơn {selectedTable.name}
+            {selectedTable ? `Đơn ${selectedTable.number ? `Bàn ${selectedTable.number}` : selectedTable.id}` : "Đơn hàng"}
           </h2>
           <p className="text-xs text-muted-foreground">
-            {getStatusLabel(selectedTable.status)} ·{" "}
-            {currentOrder.length} món
+            {selectedTable ? `${currentOrder.length} món` : "Chưa chọn bàn"}
           </p>
         </div>
-        {currentOrder.length > 0 && (
+        {selectedTable && currentOrder.length > 0 && (
           <Button
             variant="outline"
             size="sm"

@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-12 01:40 - Task 2.6 table map
+
+Repo: `/home/longnick/projects/small-pos-release-task25`
+Branch: `release/task-2-5-pin-login`
+Summary: Replaced hard-coded Lovable table cards with a presentational `TableMap` reading existing catalog-table store state. Empty store is deliberate and visible; stale local table selection clears when the record disappears. PIN gate remains unchanged.
+Verification: 259/259 unit; TypeScript/build/leakage/self-test; Task 2.6 browser acceptance at 390×844, 768×1024, 1440×900; full Playwright 13 pass / 14 skipped; normal dist fixture scan PASS. Terra independent verdict APPROVED.
+Next: scoped commit, then owner merge approval. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-12-0140-task-2-6-table-map.md`
+
+
 ## 2026-08-12 01:10 - Task 2.5 clean release reconstruction
 
 Repo: `/home/longnick/projects/small-pos-release-task25`

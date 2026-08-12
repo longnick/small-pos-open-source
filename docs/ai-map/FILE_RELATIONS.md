@@ -100,6 +100,17 @@ Purpose: create ephemeral demo auth records and gate the Lovable POS shell behin
 - `src/auth/demo-auth-adapter.test.ts`, `src/components/auth/PinLogin.test.tsx`, `src/App.test.tsx` — adapter, form, and fail-closed gate coverage.
 - Scope: no Dexie, routing, event bus, persistence, or other-store coupling.
 
+## Module: Table map (Task 2.6)
+
+Purpose: render current in-memory catalog-table store records in the existing Lovable POS shell without creating or mutating domain data.
+
+- `src/components/pos/TableMap.tsx` — presentational table card grid; sorts a copied `PosTable[]`, maps core statuses, renders empty state, and emits selected ID.
+- `src/components/pos/TableMap.test.tsx` — status, sort, selection, and visual-selection coverage.
+- `src/App.tsx` — subscribes to `useCatalogTableStore.tables`; owns local selection and clears it when store records remove selected ID. Does not hydrate or mutate the store.
+- `src/App.test.tsx` — covers authenticated empty store and removal of selected table.
+- `e2e/smoke.spec.ts` — fixture-authenticated empty table-map acceptance at 390×844, 768×1024, and 1440×900.
+- Scope: no seed/hydration/persistence/order/payment/shift/EventBus coupling. Actual table cards require a future approved data-population lane.
+
 ## Module: POS core
 
 - `packages/pos-core/src/order-calc.ts`, `shift-report.ts`, `event-bus.ts`

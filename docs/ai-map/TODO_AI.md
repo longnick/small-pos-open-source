@@ -2,12 +2,12 @@
 
 ## Doing
 
-- Task 2.5: clean scoped release unit reconstructed and gates rerun. Commit/review handoff remains; no merge or deploy.
+- Task 2.6: scoped table-map unit approved by Terra. Commit/owner merge handoff remains; no deploy.
 
 ## Next
 
-- Commit Task 2.5 from the release worktree with explicit paths, then request owner merge approval.
-- Task 2.6: Sơ đồ bàn screen (Lovable TableGrid + table store), only after Task 2.5 commit/review.
+- Commit Task 2.6 from the release worktree with explicit paths, then request owner merge approval.
+- Task 2.7: Order screen — menu grid (Lovable MenuList + catalog store), only after Task 2.6 commit/review.
 - Keep all stores in-memory until approved Dexie hydration phase.
 - Keep `verifyPin` adapter-injected; add bcrypt/cloud adapter only when persistence/auth integration phase requires it.
 
