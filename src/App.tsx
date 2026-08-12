@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { bootstrapDemoAuth } from "@/auth/demo-auth-adapter";
+import { bootstrapDemoPos } from "@/pos/demo-pos-bootstrap";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
 import { useCatalogTableStore } from "@/stores/catalog-table-store";
@@ -269,13 +270,17 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     setAuthenticatedStaff(null);
-    bootstrapDemoAuth()
-      .then(({ tenant: t, staff: s, verifier: v }) => {
+    Promise.all([bootstrapDemoAuth(), bootstrapDemoPos()])
+      .then(([{ tenant: t, staff: s, verifier: v }, pos]) => {
         if (cancelled) return;
         verifierRef.current = v;
         setTenant(t);
         setBootTenant(t);
         setStaffList(s);
+        if (pos) {
+          useCatalogTableStore.getState().replaceTenantData(t.id, pos);
+          if (pos.currentOrder) useOrderPaymentStore.getState().selectOpenOrder(pos.currentOrder);
+        }
         setBootState("ready");
       })
       .catch(() => {
