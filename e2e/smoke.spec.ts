@@ -870,3 +870,283 @@ test.describe("Task 2.7 menu empty state @ 1440×900", () => {
     await runMenuEmptyAcceptance(page, { width: 1440, height: 900 });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 2.8 Slice 3: authenticated order-panel intentional empty state
+//
+// The fixture auth adapter never adds items to the order-payment-store, so
+// currentOrder is null after sign-in. OrderPanel renders the empty-state
+// message "Chọn món để thêm vào đơn" when isEmpty is true (no order or no
+// items). Slice 2 already delivers this empty-state render; these browser
+// assertions are expected GREEN on first run (inherited GREEN). No code,
+// fixture, or production source is modified to produce a RED run.
+//
+// Auth flow: fixture UI only — select "Fixture Manager", fill PIN "2468",
+// click submit. No page.evaluate store injection. No order fixture.
+//
+// Layout notes:
+//   - Mobile (390×844) and tablet (768×1024): POS view defaults to "tables"
+//     tab. Must click the "Đơn" tab trigger to bring OrderPanel into the
+//     active (visible) panel before asserting.
+//   - Desktop (1440×900): order panel is rendered directly in the 12-col
+//     desktop grid (col-span-4) — no tab click required.
+//
+// Both layout branches (desktop hidden + mobile/tablet tabs) produce two
+// <p> elements with the empty-state text in the DOM at narrow widths. The
+// desktop copy is inside `<main className="hidden ... lg:grid">` which has
+// display:none below lg, so we assert at least one computed-style-visible
+// instance via evaluateAll.
+//
+// Assertions per viewport:
+//   1. CafePOS heading visible (confirms PosShell rendered).
+//   2. At least one computed-style-visible exact "Chọn món để thêm vào đơn".
+//   3. Visible order heading "Đơn hàng" (h2 inside the order panel).
+//   4. No visible text "Cà phê đen", "Cơm gà", "Ít cơm" in the order panel.
+//   5. Totals show zero (0 ₫) within the order panel.
+//   6. Buttons "Gửi bếp" and "Thanh toán" are disabled.
+//   7. No horizontal overflow on documentElement / body.
+//   8. Screenshot saved as task-2-8-order-empty-{tag}.png.
+//
+// Projects: mobile (390×844), tablet (768×1024), desktop (1440×900).
+// Each describe block skips all other projects so the test runs exactly once.
+// ---------------------------------------------------------------------------
+
+/**
+ * Authenticates via fixture UI flow, navigates to the order panel, and asserts
+ * the OrderPanel empty state. Shared helper for all three Task 2.8 Slice 3 blocks.
+ */
+async function runOrderEmptyAcceptance(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  page: any,
+  viewport: { width: number; height: number },
+) {
+  const tag = `${viewport.width}x${viewport.height}`;
+
+  // ── Navigate ──────────────────────────────────────────────────────────────
+  await page.goto("/");
+  await page.bringToFront();
+
+  // ── Wait for login form ────────────────────────────────────────────────────
+  const loginHeading = page.getByRole("heading", { name: "Đăng nhập" });
+  await expect(loginHeading).toBeVisible({ timeout: 10_000 });
+
+  const staffSelect = page.locator('select[aria-label="Chọn nhân viên"]');
+  const pinInput = page.locator('input[type="password"]');
+  const submitBtn = page.getByRole("button", { name: "Đăng nhập" });
+
+  // ── Authenticate via fixture UI flow ──────────────────────────────────────
+  await staffSelect.selectOption({ label: "Fixture Manager" });
+  await pinInput.fill("2468");
+  await submitBtn.click();
+
+  // ── Wait for PosShell ─────────────────────────────────────────────────────
+  await expect(loginHeading).not.toBeAttached({ timeout: 10_000 });
+
+  // ── 1. CafePOS heading visible ────────────────────────────────────────────
+  const cafeHeading = page.getByRole("heading", {
+    name: "CafePOS",
+    exact: true,
+  });
+  await expect(cafeHeading).toBeVisible({ timeout: 10_000 });
+
+  // ── Navigate to order panel ───────────────────────────────────────────────
+  // Mobile/tablet: POS view defaults to "tables" tab; must click "Đơn".
+  // Desktop (≥ lg = 1024 px): orderPanel is rendered in the 12-col desktop
+  // grid directly — no tab click needed.
+  if (viewport.width < 1024) {
+    // The mobile/tablet layout uses a Tabs component with an "order" TabsTrigger.
+    // The trigger label text is "Đơn" (with an optional badge when items > 0,
+    // but since the order is empty the badge is absent).
+    const orderTab = page.getByRole("tab", { name: "Đơn", exact: true });
+    await expect(orderTab).toBeVisible({ timeout: 5_000 });
+    await orderTab.click();
+    // Wait for the order tab panel to become active (data-[state=active]).
+    await page.waitForSelector('[role="tabpanel"][data-state="active"]', {
+      timeout: 5_000,
+    });
+  }
+
+  // ── 2. Empty-state text visible ───────────────────────────────────────────
+  // OrderPanel renders <p className="text-sm">Chọn món để thêm vào đơn</p>
+  // inside a ScrollArea when isEmpty is true. Both the mobile/tablet Tabs
+  // panel and the desktop grid column contain an OrderPanel; at widths below
+  // lg the desktop column is CSS-hidden (display:none via "hidden lg:grid"
+  // classes on <main>), so only the active Tabs panel element is visible.
+  //
+  // We collect all matching elements and assert at least one is
+  // computed-style-visible (no ancestor with display:none or visibility:hidden).
+  const emptyTextLocator = page.locator("p", {
+    hasText: "Chọn món để thêm vào đơn",
+  });
+  // At least one instance must be present in the DOM.
+  await expect(emptyTextLocator.first()).toBeAttached({ timeout: 5_000 });
+  // At least one instance must be computed-style-visible.
+  const emptyVisibleCount: number = await emptyTextLocator.evaluateAll(
+    (els: Element[]) =>
+      els.filter((el) => {
+        let node: Element | null = el;
+        while (node) {
+          const style = window.getComputedStyle(node);
+          if (style.display === "none" || style.visibility === "hidden") {
+            return false;
+          }
+          node = node.parentElement;
+        }
+        return true;
+      }).length,
+  );
+  expect(emptyVisibleCount).toBeGreaterThanOrEqual(1);
+
+  // ── 3. Visible order heading "Đơn hàng" ──────────────────────────────────
+  // OrderPanel always renders <h2 role="heading" aria-level={2}>Đơn hàng</h2>.
+  // Both layout branches contain OrderPanel; at narrow widths the desktop copy
+  // is inside display:none <main>. Assert at least one computed-style-visible
+  // instance using the same evaluateAll visibility walk.
+  const orderHeadingLocator = page.locator("h2", { hasText: "Đơn hàng" });
+  await expect(orderHeadingLocator.first()).toBeAttached({ timeout: 5_000 });
+  const headingVisibleCount: number = await orderHeadingLocator.evaluateAll(
+    (els: Element[]) =>
+      els.filter((el) => {
+        let node: Element | null = el;
+        while (node) {
+          const style = window.getComputedStyle(node);
+          if (style.display === "none" || style.visibility === "hidden") {
+            return false;
+          }
+          node = node.parentElement;
+        }
+        return true;
+      }).length,
+  );
+  expect(headingVisibleCount).toBeGreaterThanOrEqual(1);
+
+  // ── 4. No visible "Cà phê đen", "Cơm gà", "Ít cơm" in order panel ───────
+  // These item names must not appear anywhere in the rendered DOM; the
+  // fixture adapter does not inject any order items.
+  const fullDomText: string = await page.evaluate(
+    () => document.body.innerText,
+  );
+  // innerText omits content of display:none elements, so this covers both
+  // layout branches correctly: at narrow widths the desktop panel is hidden
+  // and excluded, and the active tabs panel shows the empty state only.
+  expect(fullDomText).not.toContain("Cà phê đen");
+  expect(fullDomText).not.toContain("Cơm gà");
+  expect(fullDomText).not.toContain("Ít cơm");
+
+  // ── 5. Totals show zero within the order panel ────────────────────────────
+  // OrderPanel renders formatCurrency(currentOrder?.subtotal ?? 0) and
+  // formatCurrency(currentOrder?.total ?? 0). formatCurrency uses vi-VN locale
+  // which renders 0 as "0 ₫". We check the visible text of the active order
+  // panel by scoping to a visible ancestor of the empty-state <p>.
+  //
+  // Strategy: find the closest visible panel ancestor (tabpanel or the desktop
+  // section) from the visible empty-state element, then assert its innerText
+  // contains "0 ₫" for both subtotal and total labels.
+  const orderPanelText: string = await emptyTextLocator.first().evaluate(
+    (el: Element) => {
+      // Walk up to the first tabpanel, section, or main ancestor, or fall back
+      // to the 6th ancestor (the OrderPanel root div).
+      let node: Element | null = el;
+      for (let i = 0; i < 10; i++) {
+        node = node?.parentElement ?? null;
+        if (!node) break;
+        const tagName = node.tagName.toLowerCase();
+        const role = node.getAttribute("role");
+        if (tagName === "section" || tagName === "main" || role === "tabpanel") {
+          return (node as HTMLElement).innerText ?? "";
+        }
+      }
+      return (node as HTMLElement | null)?.innerText ?? "";
+    },
+  );
+  // Both subtotal and total must show "0 ₫" (vi-VN locale zero formatting).
+  // The panel innerText contains two formatted-zero values (one per row).
+  const zeroMatches = (orderPanelText.match(/0\s*₫/g) ?? []).length;
+  expect(zeroMatches).toBeGreaterThanOrEqual(2);
+
+  // ── 6. "Gửi bếp" and "Thanh toán" buttons are disabled ───────────────────
+  // OrderPanel always renders both buttons with the `disabled` prop.
+  // Both layout branches contain these buttons; at narrow widths the desktop
+  // copy is in a display:none container but Playwright's toBeDisabled() works
+  // on any attached element. We use getByRole scoped to find disabled instances.
+  //
+  // At narrow widths two copies exist (desktop hidden + tabs active). Use
+  // locator with .first() since both should be disabled.
+  const sendKitchenBtn = page.getByRole("button", { name: /Gửi bếp/ });
+  const checkoutBtn = page.getByRole("button", { name: /Thanh toán/ });
+  // Both must have at least one instance in the DOM.
+  await expect(sendKitchenBtn.first()).toBeAttached({ timeout: 5_000 });
+  await expect(checkoutBtn.first()).toBeAttached({ timeout: 5_000 });
+  // All instances must be disabled (aria-disabled or disabled attribute).
+  const sendKitchenCount = await sendKitchenBtn.count();
+  const checkoutCount = await checkoutBtn.count();
+  for (let i = 0; i < sendKitchenCount; i++) {
+    await expect(sendKitchenBtn.nth(i)).toBeDisabled();
+  }
+  for (let i = 0; i < checkoutCount; i++) {
+    await expect(checkoutBtn.nth(i)).toBeDisabled();
+  }
+
+  // ── 7. No horizontal overflow ─────────────────────────────────────────────
+  const overflowResult = await page.evaluate(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    return {
+      htmlScrollWidth: html.scrollWidth,
+      htmlClientWidth: html.clientWidth,
+      bodyScrollWidth: body.scrollWidth,
+      bodyClientWidth: body.clientWidth,
+    };
+  });
+  expect(overflowResult.htmlScrollWidth).toBeLessThanOrEqual(
+    overflowResult.htmlClientWidth,
+  );
+  expect(overflowResult.bodyScrollWidth).toBeLessThanOrEqual(
+    overflowResult.bodyClientWidth,
+  );
+
+  // ── 8. Screenshot ─────────────────────────────────────────────────────────
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, `task-2-8-order-empty-${tag}.png`),
+    fullPage: false,
+  });
+}
+
+// ── Task 2.8 Slice 3 test: 390×844 (mobile) ──────────────────────────────────
+test.describe("Task 2.8 order empty state @ 390×844", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("Task 2.8 order empty state", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile",
+      `Skipped in project "${testInfo.project.name}" — this test targets 390×844 (mobile only)`,
+    );
+    await runOrderEmptyAcceptance(page, { width: 390, height: 844 });
+  });
+});
+
+// ── Task 2.8 Slice 3 test: 768×1024 (tablet) ─────────────────────────────────
+test.describe("Task 2.8 order empty state @ 768×1024", () => {
+  test.use({ viewport: { width: 768, height: 1024 } });
+
+  test("Task 2.8 order empty state", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "tablet",
+      `Skipped in project "${testInfo.project.name}" — this test targets 768×1024 (tablet only)`,
+    );
+    await runOrderEmptyAcceptance(page, { width: 768, height: 1024 });
+  });
+});
+
+// ── Task 2.8 Slice 3 test: 1440×900 (desktop) ────────────────────────────────
+test.describe("Task 2.8 order empty state @ 1440×900", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test("Task 2.8 order empty state", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "desktop",
+      `Skipped in project "${testInfo.project.name}" — this test targets 1440×900 (desktop only)`,
+    );
+    await runOrderEmptyAcceptance(page, { width: 1440, height: 900 });
+  });
+});

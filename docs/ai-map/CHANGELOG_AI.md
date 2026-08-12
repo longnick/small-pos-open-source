@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-12 03:00 - Task 2.8 order panel
+
+Repo: `/home/longnick/projects/small-pos-release-task25`
+Branch: `release/task-2-5-pin-login`
+Summary: Replaced hard-coded POS order display with read-only `OrderPanel` backed by existing order-payment store. Empty order is intentional; stored lines/totals render without local recomputation; nonimplemented controls are disabled.
+Verification: 284/284 unit; TypeScript/build/leakage/self-test; Task 2.8 E2E at 390×844, 768×1024, 1440×900; normal dist fixture scan PASS. Terra source/spec review clear after restoring unrelated generated screenshots. Pixel inspection blocked by vision-provider credit 402.
+Next: scoped commit and owner visual QA/merge approval. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-12-0300-task-2-8-order-panel.md`
+
+
 ## 2026-08-12 02:10 - Task 2.7 menu grid
 
 Repo: `/home/longnick/projects/small-pos-release-task25`

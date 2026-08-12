@@ -6,6 +6,7 @@ import type { PinHashVerifier } from "../packages/pos-core/src/auth";
 import type { DemoAuthBootstrap } from "./auth/demo-auth-adapter";
 import { useTenantAuthStore } from "./stores/tenant-auth-store";
 import { useCatalogTableStore } from "./stores/catalog-table-store";
+import { useOrderPaymentStore } from "./stores/order-payment-store";
 
 // ---------------------------------------------------------------------------
 // Hoisted mock — per-test implementation via mockImplementation
@@ -91,6 +92,7 @@ async function signInViaUI(staffId: string, pin: string) {
 beforeEach(() => {
   useTenantAuthStore.setState({ tenant: null, staff: null });
   useCatalogTableStore.setState({ tenantId: null, catalogGroups: [], catalogItems: [], tables: [] });
+  useOrderPaymentStore.getState().clearCurrentOrder();
   bootstrap.create.mockClear();
   // Default: bootstrap never resolves (pending forever)
   bootstrap.create.mockImplementation(() => new Promise<DemoAuthBootstrap>(() => {}));
@@ -477,10 +479,6 @@ test("authenticated POS menu empty store: exact text 'Chưa có món để hiể
   expect(screen.getAllByText("Chưa có món để hiển thị").length).toBeGreaterThan(0);
 });
 
-// ---------------------------------------------------------------------------
-// Task 2.6 Slice 2 — catalog table store as sole table-map source
-// ---------------------------------------------------------------------------
-
 test("authenticated shell with empty catalog-table store: shows empty state text and no Bàn 1 card", async () => {
   bootstrap.create.mockImplementation(makeReadyBootstrap);
   // catalog-table store is empty (cleared in beforeEach)
@@ -564,4 +562,39 @@ test("authenticated shell: select Bàn 2 then replace store omitting its ID — 
   // Selection must have cleared — no stale Bàn 2 state in the order panel
   // (order panel is neutral / presentation-only when nothing is selected)
   expect(screen.queryByText(/Đơn Bàn 2/)).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// Task 2.8 Slice 2 — OrderPanel wired into PosShell
+// ---------------------------------------------------------------------------
+
+test("2.8-s2: authenticated shell with null order state: shows 'Chọn món để thêm vào đơn', no fake line items, Gửi bếp/Thanh toán disabled", async () => {
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  // order-payment store is cleared in beforeEach (currentOrder = null)
+
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy()
+  );
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy()
+  );
+
+  // Empty-state text must be present (desktop + mobile panels both render)
+  expect(screen.getAllByText("Chọn món để thêm vào đơn").length).toBeGreaterThan(0);
+
+  // Hard-coded fake line items must be absent
+  expect(screen.queryByText("Cà phê đen")).toBeNull();
+  expect(screen.queryByText("Cơm gà")).toBeNull();
+  expect(screen.queryByText("Ít cơm")).toBeNull();
+
+  // Action buttons disabled (both desktop + mobile panels each render one pair)
+  const guiBep = screen.getAllByRole("button", { name: /Gửi bếp/i });
+  const thanhToan = screen.getAllByRole("button", { name: /Thanh toán/i });
+  expect(guiBep.length).toBeGreaterThan(0);
+  expect(thanhToan.length).toBeGreaterThan(0);
+  guiBep.forEach((btn) => expect(btn).toBeDisabled());
+  thanhToan.forEach((btn) => expect(btn).toBeDisabled());
 });

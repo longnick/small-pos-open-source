@@ -3,14 +3,11 @@ import { bootstrapDemoAuth } from "@/auth/demo-auth-adapter";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
 import { useCatalogTableStore } from "@/stores/catalog-table-store";
+import { useOrderPaymentStore } from "@/stores/order-payment-store";
 import type { Staff, Tenant } from "../packages/pos-core/src/types";
 import type { PinHashVerifier } from "../packages/pos-core/src/auth";
 import {
   Coffee,
-  Plus,
-  Minus,
-  Trash2,
-  Receipt,
   ChefHat,
   Clock,
   User,
@@ -20,18 +17,15 @@ import {
   Users,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { MenuGrid } from "@/components/pos/MenuGrid";
 import { MenuManagement } from "@/components/pos/MenuManagement";
 import { ReportsPanel } from "@/components/pos/ReportsPanel";
 import { StaffManagement } from "@/components/pos/StaffManagement";
 import { KitchenPanel } from "@/components/pos/KitchenPanel";
 import { TableMap } from "@/components/pos/TableMap";
-import { formatCurrency } from "@/lib/pos";
+import { OrderPanel } from "@/components/pos/OrderPanel";
 
 const VIEWS = [
   { id: "pos", name: "Bán hàng", icon: LayoutGrid },
@@ -45,26 +39,6 @@ type ViewId = (typeof VIEWS)[number]["id"];
 
 // --- Components ---
 
-function QuantityButton({
-  children,
-  onClick,
-  disabled,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="flex h-7 w-7 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors hover:bg-accent disabled:opacity-40"
-    >
-      {children}
-    </button>
-  );
-}
-
 // --- Main Page (existing Lovable shell — do not modify) ---
 
 function PosShell() {
@@ -73,6 +47,7 @@ function PosShell() {
   const catalogGroups = useCatalogTableStore((state) => state.catalogGroups);
   const catalogItems = useCatalogTableStore((state) => state.catalogItems);
   const [view, setView] = useState<ViewId>("pos");
+  const orderItemCount = useOrderPaymentStore((state) => state.currentOrder?.items.length ?? 0);
 
   // Clear selection when the selected table no longer exists in the store
   useEffect(() => {
@@ -82,11 +57,6 @@ function PosShell() {
   }, [tables, selectedTableId]);
 
   const selectedTable = tables.find((t) => t.id === selectedTableId) ?? null;
-  const currentOrder = [
-    { itemId: "c1", name: "Cà phê đen", price: 25000, quantity: 2, sentQty: 2 },
-    { itemId: "f1", name: "Cơm gà", price: 55000, quantity: 1, note: "Ít cơm", sentQty: 1 },
-  ];
-  const subtotal = currentOrder.reduce((sum, line) => sum + line.price * line.quantity, 0);
 
   // --- Panels ---
 
@@ -117,130 +87,7 @@ function PosShell() {
     <MenuGrid groups={catalogGroups} items={catalogItems} />
   );
 
-  const orderPanel = (
-    <div className="flex h-full flex-col">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-foreground">
-            {selectedTable ? `Đơn ${selectedTable.number ? `Bàn ${selectedTable.number}` : selectedTable.id}` : "Đơn hàng"}
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            {selectedTable ? `${currentOrder.length} món` : "Chưa chọn bàn"}
-          </p>
-        </div>
-        {selectedTable && currentOrder.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            onClick={() => undefined}
-          >
-            <Trash2 className="mr-1 h-3 w-3" />
-            Xóa đơn
-          </Button>
-        )}
-      </div>
-
-      <ScrollArea className="flex-1 -mx-1 px-1">
-        {currentOrder.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-            <Receipt className="mb-2 h-10 w-10 opacity-40" />
-            <p className="text-sm">Chọn món để thêm vào đơn</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {currentOrder.map((line) => (
-              <div
-                key={line.itemId}
-                className="flex items-center justify-between rounded-xl border border-border bg-card p-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-card-foreground text-sm">
-                    {line.name}
-                  </p>
-                  {(line.sentQty ?? 0) > 0 ? (
-                    <Badge className="mt-0.5 bg-success/15 text-[10px] text-espresso">
-                      Đã gửi bếp {line.sentQty}
-                      {line.quantity > (line.sentQty ?? 0)
-                        ? ` · mới ${line.quantity - (line.sentQty ?? 0)}`
-                        : ""}
-                    </Badge>
-                  ) : (
-                    <Badge className="mt-0.5 bg-warning/20 text-[10px] text-espresso">
-                      Chưa gửi bếp
-                    </Badge>
-                  )}
-                  {line.note && (
-                    <p className="text-xs text-muted-foreground">{line.note}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    {formatCurrency(line.price)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <QuantityButton
-                    onClick={() => undefined}
-                    disabled={line.quantity <= 1}
-                  >
-                    <Minus className="h-3 w-3" />
-                  </QuantityButton>
-                  <span className="w-5 text-center text-sm font-semibold">
-                    {line.quantity}
-                  </span>
-                  <QuantityButton
-                    onClick={() => undefined}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </QuantityButton>
-                  <button
-                    onClick={() => undefined}
-                    className="ml-1 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </ScrollArea>
-
-      <Separator className="my-3" />
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Tạm tính</span>
-          <span>{formatCurrency(subtotal)}</span>
-        </div>
-        <div className="flex items-center justify-between text-base font-semibold">
-          <span>Tổng cộng</span>
-          <span className="text-xl font-bold text-primary">
-            {formatCurrency(subtotal)}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button
-          variant="secondary"
-          className="h-12 text-sm font-semibold"
-          disabled
-          onClick={() => undefined}
-        >
-          <ChefHat className="mr-2 h-4 w-4" />
-          Gửi bếp
-        </Button>
-        <Button
-          className="h-12 bg-primary text-sm font-semibold text-primary-foreground shadow-sm"
-          disabled
-          onClick={() => undefined}
-        >
-          <Receipt className="mr-2 h-4 w-4" />
-          Thanh toán
-        </Button>
-      </div>
-    </div>
-  );
+  const orderPanel = <OrderPanel selectedTable={selectedTable} />;
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -319,9 +166,9 @@ function PosShell() {
                 </TabsTrigger>
                 <TabsTrigger value="order" className="text-xs sm:text-sm">
                   Đơn{" "}
-                  {currentOrder.length > 0 && (
+                  {orderItemCount > 0 && (
                     <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-                      {currentOrder.length}
+                      {orderItemCount}
                     </span>
                   )}
                 </TabsTrigger>
