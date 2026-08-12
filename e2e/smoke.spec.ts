@@ -648,3 +648,225 @@ test.describe("Task 2.6 table-map empty state @ 1440×900", () => {
     await runTableMapEmptyAcceptance(page, { width: 1440, height: 900 });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 2.7 Slice 3: authenticated menu (catalog) intentional empty state
+//
+// The fixture auth adapter never calls replaceTenantData(), so
+// catalog-table-store.catalogGroups / catalogItems remain [] after sign-in.
+// MenuGrid renders the empty-state message "Chưa có món để hiển thị" when
+// orderedGroups.length === 0 — implemented in Slice 2.
+//
+// TDD note: Slice 2 already delivers the empty-state render; these browser
+// assertions are expected to be GREEN on first run (inherited GREEN). No code,
+// fixture, or production source is modified to produce a RED run.
+//
+// Auth flow: fixture UI only — select "Fixture Manager", fill PIN "2468",
+// click submit. No page.evaluate store injection. No catalog fixture.
+//
+// Layout notes:
+//   - Mobile (390×844) and tablet (768×1024): "pos" view shows a Tabs panel
+//     (defaultValue="tables"). The "Thực đơn" tab must be clicked after login
+//     to bring MenuGrid into the active (visible) panel.
+//   - Desktop (1440×900): the desktop 12-col grid is visible at lg breakpoint;
+//     the center column renders menuPanel directly — no tab click required.
+//
+// Assertions per viewport:
+//   1. CafePOS heading visible (confirms PosShell rendered).
+//   2. At least one computed-style-visible exact text "Chưa có món để hiển thị".
+//   3. Searchbox absent (MenuGrid only renders it when groups exist; empty
+//      catalog produces no search input — this is correct empty-state behavior).
+//   4. No text "Cà phê đen" anywhere in the DOM (legacy hardcoded menu item
+//      must not bleed into the MenuGrid panel).
+//   5. No horizontal overflow on documentElement / body.
+//   6. Screenshot saved as task-2-7-menu-empty-{tag}.png.
+//
+// Projects: mobile (390×844), tablet (768×1024), desktop (1440×900).
+// Each describe block skips all other projects so the test runs exactly once.
+// ---------------------------------------------------------------------------
+
+/**
+ * Authenticates via fixture UI flow, navigates to the menu panel, and asserts
+ * the MenuGrid empty state. Shared helper for all three Task 2.7 Slice 3 blocks.
+ */
+async function runMenuEmptyAcceptance(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  page: any,
+  viewport: { width: number; height: number },
+) {
+  const tag = `${viewport.width}x${viewport.height}`;
+
+  // ── Navigate ──────────────────────────────────────────────────────────────
+  await page.goto("/");
+  await page.bringToFront();
+
+  // ── Wait for login form ────────────────────────────────────────────────────
+  const loginHeading = page.getByRole("heading", { name: "Đăng nhập" });
+  await expect(loginHeading).toBeVisible({ timeout: 10_000 });
+
+  const staffSelect = page.locator('select[aria-label="Chọn nhân viên"]');
+  const pinInput = page.locator('input[type="password"]');
+  const submitBtn = page.getByRole("button", { name: "Đăng nhập" });
+
+  // ── Authenticate via fixture UI flow ──────────────────────────────────────
+  await staffSelect.selectOption({ label: "Fixture Manager" });
+  await pinInput.fill("2468");
+  await submitBtn.click();
+
+  // ── Wait for PosShell ─────────────────────────────────────────────────────
+  await expect(loginHeading).not.toBeAttached({ timeout: 10_000 });
+
+  // ── 1. CafePOS heading visible ────────────────────────────────────────────
+  const cafeHeading = page.getByRole("heading", {
+    name: "CafePOS",
+    exact: true,
+  });
+  await expect(cafeHeading).toBeVisible({ timeout: 10_000 });
+
+  // ── Navigate to menu panel ────────────────────────────────────────────────
+  // Mobile/tablet: POS view defaults to "tables" tab; must click "Thực đơn".
+  // Desktop (≥ lg): menuPanel is rendered in the 12-col desktop grid directly —
+  // no tab click needed. The breakpoint "lg" is 1024 px; 768 is below lg.
+  if (viewport.width < 1024) {
+    // The mobile/tablet layout uses a Tabs component with a "menu" TabsTrigger.
+    // The trigger label is "Thực đơn".
+    const menuTab = page.getByRole("tab", { name: "Thực đơn" });
+    await expect(menuTab).toBeVisible({ timeout: 5_000 });
+    await menuTab.click();
+    // Wait for the tab panel to become active (data-[state=active]).
+    await page.waitForSelector('[role="tabpanel"][data-state="active"]', {
+      timeout: 5_000,
+    });
+  }
+
+  // ── 2. Empty-state text visible ───────────────────────────────────────────
+  // MenuGrid renders <span>Chưa có món để hiển thị</span> inside a div when
+  // orderedGroups is empty. Both the mobile/tablet Tabs panel and the desktop
+  // grid column contain a MenuGrid; at widths below lg the desktop column is
+  // CSS-hidden (display:none via "hidden lg:grid" classes on <main>), so only
+  // the active Tabs panel element is visible.
+  //
+  // We collect all matching elements and assert at least one is
+  // computed-style-visible (no ancestor with display:none or visibility:hidden).
+  const emptyTextLocator = page.locator("span", {
+    hasText: "Chưa có món để hiển thị",
+  });
+  // At least one instance must be present in the DOM.
+  await expect(emptyTextLocator.first()).toBeAttached({ timeout: 5_000 });
+  // At least one instance must be computed-style-visible.
+  const visibleCount: number = await emptyTextLocator.evaluateAll(
+    (els: Element[]) =>
+      els.filter((el) => {
+        let node: Element | null = el;
+        while (node) {
+          const style = window.getComputedStyle(node);
+          if (style.display === "none" || style.visibility === "hidden") {
+            return false;
+          }
+          node = node.parentElement;
+        }
+        return true;
+      }).length,
+  );
+  expect(visibleCount).toBeGreaterThanOrEqual(1);
+
+  // ── 3. Searchbox absent ───────────────────────────────────────────────────
+  // MenuGrid only renders the search <input role="searchbox"> when
+  // orderedGroups.length > 0. With an empty catalog, no searchbox is rendered.
+  // Asserting count 0 verifies the empty-state branch is active (not the
+  // populated branch with search/pills/grid).
+  await expect(page.getByRole("searchbox")).toHaveCount(0);
+
+  // ── 4. No legacy "Cà phê đen" text in the menu panel ────────────────────
+  // "Cà phê đen" is a hardcoded item in the order panel (PosShell.currentOrder).
+  // It must NOT appear in the MenuGrid panel itself. At mobile/tablet the order
+  // tab is display:none (inactive), so innerText omits it naturally. At desktop
+  // the order column is always visible alongside the menu column — scoping the
+  // check to the menu container (the element containing the empty-state span)
+  // ensures "Cà phê đen" from the order column doesn't create a false failure.
+  //
+  // Strategy: find the closest visible ancestor of the empty-state span and
+  // assert its innerText does not contain "Cà phê đen". This scopes the
+  // assertion to the menu panel without relying on layout-specific selectors.
+  const menuPanelText: string = await emptyTextLocator.first().evaluate(
+    (el: Element) => {
+      // Walk up to the first ancestor that is a section or has role="tabpanel",
+      // or fall back to the direct parent two levels up (the MenuGrid root div).
+      let node: Element | null = el;
+      for (let i = 0; i < 6; i++) {
+        node = node?.parentElement ?? null;
+        if (!node) break;
+        const tag = node.tagName.toLowerCase();
+        const role = node.getAttribute("role");
+        if (tag === "section" || tag === "main" || role === "tabpanel") {
+          return (node as HTMLElement).innerText ?? "";
+        }
+      }
+      return (node as HTMLElement | null)?.innerText ?? "";
+    },
+  );
+  expect(menuPanelText).not.toContain("Cà phê đen");
+
+  // ── 5. No horizontal overflow ─────────────────────────────────────────────
+  const overflowResult = await page.evaluate(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    return {
+      htmlScrollWidth: html.scrollWidth,
+      htmlClientWidth: html.clientWidth,
+      bodyScrollWidth: body.scrollWidth,
+      bodyClientWidth: body.clientWidth,
+    };
+  });
+  expect(overflowResult.htmlScrollWidth).toBeLessThanOrEqual(
+    overflowResult.htmlClientWidth,
+  );
+  expect(overflowResult.bodyScrollWidth).toBeLessThanOrEqual(
+    overflowResult.bodyClientWidth,
+  );
+
+  // ── 6. Screenshot ─────────────────────────────────────────────────────────
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, `task-2-7-menu-empty-${tag}.png`),
+    fullPage: false,
+  });
+}
+
+// ── Task 2.7 Slice 3 test: 390×844 (mobile) ──────────────────────────────────
+test.describe("Task 2.7 menu empty state @ 390×844", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("Task 2.7 menu empty state", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile",
+      `Skipped in project "${testInfo.project.name}" — this test targets 390×844 (mobile only)`,
+    );
+    await runMenuEmptyAcceptance(page, { width: 390, height: 844 });
+  });
+});
+
+// ── Task 2.7 Slice 3 test: 768×1024 (tablet) ─────────────────────────────────
+test.describe("Task 2.7 menu empty state @ 768×1024", () => {
+  test.use({ viewport: { width: 768, height: 1024 } });
+
+  test("Task 2.7 menu empty state", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "tablet",
+      `Skipped in project "${testInfo.project.name}" — this test targets 768×1024 (tablet only)`,
+    );
+    await runMenuEmptyAcceptance(page, { width: 768, height: 1024 });
+  });
+});
+
+// ── Task 2.7 Slice 3 test: 1440×900 (desktop) ────────────────────────────────
+test.describe("Task 2.7 menu empty state @ 1440×900", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test("Task 2.7 menu empty state", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "desktop",
+      `Skipped in project "${testInfo.project.name}" — this test targets 1440×900 (desktop only)`,
+    );
+    await runMenuEmptyAcceptance(page, { width: 1440, height: 900 });
+  });
+});

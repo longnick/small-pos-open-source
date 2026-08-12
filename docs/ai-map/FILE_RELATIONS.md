@@ -100,6 +100,17 @@ Purpose: create ephemeral demo auth records and gate the Lovable POS shell behin
 - `src/auth/demo-auth-adapter.test.ts`, `src/components/auth/PinLogin.test.tsx`, `src/App.test.tsx` — adapter, form, and fail-closed gate coverage.
 - Scope: no Dexie, routing, event bus, persistence, or other-store coupling.
 
+## Module: POS menu grid (Task 2.7)
+
+Purpose: render read-only in-memory catalog groups and available items in the existing Lovable POS menu panel.
+
+- `src/components/pos/MenuGrid.tsx` — presentational groups/search/item grid with local category reconciliation; emits no domain mutation.
+- `src/components/pos/MenuGrid.test.tsx` — ordering, availability, search, empty/no-result, category switch/removal, VND, and presentation-only button coverage.
+- `src/App.tsx` — reads catalog groups/items from `useCatalogTableStore` and passes them into `MenuGrid`; order panel remains independent presentation.
+- `src/App.test.tsx` — covers authenticated store-fed menu and empty store state.
+- `e2e/smoke.spec.ts` — fixture-authenticated empty-menu evidence at 390×844, 768×1024, and 1440×900.
+- Scope: no hydration, seed, persistence, store mutation, or order/payment coupling. Actual populated-card browser proof requires a later approved data lane.
+
 ## Module: Table map (Task 2.6)
 
 Purpose: render current in-memory catalog-table store records in the existing Lovable POS shell without creating or mutating domain data.

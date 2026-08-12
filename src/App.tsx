@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { bootstrapDemoAuth } from "@/auth/demo-auth-adapter";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
@@ -14,7 +14,6 @@ import {
   ChefHat,
   Clock,
   User,
-  Search,
   LayoutGrid,
   BookOpen,
   BarChart3,
@@ -23,22 +22,16 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
+import { MenuGrid } from "@/components/pos/MenuGrid";
 import { MenuManagement } from "@/components/pos/MenuManagement";
 import { ReportsPanel } from "@/components/pos/ReportsPanel";
 import { StaffManagement } from "@/components/pos/StaffManagement";
 import { KitchenPanel } from "@/components/pos/KitchenPanel";
 import { TableMap } from "@/components/pos/TableMap";
-import {
-  CATEGORIES,
-  INITIAL_MENU_ITEMS,
-  formatCurrency,
-  type MenuItem,
-} from "@/lib/pos";
+import { formatCurrency } from "@/lib/pos";
 
 const VIEWS = [
   { id: "pos", name: "Bán hàng", icon: LayoutGrid },
@@ -51,42 +44,6 @@ const VIEWS = [
 type ViewId = (typeof VIEWS)[number]["id"];
 
 // --- Components ---
-
-function MenuItemCard({ item }: { item: MenuItem }) {
-  return (
-    <Card className="group overflow-hidden border-border transition-shadow hover:shadow-md">
-      <CardContent className="flex flex-col gap-2 p-3 sm:p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h4 className="font-semibold text-foreground text-sm sm:text-base leading-tight">
-              {item.name}
-            </h4>
-            {item.popular && (
-              <Badge
-                variant="secondary"
-                className="mt-1 bg-accent text-accent-foreground text-[10px]"
-              >
-                Bán chạy
-              </Badge>
-            )}
-          </div>
-        </div>
-        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-          <span className="font-bold text-primary text-sm sm:text-base">
-            {formatCurrency(item.price)}
-          </span>
-          <Button
-            size="icon"
-            className="h-8 w-8 rounded-full bg-primary text-primary-foreground shadow-sm"
-            onClick={() => undefined}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function QuantityButton({
   children,
@@ -113,8 +70,8 @@ function QuantityButton({
 function PosShell() {
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const tables = useCatalogTableStore((state) => state.tables);
-  const [activeCategory, setActiveCategory] = useState<string>("coffee");
-  const [search, setSearch] = useState("");
+  const catalogGroups = useCatalogTableStore((state) => state.catalogGroups);
+  const catalogItems = useCatalogTableStore((state) => state.catalogItems);
   const [view, setView] = useState<ViewId>("pos");
 
   // Clear selection when the selected table no longer exists in the store
@@ -129,12 +86,6 @@ function PosShell() {
     { itemId: "c1", name: "Cà phê đen", price: 25000, quantity: 2, sentQty: 2 },
     { itemId: "f1", name: "Cơm gà", price: 55000, quantity: 1, note: "Ít cơm", sentQty: 1 },
   ];
-  const filteredItems = useMemo(
-    () => INITIAL_MENU_ITEMS.filter(
-      (item) => item.category === activeCategory && item.available !== false && item.name.toLowerCase().includes(search.trim().toLowerCase()),
-    ),
-    [activeCategory, search],
-  );
   const subtotal = currentOrder.reduce((sum, line) => sum + line.price * line.quantity, 0);
 
   // --- Panels ---
@@ -163,54 +114,7 @@ function PosShell() {
   );
 
   const menuPanel = (
-    <div className="flex h-full flex-col gap-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-lg font-bold text-foreground">Thực đơn</h2>
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Tìm món..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-9 pl-9 text-sm"
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2 pb-1">
-        {CATEGORIES.map((cat) => {
-          const Icon = cat.icon;
-          return (
-          <button
-            key={cat.id}
-            onClick={() => setActiveCategory(cat.id)}
-            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${
-              activeCategory === cat.id
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }`}
-          >
-              <Icon className="h-4 w-4" />
-              {cat.name}
-            </button>
-          );
-        })}
-      </div>
-
-      <ScrollArea className="flex-1 -mx-1 px-1">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredItems.map((item) => (
-            <MenuItemCard key={item.id} item={item} />
-          ))}
-        </div>
-        {filteredItems.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-            <Search className="mb-2 h-8 w-8 opacity-50" />
-            <p className="text-sm">Không tìm thấy món nào</p>
-          </div>
-        )}
-      </ScrollArea>
-    </div>
+    <MenuGrid groups={catalogGroups} items={catalogItems} />
   );
 
   const orderPanel = (

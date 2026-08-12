@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-12 02:10 - Task 2.7 menu grid
+
+Repo: `/home/longnick/projects/small-pos-release-task25`
+Branch: `release/task-2-5-pin-login`
+Summary: Replaced POS hard-coded menu panel with `MenuGrid` fed only by existing catalog-table store state. Covers available-item filtering, safe group/item sorting, local search/category repair, and intentional empty state. No catalog hydration or order mutation.
+Verification: 272/272 unit; TypeScript/build/leakage/self-test; Task 2.7 E2E at 390×844, 768×1024, 1440×900; full Playwright 16 pass / 20 skipped; normal dist fixture scan PASS. Terra source/spec review clear after restoring unrelated old screenshots. Pixel screenshot inspection blocked by vision-provider credit 402.
+Next: scoped commit and owner visual QA/merge approval. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-12-0210-task-2-7-menu-grid.md`
+
+
 ## 2026-08-12 01:40 - Task 2.6 table map
 
 Repo: `/home/longnick/projects/small-pos-release-task25`

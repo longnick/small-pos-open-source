@@ -381,6 +381,103 @@ test("remount after signOut: fresh mount starts at non-shell boundary", async ()
 });
 
 // ---------------------------------------------------------------------------
+// Task 2.7 Slice 2 — catalog store as sole POS menu source (MenuGrid)
+// ---------------------------------------------------------------------------
+
+test("authenticated POS menu: store groups/items appear; unavailable item absent; replacing store clears stale data", async () => {
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy()
+  );
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy()
+  );
+
+  // Inject catalog data via replaceTenantData (test-only act)
+  act(() => {
+    useCatalogTableStore.getState().replaceTenantData(tenant.id, {
+      catalogGroups: [
+        { id: "g1", tenantId: tenant.id, name: "Cà phê", sortOrder: 1 },
+        { id: "g2", tenantId: tenant.id, name: "Trà sữa", sortOrder: 2 },
+      ],
+      catalogItems: [
+        {
+          id: "ci1", tenantId: tenant.id, groupId: "g1",
+          name: "Espresso đặc", price: 30000, available: true,
+          sortOrder: 1, createdAt: 0, updatedAt: 0,
+        },
+        {
+          id: "ci2", tenantId: tenant.id, groupId: "g1",
+          name: "Món hết hàng", price: 20000, available: false,
+          sortOrder: 2, createdAt: 0, updatedAt: 0,
+        },
+        {
+          id: "ci3", tenantId: tenant.id, groupId: "g2",
+          name: "Trà sữa trân châu", price: 40000, available: true,
+          sortOrder: 1, createdAt: 0, updatedAt: 0,
+        },
+      ],
+      tables: [],
+    });
+  });
+
+  // Store group and item names must appear in the menu area
+  await waitFor(() =>
+    expect(screen.getAllByText("Cà phê").length).toBeGreaterThan(0)
+  );
+  expect(screen.getAllByText("Espresso đặc").length).toBeGreaterThan(0);
+
+  // Unavailable item must NOT appear
+  expect(screen.queryByText("Món hết hàng")).toBeNull();
+
+  // Now replace: remove the "Cà phê" group entirely
+  act(() => {
+    useCatalogTableStore.getState().replaceTenantData(tenant.id, {
+      catalogGroups: [
+        { id: "g2", tenantId: tenant.id, name: "Trà sữa", sortOrder: 2 },
+      ],
+      catalogItems: [
+        {
+          id: "ci3", tenantId: tenant.id, groupId: "g2",
+          name: "Trà sữa trân châu", price: 40000, available: true,
+          sortOrder: 1, createdAt: 0, updatedAt: 0,
+        },
+      ],
+      tables: [],
+    });
+  });
+
+  // Stale group pill and its items must vanish; reconcile resets active group
+  await waitFor(() =>
+    expect(screen.queryByText("Espresso đặc")).toBeNull()
+  );
+  // The remaining group must still render
+  expect(screen.getAllByText("Trà sữa trân châu").length).toBeGreaterThan(0);
+});
+
+test("authenticated POS menu empty store: exact text 'Chưa có món để hiển thị' appears", async () => {
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  // catalog store is empty (cleared in beforeEach)
+
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy()
+  );
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy()
+  );
+
+  // With no catalog groups, MenuGrid must show the empty-state text
+  expect(screen.getAllByText("Chưa có món để hiển thị").length).toBeGreaterThan(0);
+});
+
+// ---------------------------------------------------------------------------
 // Task 2.6 Slice 2 — catalog table store as sole table-map source
 // ---------------------------------------------------------------------------
 

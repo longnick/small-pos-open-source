@@ -2,12 +2,12 @@
 
 ## Doing
 
-- Task 2.6: scoped table-map unit approved by Terra. Commit/owner merge handoff remains; no deploy.
+- Task 2.7: scoped menu-grid unit passed executable gates. Screenshot pixel inspection is blocked by vision-provider credit; owner visual QA and commit/merge handoff remain. No deploy.
 
 ## Next
 
-- Commit Task 2.6 from the release worktree with explicit paths, then request owner merge approval.
-- Task 2.7: Order screen — menu grid (Lovable MenuList + catalog store), only after Task 2.6 commit/review.
+- Commit Task 2.7 from the release worktree after final scope review, then request owner visual QA/merge approval.
+- Task 2.8: Order screen — order panel (Lovable OrderPanel + order store), only after Task 2.7 commit/review.
 - Keep all stores in-memory until approved Dexie hydration phase.
 - Keep `verifyPin` adapter-injected; add bcrypt/cloud adapter only when persistence/auth integration phase requires it.
 
