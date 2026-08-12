@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a bounded improvement within the Small POS roadmap
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include credentials, customer data, payment data, or production configuration. Security reports belong in private vulnerability reporting."
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What local workflow is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe observable behavior, not a required implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Scope and safety boundary
+      description: State whether this would need cloud sync, credentials, real payment processing, or personal data.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and the roadmap.
+          required: true
+        - label: This request does not contain sensitive data.
+          required: true

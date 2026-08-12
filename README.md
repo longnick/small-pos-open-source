@@ -14,6 +14,8 @@
   <img src="docs/screenshots/payment-receipt-mobile.png" alt="Small POS mobile receipt after a cash payment" width="300" />
 </p>
 
+**Live demo:** https://longnick.github.io/small-pos-open-source/ *(fixture data only; never use for real payments)*
+
 Small POS is a public MIT-licensed reference implementation—not production payment software. It is for independent F&B teams, food stalls, and developers who want a small, inspectable foundation instead of an enterprise POS.
 
 [Tiếng Việt](#tiếng-việt) · [Features](#features) · [Quick start](#quick-start) · [Contributing](#contributing)
