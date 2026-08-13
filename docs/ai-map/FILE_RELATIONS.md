@@ -138,7 +138,7 @@ Purpose: render read-only in-memory catalog groups and available items in the ex
 Purpose: render current in-memory catalog-table store records in the existing Lovable POS shell without creating or mutating domain data.
 
 - `src/components/pos/TableMap.tsx` — presentational table card grid; sorts a copied `PosTable[]`, maps core statuses, renders empty state, and emits selected ID.
-- `src/components/pos/TableMap.test.tsx` — status, sort, selection, and visual-selection coverage.
+- `src/components/pos/TableMap.test.tsx` — status, sort, selection, visual-selection, and empty-state `role=status` name (issue #7).
 - `src/App.tsx` — subscribes to `useCatalogTableStore.tables`; owns local selection and clears it when store records remove selected ID. Does not hydrate or mutate the store.
 - `src/App.test.tsx` — covers authenticated empty store and removal of selected table.
 - `e2e/smoke.spec.ts` — fixture-authenticated empty table-map acceptance at 390×844, 768×1024, and 1440×900.
