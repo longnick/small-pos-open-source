@@ -50,6 +50,17 @@ describe("OrderPanel", () => {
     expect(screen.getByText("Chọn món để thêm vào đơn")).toBeInTheDocument();
   });
 
+  it("exposes the empty order state as a Vietnamese region", () => {
+    render(<OrderPanel selectedTable={null} />);
+    expect(
+      screen.getByRole("region", { name: "Chọn món để thêm vào đơn" }),
+    ).toBeTruthy();
+    expect(screen.getByTestId("order-empty-state")).toHaveAttribute(
+      "aria-label",
+      "Chọn món để thêm vào đơn",
+    );
+  });
+
   it("does not render 'Cà phê đen' when currentOrder is null", () => {
     render(<OrderPanel selectedTable={null} />);
     expect(screen.queryByText("Cà phê đen")).not.toBeInTheDocument();

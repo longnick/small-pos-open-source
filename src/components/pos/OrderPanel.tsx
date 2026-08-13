@@ -121,6 +121,8 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
             ref={emptyStateRef}
             data-testid="order-empty-state"
             tabIndex={-1}
+            role="region"
+            aria-label="Chọn món để thêm vào đơn"
             className="flex flex-col items-center justify-center py-10 text-muted-foreground"
           >
             <Receipt className="mb-2 h-10 w-10 opacity-40" aria-hidden="true" />
