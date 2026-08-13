@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 04:17 - Issue #3 tablet/desktop visual evidence
+
+Repo: `/home/longnick/projects/small-pos-issue3`
+Branch: `test/issue-3-tablet-desktop-visual`
+Agent: Hermes / gcli/grok-4.6 via 9router
+Summary: Isolated Playwright visual suite for local order-entry and order-line controls at 768×1024 and 1440×900. Reuses order-entry fixture. Default smoke ignores the spec. CI runs `npm run test:e2e:visual`. No production UI change.
+Verification: `npm run test:e2e:visual` 4/4 passed. Full ci/E2E recorded in task log after this entry.
+Next: PR + owner review. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-0417-issue-3-tablet-desktop-visual.md`
+
 ## 2026-08-12 03:40 - Task 2.9 minimal payment modal
 
 Repo: `/home/longnick/projects/small-pos-release-task25`

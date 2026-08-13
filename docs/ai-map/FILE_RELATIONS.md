@@ -144,6 +144,20 @@ Purpose: render current in-memory catalog-table store records in the existing Lo
 - `e2e/smoke.spec.ts` — fixture-authenticated empty table-map acceptance at 390×844, 768×1024, and 1440×900.
 - Scope: no seed/hydration/persistence/order/payment/shift/EventBus coupling. Actual table cards require a future approved data-population lane.
 
+## Module: Tablet/desktop visual evidence (issue #3)
+
+Purpose: isolated fixture Playwright proof of order-entry and order-line controls at 768×1024 and 1440×900.
+
+Related files:
+
+- `e2e/visual-tablet-desktop.spec.ts` — tablet/desktop workflow + overflow + control-box checks; writes `docs/ai-map/TASK_LOGS/issue-3-*.png`
+- `playwright.visual.config.ts` — dedicated config, port 5277, tablet + desktop projects only
+- `vite.order-entry-e2e.config.ts` / `e2e/fixtures/test-order-entry-bootstrap.ts` — reused fixture aliases
+- `playwright.config.ts` — ignores the visual spec so default smoke stays isolated
+- `.github/workflows/ci.yml` — runs `npm run test:e2e:visual`
+
+Scope: no production UI change, no persistence, no cloud, no real payment data.
+
 ## Module: POS core
 
 - `packages/pos-core/src/order-calc.ts`, `shift-report.ts`, `event-bus.ts`

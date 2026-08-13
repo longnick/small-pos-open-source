@@ -2,14 +2,14 @@
 
 ## Doing
 
-- Task 2.9: minimal local read-only payment modal passed executable gates. Full payment execution is excluded; screenshot pixel inspection is blocked by vision-provider credit. Commit/owner handoff remains. No deploy.
+- Issue #3 tablet/desktop visual evidence — local gates green. Remaining: PR CI + owner review. No deploy.
 
 ## Next
 
-- Commit Task 2.9 from the release worktree after final scope review, then request owner visual QA/merge approval.
-- Full payment lifecycle: explicit approval required for `recordPayment`, identity/time/receipt/audit, error/retry semantics, paid state, and table/order lifecycle coupling.
+- After issue #3 merges: issue templates / triage labels / first contributor tasks (ROADMAP).
 - Keep all stores in-memory until approved Dexie hydration phase.
 - Keep `verifyPin` adapter-injected; add bcrypt/cloud adapter only when persistence/auth integration phase requires it.
+- Full payment lifecycle extras beyond local fixture payment already on `main` still need separate design/review.
 
 ## Blocked
 
@@ -21,6 +21,8 @@
 
 ## Done recently
 
+- Issue #3 tablet/desktop visual evidence — `docs/ai-map/TASK_LOGS/2026-08-13-0417-issue-3-tablet-desktop-visual.md`
+- Local payment + receipt + table release already on `main` (`382cec0`); Task 2.9 TODO above was stale.
 - Task 2.5 PIN Login — `docs/ai-map/TASK_LOGS/2026-08-08-0832-task-2-5-pin-login.md` (implementation/gates verified; strict historical TDD evidence partially interrupted by Kiro rate limit and Luna tool stall).
 - Task 2.4 shift and audit Zustand store — `docs/ai-map/TASK_LOGS/2026-08-08-0758-task-2-4-strict-tdd.md`
 - Task 2.3 order and payment Zustand store — `docs/ai-map/TASK_LOGS/2026-08-02-0928-task-2.3.md`
