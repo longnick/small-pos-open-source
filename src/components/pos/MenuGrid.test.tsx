@@ -80,6 +80,39 @@ describe("MenuGrid", () => {
     expect(screen.getByText("Cà phê sữa")).toBeInTheDocument();
   });
 
+  it("default category 'Cà phê' is pressed", () => {
+    render(<MenuGrid groups={groups} items={items} />);
+    expect(screen.getByRole("button", { name: "Cà phê" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("other category pills are not pressed initially", () => {
+    render(<MenuGrid groups={groups} items={items} />);
+    expect(screen.getByRole("button", { name: "Trà" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByRole("button", { name: "Đồ ăn" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("clicking 'Trà' presses only that category", () => {
+    render(<MenuGrid groups={groups} items={items} />);
+    fireEvent.click(screen.getByRole("button", { name: "Trà" }));
+    expect(screen.getByRole("button", { name: "Trà" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Cà phê" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
   // --- available items only ---
 
   it("shows only available items for the active group", () => {
