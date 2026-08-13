@@ -137,6 +137,13 @@ describe("MenuGrid", () => {
     expect(screen.getByText("Chưa có món để hiển thị")).toBeInTheDocument();
   });
 
+  it("exposes the empty catalog state as a Vietnamese status", () => {
+    render(<MenuGrid groups={[]} items={[]} />);
+    expect(
+      screen.getByRole("status", { name: "Chưa có món để hiển thị" }),
+    ).toBeTruthy();
+  });
+
   // --- group with no matching query ---
 
   it("shows exact text 'Không tìm thấy món nào' when search matches nothing in active group", () => {

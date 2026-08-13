@@ -127,7 +127,7 @@ Purpose: render existing in-memory current order in the Lovable shell without in
 Purpose: render read-only in-memory catalog groups and available items in the existing Lovable POS menu panel.
 
 - `src/components/pos/MenuGrid.tsx` — presentational groups/search/item grid with local category reconciliation; emits no domain mutation.
-- `src/components/pos/MenuGrid.test.tsx` — ordering, availability, search, empty/no-result, category switch/removal, VND, and presentation-only button coverage.
+- `src/components/pos/MenuGrid.test.tsx` — ordering, availability, search, empty/no-result, empty-catalog `role=status` name, category switch/removal, VND, and presentation-only button coverage.
 - `src/App.tsx` — reads catalog groups/items from `useCatalogTableStore` and passes them into `MenuGrid`; order panel remains independent presentation.
 - `src/App.test.tsx` — covers authenticated store-fed menu and empty store state.
 - `e2e/smoke.spec.ts` — fixture-authenticated empty-menu evidence at 390×844, 768×1024, and 1440×900.
