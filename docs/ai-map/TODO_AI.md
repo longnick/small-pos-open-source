@@ -2,7 +2,7 @@
 
 ## Doing
 
-- KitchenPanel empty-state a11y — Sol APPROVE. Remaining: PR + owner review. No deploy.
+- KitchenPanel filter `aria-pressed` — Sol APPROVE. Remaining: PR + owner review. No deploy.
 
 ## Next
 
@@ -21,6 +21,7 @@
 
 ## Done recently
 
+- KitchenPanel empty-state a11y — merged #14 (`3597b84`).
 - OrderPanel empty-state a11y — merged #13 (`857554d`).
 - MenuGrid search no-result a11y — merged #12 (`78bd65c`).
 - MenuGrid empty-catalog a11y — merged #11 (`95c2838`).

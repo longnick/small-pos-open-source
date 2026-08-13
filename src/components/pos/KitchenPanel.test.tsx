@@ -23,4 +23,37 @@ describe("KitchenPanel", () => {
     expect(screen.getByText("Bàn 1")).toBeInTheDocument();
     expect(screen.queryByText("Chưa có phiếu bếp nào")).not.toBeInTheDocument();
   });
+
+  it("default filter 'Đang xử lý' is pressed", () => {
+    render(<KitchenPanel />);
+    expect(screen.getByRole("button", { name: "Đang xử lý" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("other filters are not pressed initially", () => {
+    render(<KitchenPanel />);
+    expect(screen.getByRole("button", { name: "Chờ làm" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByRole("button", { name: "Sẵn sàng" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("clicking 'Sẵn sàng' presses only that filter", () => {
+    render(<KitchenPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Sẵn sàng" }));
+    expect(screen.getByRole("button", { name: "Sẵn sàng" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Đang xử lý" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
 });
