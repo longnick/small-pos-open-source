@@ -138,6 +138,7 @@ export function MenuGrid({ groups, items }: MenuGridProps) {
           <button
             key={group.id}
             type="button"
+            aria-pressed={activeGroupId === group.id}
             onClick={() => {
               setActiveGroupId(group.id);
               setSearch("");

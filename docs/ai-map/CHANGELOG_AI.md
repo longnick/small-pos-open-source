@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 07:22 - MenuGrid category aria-pressed
+
+Repo: `/home/longnick/projects/small-pos-menugrid-pressed`
+Branch: `fix/menugrid-category-pressed`
+Agent: Hermes / gcli/grok-4.6
+Summary: Category pills now expose exclusive `aria-pressed`, same class as Kitchen #15 / PaymentModal. Layout/copy unchanged.
+Verification: MenuGrid 16/16. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-0722-menugrid-category-pressed.md`
+
 ## 2026-08-13 07:06 - KitchenPanel filter aria-pressed
 
 Repo: `/home/longnick/projects/small-pos-kitchen-filter`
