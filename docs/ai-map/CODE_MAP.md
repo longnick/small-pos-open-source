@@ -38,3 +38,4 @@
 - `npm test` — unit tests.
 - `npm run ci:e2e` — typecheck, unit tests, build, leakage scan, Playwright smoke tests.
 - `npm run test:e2e:visual` — isolated tablet 768×1024 + desktop 1440×900 order-entry visual evidence (issue #3).
+- `.github/ISSUE_TEMPLATE/` — Bug, Feature, Documentation forms. New issues get `needs-triage`.

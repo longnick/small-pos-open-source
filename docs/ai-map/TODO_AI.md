@@ -2,14 +2,14 @@
 
 ## Doing
 
-- Issue #3 tablet/desktop visual evidence — local gates green. Remaining: PR CI + owner review. No deploy.
+- Issue templates / triage labels / first contributor tasks — rebase onto merged #5. Remaining: merge this PR + Pages verify. No extra deploy.
 
 ## Next
 
-- After issue #3 merges: issue templates / triage labels / first contributor tasks (ROADMAP).
+- After this docs PR: IndexedDB/Dexie only with separate design/review.
 - Keep all stores in-memory until approved Dexie hydration phase.
 - Keep `verifyPin` adapter-injected; add bcrypt/cloud adapter only when persistence/auth integration phase requires it.
-- Full payment lifecycle extras beyond local fixture payment already on `main` still need separate design/review.
+- Full payment extras beyond local fixture payment already on `main` still need separate design/review.
 
 ## Blocked
 

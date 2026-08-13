@@ -158,6 +158,23 @@ Related files:
 
 Scope: no production UI change, no persistence, no cloud, no real payment data.
 
+## Module: GitHub issue hygiene
+
+Purpose: keep public issues fixture-safe and triaged.
+
+Related files:
+
+- `.github/ISSUE_TEMPLATE/bug_report.yml`
+  - role: reproducible bug form. Labels `bug` + `needs-triage`.
+- `.github/ISSUE_TEMPLATE/feature_request.yml`
+  - role: bounded feature form. Labels `enhancement` + `needs-triage`.
+- `.github/ISSUE_TEMPLATE/docs.yml`
+  - role: docs-only form. Labels `documentation` + `needs-triage`.
+- `.github/ISSUE_TEMPLATE/config.yml`
+  - role: disables blank issues; points security to advisories and questions to Discussions.
+- `CONTRIBUTING.md`
+  - role: first-task path and label table.
+
 ## Module: POS core
 
 - `packages/pos-core/src/order-calc.ts`, `shift-report.ts`, `event-bus.ts`
