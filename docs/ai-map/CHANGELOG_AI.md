@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 06:52 - KitchenPanel empty-state a11y
+
+Repo: `/home/longnick/projects/small-pos-kitchen-a11y`
+Branch: `fix/kitchen-empty-a11y`
+Agent: Hermes / gcli/grok-4.6
+Summary: Empty kitchen filter now exposes Vietnamese `role="status"` + `aria-label`. Dummy tickets and layout unchanged. ChefHat marked `aria-hidden`.
+Verification: KitchenPanel 3/3. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-0652-kitchen-empty-a11y.md`
+
 ## 2026-08-13 06:35 - OrderPanel empty-state a11y
 
 Repo: `/home/longnick/projects/small-pos-orderpanel-a11y`

@@ -175,6 +175,14 @@ Related files:
 - `CONTRIBUTING.md`
   - role: first-task path and label table.
 
+## Module: Kitchen panel (presentation dummy)
+
+Purpose: render hardcoded kitchen tickets in the Lovable shell. No store, no fixture, no mutations.
+
+- `src/components/pos/KitchenPanel.tsx` — local filter + dummy tickets; empty filter exposes Vietnamese `role=status` name.
+- `src/components/pos/KitchenPanel.test.tsx` — empty-filter text, named status, and default-filter dummy tickets.
+- `src/App.tsx` — mounts `KitchenPanel` in the kitchen tab.
+
 ## Module: POS core
 
 - `packages/pos-core/src/order-calc.ts`, `shift-report.ts`, `event-bus.ts`
