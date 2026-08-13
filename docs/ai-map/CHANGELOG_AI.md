@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 05:41 - Issue #7 TableMap empty-state a11y
+
+Repo: `/home/longnick/projects/small-pos-issue7`
+Branch: `fix/issue-7-tablemap-empty-a11y`
+Agent: Hermes / gcli/grok-4.6
+Summary: Empty table map now exposes Vietnamese `role="status"` + `aria-label`. Layout/copy unchanged. TDD: RED missing status name, GREEN one-line a11y attrs.
+Verification: TableMap 5/5. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-0541-issue-7-tablemap-empty-a11y.md`
+
 ## 2026-08-13 04:37 - Issue templates and triage labels
 
 Repo: `/home/longnick/projects/small-pos-oss-triage`

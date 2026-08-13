@@ -107,4 +107,15 @@ describe("TableMap", () => {
     // The selected button should have the ring class applied
     expect(btn2.className).toMatch(/ring-2/);
   });
+
+  it("exposes the empty table-map state as a Vietnamese status", () => {
+    render(
+      <TableMap tables={[]} selectedTableId={null} onSelect={() => {}} />,
+    );
+
+    expect(
+      screen.getByRole("status", { name: "Chưa có bàn để hiển thị" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
 });

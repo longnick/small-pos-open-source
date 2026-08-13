@@ -2,7 +2,7 @@
 
 ## Doing
 
-- Issue templates / triage labels / first contributor tasks — rebase onto merged #5. Remaining: merge this PR + Pages verify. No extra deploy.
+- Issue #7 TableMap empty-state a11y — Sol APPROVE. Remaining: PR + owner review. No deploy.
 
 ## Next
 
@@ -21,6 +21,7 @@
 
 ## Done recently
 
+- Issue templates / triage labels / first contributor tasks — merged #9 (`848603f`).
 - Issue #3 tablet/desktop visual evidence — `docs/ai-map/TASK_LOGS/2026-08-13-0417-issue-3-tablet-desktop-visual.md`
 - Local payment + receipt + table release already on `main` (`382cec0`); Task 2.9 TODO above was stale.
 - Task 2.5 PIN Login — `docs/ai-map/TASK_LOGS/2026-08-08-0832-task-2-5-pin-login.md` (implementation/gates verified; strict historical TDD evidence partially interrupted by Kiro rate limit and Luna tool stall).

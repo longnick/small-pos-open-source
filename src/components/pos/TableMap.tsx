@@ -85,7 +85,13 @@ export function TableMap({ tables, selectedTableId, onSelect }: TableMapProps) {
   if (sorted.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center py-12 text-muted-foreground">
-        <p className="text-sm">Chưa có bàn để hiển thị</p>
+        <p
+          className="text-sm"
+          role="status"
+          aria-label="Chưa có bàn để hiển thị"
+        >
+          Chưa có bàn để hiển thị
+        </p>
       </div>
     );
   }
