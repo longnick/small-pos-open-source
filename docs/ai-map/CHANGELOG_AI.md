@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 05:49 - MenuGrid empty-catalog a11y
+
+Repo: `/home/longnick/projects/small-pos-menugrid-a11y`
+Branch: `fix/menugrid-empty-a11y`
+Agent: Hermes / gcli/grok-4.6
+Summary: Same class as issue #7. Empty catalog now exposes Vietnamese `role="status"` + `aria-label`. Layout/copy unchanged. Kitchen dummy empty state left alone.
+Verification: MenuGrid 12/12. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-0549-menugrid-empty-a11y.md`
+
 ## 2026-08-13 05:41 - Issue #7 TableMap empty-state a11y
 
 Repo: `/home/longnick/projects/small-pos-issue7`

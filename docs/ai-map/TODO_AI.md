@@ -2,7 +2,7 @@
 
 ## Doing
 
-- Issue #7 TableMap empty-state a11y — Sol APPROVE. Remaining: PR + owner review. No deploy.
+- MenuGrid empty-catalog a11y — Sol APPROVE. Remaining: PR + owner review. No deploy.
 
 ## Next
 
@@ -21,6 +21,7 @@
 
 ## Done recently
 
+- Issue #7 TableMap empty-state a11y — merged #10 (`97742bc`).
 - Issue templates / triage labels / first contributor tasks — merged #9 (`848603f`).
 - Issue #3 tablet/desktop visual evidence — `docs/ai-map/TASK_LOGS/2026-08-13-0417-issue-3-tablet-desktop-visual.md`
 - Local payment + receipt + table release already on `main` (`382cec0`); Task 2.9 TODO above was stale.
