@@ -70,6 +70,8 @@ Run full local verification:
 npm run ci
 npm run test:e2e
 npm run test:e2e:payment
+npm run test:e2e:order
+npm run test:e2e:visual
 ```
 
 ## Project boundaries

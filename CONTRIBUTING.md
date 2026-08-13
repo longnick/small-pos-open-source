@@ -14,6 +14,7 @@ Thanks for improving Small POS.
 npm ci
 npm run ci
 npm run test:e2e
+npm run test:e2e:visual
 ```
 
 Use Node.js 22. The browser suite runs against a fixture-only authentication adapter; never replace it with real credentials or services.

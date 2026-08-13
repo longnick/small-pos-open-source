@@ -5,7 +5,11 @@ const E2E_BASE_URL = `http://127.0.0.1:${E2E_PORT}`;
 
 export default defineConfig({
   testDir: "e2e",
-  testIgnore: ["payment-positive.spec.ts", "order-entry.spec.ts"],
+  testIgnore: [
+    "payment-positive.spec.ts",
+    "order-entry.spec.ts",
+    "visual-tablet-desktop.spec.ts",
+  ],
   use: { baseURL: E2E_BASE_URL },
   projects: [
     { name: "mobile", use: { viewport: { width: 390, height: 844 } } },
