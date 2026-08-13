@@ -98,10 +98,11 @@ scripts/               Leakage scanner and verification helpers
 
 Issues, docs improvements, accessibility work, test coverage, and small workflow fixes are welcome.
 
-1. Read [CONTRIBUTING.md](CONTRIBUTING.md).
+1. Read [CONTRIBUTING.md](CONTRIBUTING.md) for templates, labels, and first-task rules.
 2. Search existing Issues and Discussions.
-3. Choose a focused `good first issue` or `help wanted` task.
-4. Keep changes test-backed; run `npm run ci` and relevant E2E tests.
+3. Open a Bug, Feature, or Documentation template. New issues start as `needs-triage`.
+4. Choose a focused `good first issue` or `help wanted` task.
+5. Keep changes test-backed; run `npm run ci` and relevant E2E tests.
 
 Please do not include credentials, customer data, payment data, or real business configuration in issues or pull requests.
 
@@ -121,6 +122,13 @@ Hiện có: chọn bàn, đơn hàng, tính tiền VND an toàn, tiền thừa t
 Chưa có: VietQR, Firebase, cloud sync, tồn kho/doanh thu thời gian thực, cổng thanh toán, hoàn tiền, hóa đơn điện tử, hay hướng dẫn deploy production. Đây là các giới hạn có chủ đích để giữ core nhỏ và an toàn.
 
 Nếu dự án hữu ích, hãy mở Issue/Discussion hoặc cho repo một Star để giúp nhiều người tìm thấy nó hơn.
+
+Muốn đóng góp lần đầu:
+
+1. Đọc [CONTRIBUTING.md](CONTRIBUTING.md) để biết template, nhãn, và việc nhỏ cho người mới.
+2. Mở Issue bằng mẫu Bug / Feature / Documentation. Issue mới có nhãn `needs-triage`.
+3. Chọn việc `good first issue` hoặc `help wanted`.
+4. Không gửi mật khẩu, dữ liệu khách, hay thông tin thanh toán thật.
 
 ## Maintainer use of Codex
 

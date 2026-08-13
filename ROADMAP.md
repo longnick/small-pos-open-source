@@ -16,7 +16,7 @@ Small POS is a reference starter. Roadmap items are not promises and should not 
 - [x] Local table transition rules around payment completion.
 - [x] Accessible receipt view and printable local-only receipt data.
 - [ ] More mobile/tablet visual regression evidence.
-- [ ] Issue templates, triage labels, and first contributor tasks.
+- [x] Issue templates, triage labels, and first contributor tasks.
 
 ## Later: persistence and concurrency
 

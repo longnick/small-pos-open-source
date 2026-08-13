@@ -1,0 +1,33 @@
+name: Documentation
+description: Improve local-demo docs without changing product behavior
+title: "docs: "
+labels: [documentation, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: "Docs-only. Do not include credentials, customer data, payment data, or production configuration."
+  - type: textarea
+    id: gap
+    attributes:
+      label: What is unclear today?
+      description: Point at the file or README section. Quote the confusing sentence if you can.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed wording or structure
+      description: Keep the change local-demo only. No cloud, payment gateway, or deploy guidance.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and Discussions.
+          required: true
+        - label: This request contains no credentials, personal data, or payment data.
+          required: true
+        - label: This does not expand production, cloud, or payment scope.
+          required: true

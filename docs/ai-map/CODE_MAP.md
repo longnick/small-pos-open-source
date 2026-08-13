@@ -37,3 +37,4 @@
 
 - `npm test` — unit tests.
 - `npm run ci:e2e` — typecheck, unit tests, build, leakage scan, Playwright smoke tests.
+- `.github/ISSUE_TEMPLATE/` — Bug, Feature, Documentation forms. New issues get `needs-triage`.

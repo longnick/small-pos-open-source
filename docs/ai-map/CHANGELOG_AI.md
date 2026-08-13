@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 04:37 - Issue templates and triage labels
+
+Repo: `/home/longnick/projects/small-pos-oss-triage`
+Branch: `docs/issue-templates-triage`
+Agent: Hermes / gcli/grok-4.6
+Summary: Docs-only OSS hygiene. Added Documentation issue template, `needs-triage` on existing templates, CONTRIBUTING first-task + label table. No `src/` change.
+Verification: pending Gemini Pro review + `npm run ci` (docs-only; no new tests).
+Next: create GitHub labels + starter issues; open PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-0437-issue-templates-triage.md`
+
 ## 2026-08-12 03:40 - Task 2.9 minimal payment modal
 
 Repo: `/home/longnick/projects/small-pos-release-task25`
