@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 09:20 - MenuGrid searchbox name
+
+Repo: `/home/longnick/projects/small-pos-menugrid-search-name`
+Branch: `fix/menugrid-search-name`
+Agent: Hermes / gcli/grok-4.6
+Summary: Searchbox now has Vietnamese accessible name `Tìm món`. Placeholder/layout unchanged.
+Verification: MenuGrid 17/17. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-0920-menugrid-search-name.md`
+
 ## 2026-08-13 07:22 - MenuGrid category aria-pressed
 
 Repo: `/home/longnick/projects/small-pos-menugrid-pressed`

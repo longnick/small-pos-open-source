@@ -163,6 +163,11 @@ describe("MenuGrid", () => {
     expect(screen.queryByText("Cà phê đen")).not.toBeInTheDocument();
   });
 
+  it("exposes the searchbox as a Vietnamese named search field", () => {
+    render(<MenuGrid groups={groups} items={items} />);
+    expect(screen.getByRole("searchbox", { name: "Tìm món" })).toBeTruthy();
+  });
+
   // --- empty catalog text ---
 
   it("shows exact text 'Chưa có món để hiển thị' when groups/items are empty", () => {
