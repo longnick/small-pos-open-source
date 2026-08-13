@@ -2,7 +2,7 @@
 
 ## Doing
 
-- MenuGrid searchbox name — Sol APPROVE. Remaining: PR + owner review. No deploy.
+- MenuManagement filter `aria-pressed` — Sol APPROVE. Remaining: PR + owner review. No deploy.
 
 ## Next
 
@@ -21,6 +21,7 @@
 
 ## Done recently
 
+- MenuGrid searchbox name — merged #17 (`5e82122`).
 - MenuGrid category `aria-pressed` — merged #16 (`d923167`).
 - KitchenPanel filter `aria-pressed` — merged #15 (`1d34c2f`).
 - KitchenPanel empty-state a11y — merged #14 (`3597b84`).

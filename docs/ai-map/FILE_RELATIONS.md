@@ -183,6 +183,14 @@ Purpose: render hardcoded kitchen tickets in the Lovable shell. No store, no fix
 - `src/components/pos/KitchenPanel.test.tsx` — empty-filter text, named status, default dummy tickets, and filter `aria-pressed`.
 - `src/App.tsx` — mounts `KitchenPanel` in the kitchen tab.
 
+## Module: Menu management (presentation dummy)
+
+Purpose: render hardcoded catalog rows in the Lovable shell. No store, no mutations.
+
+- `src/components/pos/MenuManagement.tsx` — local search + category filter over `INITIAL_MENU_ITEMS`; filter chips expose `aria-pressed`.
+- `src/components/pos/MenuManagement.test.tsx` — default pressed, unpressed siblings, click exclusivity.
+- `src/App.tsx` — mounts `MenuManagement` in the menu tab.
+
 ## Module: POS core
 
 - `packages/pos-core/src/order-calc.ts`, `shift-report.ts`, `event-bus.ts`
