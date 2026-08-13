@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 06:35 - OrderPanel empty-state a11y
+
+Repo: `/home/longnick/projects/small-pos-orderpanel-a11y`
+Branch: `fix/orderpanel-empty-a11y`
+Agent: Hermes / gcli/grok-4.6
+Summary: Empty order now exposes Vietnamese `role="region"` + `aria-label`. Did not use `role="status"` — that role is reserved for the existing announcement live region. Layout/copy unchanged.
+Verification: OrderPanel 38/38. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-0635-orderpanel-empty-a11y.md`
+
 ## 2026-08-13 06:26 - MenuGrid search no-result a11y
 
 Repo: `/home/longnick/projects/small-pos-menugrid-noresult`

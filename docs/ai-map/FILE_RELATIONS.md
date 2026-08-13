@@ -116,7 +116,7 @@ Purpose: owner-approved local payment choice preview for an existing open popula
 Purpose: render existing in-memory current order in the Lovable shell without introducing checkout, kitchen, or line-edit behavior.
 
 - `src/components/pos/OrderPanel.tsx` — reads `useOrderPaymentStore.currentOrder`; displays empty state or stored lines/totals and disables unimplemented controls.
-- `src/components/pos/OrderPanel.test.tsx` — null/empty/store-order display, stored totals, and disabled-control coverage.
+- `src/components/pos/OrderPanel.test.tsx` — null/empty/store-order display, stored totals, disabled-control coverage, and empty-state `role=region` name.
 - `src/App.tsx` — passes presentation-only selected table and reads store item count for mobile tab badge; no order-store mutation.
 - `src/App.test.tsx` — authenticated shell empty-order boundary coverage.
 - `e2e/smoke.spec.ts` — fixture-authenticated empty-order evidence at 390×844, 768×1024, and 1440×900.
