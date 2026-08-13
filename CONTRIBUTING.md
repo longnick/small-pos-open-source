@@ -7,6 +7,37 @@ Thanks for improving Small POS.
 - Search existing Issues and Discussions first.
 - Do not include real customer data, credentials, payment details, or internal business records.
 - For vulnerabilities, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
+- Use a template: Bug report, Feature request, or Documentation.
+- New issues get `needs-triage` until a maintainer classifies them.
+
+## First contributor tasks
+
+Start here if this is your first PR:
+
+1. Filter Issues by `good first issue`.
+2. If none fit, take a `help wanted` + `scope:docs` or `scope:a11y` task.
+3. Keep the PR docs-only or one focused test/UI change.
+4. Do not add persistence, cloud, payment gateways, or real credentials.
+
+Current starter issues live on the repo Issues tab. If you are unsure whether a change is in scope, open a Discussion first.
+
+## Labels
+
+Templates apply a **type** label plus `needs-triage`. Maintainers add a `scope:*` label and remove `needs-triage`.
+
+| Label | Kind | Meaning |
+|---|---|---|
+| `bug` / `enhancement` / `documentation` | type | Applied by the issue template. |
+| `needs-triage` | queue | New. Maintainer has not classified it yet. |
+| `good first issue` | intake | Small, fixture-safe, one-file-or-docs change. |
+| `help wanted` | intake | Bounded and welcome; may need more context. |
+| `scope:docs` | triage | Documentation only. |
+| `scope:a11y` | triage | Accessibility / Vietnamese accessible names. |
+| `scope:e2e` | triage | Fixture Playwright only. |
+| `scope:ui` | triage | Local UI/copy/layout. No new product surface. |
+| `out-of-scope` | triage | Rejected against ROADMAP / SECURITY boundaries. |
+
+Do not replace type labels with `scope:*` in templates. `documentation` and `scope:docs` are both correct: type first, scope after triage.
 
 ## Development setup
 

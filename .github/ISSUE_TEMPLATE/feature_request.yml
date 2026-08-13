@@ -1,7 +1,7 @@
 name: Feature request
 description: Propose a bounded improvement within the Small POS roadmap
 title: "feature: "
-labels: [enhancement]
+labels: [enhancement, needs-triage]
 body:
   - type: markdown
     attributes:
