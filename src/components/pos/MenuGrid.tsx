@@ -121,6 +121,7 @@ export function MenuGrid({ groups, items }: MenuGridProps) {
         <input
           role="searchbox"
           type="search"
+          aria-label="Tìm món"
           placeholder="Tìm món..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
