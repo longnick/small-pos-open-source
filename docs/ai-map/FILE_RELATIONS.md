@@ -179,8 +179,8 @@ Related files:
 
 Purpose: render hardcoded kitchen tickets in the Lovable shell. No store, no fixture, no mutations.
 
-- `src/components/pos/KitchenPanel.tsx` — local filter + dummy tickets; empty filter exposes Vietnamese `role=status` name.
-- `src/components/pos/KitchenPanel.test.tsx` — empty-filter text, named status, and default-filter dummy tickets.
+- `src/components/pos/KitchenPanel.tsx` — local filter + dummy tickets; empty filter exposes Vietnamese `role=status` name; filter chips expose `aria-pressed`.
+- `src/components/pos/KitchenPanel.test.tsx` — empty-filter text, named status, default dummy tickets, and filter `aria-pressed`.
 - `src/App.tsx` — mounts `KitchenPanel` in the kitchen tab.
 
 ## Module: POS core

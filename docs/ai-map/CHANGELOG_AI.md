@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 07:06 - KitchenPanel filter aria-pressed
+
+Repo: `/home/longnick/projects/small-pos-kitchen-filter`
+Branch: `fix/kitchen-filter-pressed`
+Agent: Hermes / gcli/grok-4.6
+Summary: Kitchen filter chips now expose `aria-pressed` like PaymentModal method buttons. Layout/copy/dummy tickets unchanged.
+Verification: KitchenPanel 6/6. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-0706-kitchen-filter-pressed.md`
+
 ## 2026-08-13 06:52 - KitchenPanel empty-state a11y
 
 Repo: `/home/longnick/projects/small-pos-kitchen-a11y`
