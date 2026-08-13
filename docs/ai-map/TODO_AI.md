@@ -2,7 +2,7 @@
 
 ## Doing
 
-- PaymentModal `type="button"` — Sol APPROVE. Remaining: PR + owner review. No deploy.
+- MenuManagement icon pencil/trash names — Sol APPROVE. Remaining: PR + owner review. No deploy.
 
 ## Next
 
@@ -21,6 +21,7 @@
 
 ## Done recently
 
+- PaymentModal `type="button"` — merged #21 (`0af55aa`).
 - StaffManagement shift `aria-pressed` — merged #20 (`79f5716`).
 - ReportsPanel range `aria-pressed` — merged #19 (`8d0df52`).
 - MenuManagement filter `aria-pressed` — merged #18 (`f8b61bd`).
