@@ -199,6 +199,14 @@ Purpose: render hardcoded report metrics in the Lovable shell. No store, no muta
 - `src/components/pos/ReportsPanel.test.tsx` — default pressed, unpressed siblings, click exclusivity.
 - `src/App.tsx` — mounts `ReportsPanel` in the report tab.
 
+## Module: Staff management (presentation dummy)
+
+Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutations.
+
+- `src/components/pos/StaffManagement.tsx` — local shift filter over `INITIAL_STAFF`; chips expose `aria-pressed`.
+- `src/components/pos/StaffManagement.test.tsx` — default pressed, unpressed siblings, click exclusivity.
+- `src/App.tsx` — mounts `StaffManagement` in the staff tab.
+
 ## Module: POS core
 
 - `packages/pos-core/src/order-calc.ts`, `shift-report.ts`, `event-bus.ts`

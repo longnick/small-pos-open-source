@@ -2,7 +2,7 @@
 
 ## Doing
 
-- ReportsPanel range `aria-pressed` — Sol APPROVE. Remaining: PR + owner review. No deploy.
+- StaffManagement shift `aria-pressed` — Sol APPROVE. Remaining: PR + owner review. No deploy.
 
 ## Next
 
@@ -21,6 +21,7 @@
 
 ## Done recently
 
+- ReportsPanel range `aria-pressed` — merged #19 (`8d0df52`).
 - MenuManagement filter `aria-pressed` — merged #18 (`f8b61bd`).
 - MenuGrid searchbox name — merged #17 (`5e82122`).
 - MenuGrid category `aria-pressed` — merged #16 (`d923167`).
