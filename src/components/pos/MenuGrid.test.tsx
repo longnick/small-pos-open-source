@@ -155,6 +155,18 @@ describe("MenuGrid", () => {
     expect(screen.getByText("Không tìm thấy món nào")).toBeInTheDocument();
   });
 
+  it("exposes the search no-result state as a Vietnamese status", () => {
+    render(<MenuGrid groups={groups} items={items} />);
+
+    fireEvent.change(screen.getByRole("searchbox"), {
+      target: { value: "xyzxyzxyz" },
+    });
+
+    expect(
+      screen.getByRole("status", { name: "Không tìm thấy món nào" }),
+    ).toBeTruthy();
+  });
+
   // --- reconcile removed active group ---
 
   it("resets to first current group when the active group is removed via rerender", () => {
