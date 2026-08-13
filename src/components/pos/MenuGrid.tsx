@@ -157,7 +157,11 @@ export function MenuGrid({ groups, items }: MenuGridProps) {
       {/* Item grid */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {visibleItems.length === 0 ? (
-          <div className="flex h-full items-center justify-center py-8 text-sm text-muted-foreground">
+          <div
+            className="flex h-full items-center justify-center py-8 text-sm text-muted-foreground"
+            role="status"
+            aria-label="Không tìm thấy món nào"
+          >
             Không tìm thấy món nào
           </div>
         ) : (

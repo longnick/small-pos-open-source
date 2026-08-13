@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 06:26 - MenuGrid search no-result a11y
+
+Repo: `/home/longnick/projects/small-pos-menugrid-noresult`
+Branch: `fix/menugrid-no-result-a11y`
+Agent: Hermes / gcli/grok-4.6
+Summary: Same class as #7/#11. Search no-result now exposes Vietnamese `role="status"` + `aria-label`. Layout/copy unchanged.
+Verification: MenuGrid 13/13. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-0626-menugrid-no-result-a11y.md`
+
 ## 2026-08-13 05:49 - MenuGrid empty-catalog a11y
 
 Repo: `/home/longnick/projects/small-pos-menugrid-a11y`
