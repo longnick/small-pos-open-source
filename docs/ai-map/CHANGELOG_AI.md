@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 09:30 - MenuManagement filter aria-pressed
+
+Repo: `/home/longnick/projects/small-pos-menumgmt-filter`
+Branch: `fix/menumgmt-filter-pressed`
+Agent: Hermes / gcli/grok-4.6
+Summary: Category filter chips now expose exclusive `aria-pressed`, same class as Kitchen #15 / MenuGrid #16. Dummy list and icon buttons unchanged.
+Verification: MenuManagement 3/3. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-0930-menumgmt-filter-pressed.md`
+
 ## 2026-08-13 09:20 - MenuGrid searchbox name
 
 Repo: `/home/longnick/projects/small-pos-menugrid-search-name`
