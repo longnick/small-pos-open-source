@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 12:22 - StaffManagement trash name
+
+Repo: `/home/longnick/projects/small-pos-staff-trash`
+Branch: `fix/staff-trash-name`
+Agent: Hermes / gcli/grok-4.6
+Summary: Icon-only trash on StaffManagement rows now has Vietnamese name `Xóa {staff}`. Dummy CRUD still no-op. Same class as MenuManagement #22.
+Verification: StaffManagement 4/4. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-1222-staff-trash-name.md`
+
 ## 2026-08-13 11:43 - MenuManagement icon names
 
 Repo: `/home/longnick/projects/small-pos-icon-names`

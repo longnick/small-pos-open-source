@@ -203,8 +203,8 @@ Purpose: render hardcoded report metrics in the Lovable shell. No store, no muta
 
 Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutations.
 
-- `src/components/pos/StaffManagement.tsx` — local shift filter over `INITIAL_STAFF`; chips expose `aria-pressed`.
-- `src/components/pos/StaffManagement.test.tsx` — default pressed, unpressed siblings, click exclusivity.
+- `src/components/pos/StaffManagement.tsx` — local shift filter over `INITIAL_STAFF`; chips expose `aria-pressed`; icon trash named `Xóa {staff}`.
+- `src/components/pos/StaffManagement.test.tsx` — default pressed, unpressed siblings, click exclusivity, named trash.
 - `src/App.tsx` — mounts `StaffManagement` in the staff tab.
 
 ## Module: POS core

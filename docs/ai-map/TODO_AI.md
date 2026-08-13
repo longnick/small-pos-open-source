@@ -2,7 +2,7 @@
 
 ## Doing
 
-- MenuManagement icon pencil/trash names — Sol APPROVE. Remaining: PR + owner review. No deploy.
+- StaffManagement trash name — Sol APPROVE. Remaining: PR + owner review. No deploy.
 
 ## Next
 
@@ -21,6 +21,7 @@
 
 ## Done recently
 
+- MenuManagement icon pencil/trash names — merged #22 (`829c166`).
 - PaymentModal `type="button"` — merged #21 (`0af55aa`).
 - StaffManagement shift `aria-pressed` — merged #20 (`79f5716`).
 - ReportsPanel range `aria-pressed` — merged #19 (`8d0df52`).
