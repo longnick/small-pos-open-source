@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 11:43 - MenuManagement icon names
+
+Repo: `/home/longnick/projects/small-pos-icon-names`
+Branch: `fix/menumgmt-icon-names`
+Agent: Hermes / gcli/grok-4.6
+Summary: Icon-only pencil/trash on MenuManagement rows now have Vietnamese names `Sửa {item}` / `Xóa {item}`. Dummy CRUD still no-ops. Staff trash left for next slice.
+Verification: MenuManagement 5/5. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-1143-menumgmt-icon-names.md`
+
 ## 2026-08-13 10:31 - PaymentModal type=button
 
 Repo: `/home/longnick/projects/small-pos-payment-type`

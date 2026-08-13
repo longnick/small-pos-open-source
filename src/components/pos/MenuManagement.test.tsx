@@ -36,4 +36,14 @@ describe("MenuManagement", () => {
       "false",
     );
   });
+
+  it("names the pencil button for 'Cà phê đen'", () => {
+    render(<MenuManagement />);
+    expect(screen.getByRole("button", { name: "Sửa Cà phê đen" })).toBeInTheDocument();
+  });
+
+  it("names the trash button for 'Cà phê đen'", () => {
+    render(<MenuManagement />);
+    expect(screen.getByRole("button", { name: "Xóa Cà phê đen" })).toBeInTheDocument();
+  });
 });
