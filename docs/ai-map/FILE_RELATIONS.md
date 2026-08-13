@@ -191,6 +191,14 @@ Purpose: render hardcoded catalog rows in the Lovable shell. No store, no mutati
 - `src/components/pos/MenuManagement.test.tsx` — default pressed, unpressed siblings, click exclusivity.
 - `src/App.tsx` — mounts `MenuManagement` in the menu tab.
 
+## Module: Reports panel (presentation dummy)
+
+Purpose: render hardcoded report metrics in the Lovable shell. No store, no mutations.
+
+- `src/components/pos/ReportsPanel.tsx` — local range chips over dummy stats/chart; chips expose `aria-pressed`.
+- `src/components/pos/ReportsPanel.test.tsx` — default pressed, unpressed siblings, click exclusivity.
+- `src/App.tsx` — mounts `ReportsPanel` in the report tab.
+
 ## Module: POS core
 
 - `packages/pos-core/src/order-calc.ts`, `shift-report.ts`, `event-bus.ts`
