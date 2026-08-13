@@ -77,16 +77,16 @@ export function PaymentModal({ open, orderTotal, onOpenChange, orderId, tenantId
             <p>Tiền thối: <strong>{formatCurrency(receipt.change)}</strong></p>
             <p>Thời điểm: <time dateTime={new Date(receipt.timestamp).toISOString()}>{new Date(receipt.timestamp).toLocaleString("vi-VN")}</time></p>
             <div className="grid grid-cols-2 gap-2 pt-2">
-              <button onClick={() => window.print()} className="rounded-lg border border-input bg-background py-2.5 font-semibold">In hóa đơn</button>
-              <button onClick={closeReceipt} className="rounded-lg bg-primary py-2.5 font-semibold text-primary-foreground">Đóng</button>
+              <button type="button" onClick={() => window.print()} className="rounded-lg border border-input bg-background py-2.5 font-semibold">In hóa đơn</button>
+              <button type="button" onClick={closeReceipt} className="rounded-lg bg-primary py-2.5 font-semibold text-primary-foreground">Đóng</button>
             </div>
           </section>
         ) : (
           <>
             <div className="rounded-xl border border-border bg-muted/40 p-4"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Tổng cộng</span><span className="text-xl font-bold text-primary">{formatCurrency(orderTotal)}</span></div></div>
-            <div className="mt-4"><p className="mb-2 text-sm font-medium text-foreground">Phương thức thanh toán</p><div className="grid grid-cols-2 gap-2">{PAYMENT_METHODS.map(({ value, label }) => <button key={value} aria-pressed={selectedMethod === value} onClick={() => setSelectedMethod(value)} className={["rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors", selectedMethod === value ? "border-primary bg-primary/10 text-primary" : "border-input bg-background text-foreground hover:bg-muted"].join(" ")}>{label}</button>)}</div></div>
+            <div className="mt-4"><p className="mb-2 text-sm font-medium text-foreground">Phương thức thanh toán</p><div className="grid grid-cols-2 gap-2">{PAYMENT_METHODS.map(({ value, label }) => <button key={value} type="button" aria-pressed={selectedMethod === value} onClick={() => setSelectedMethod(value)} className={["rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors", selectedMethod === value ? "border-primary bg-primary/10 text-primary" : "border-input bg-background text-foreground hover:bg-muted"].join(" ")}>{label}</button>)}</div></div>
             {executable && <div className="mt-4"><label htmlFor="payment-tender" className="mb-2 block text-sm font-medium text-foreground">Số tiền khách đưa</label><input id="payment-tender" type="number" inputMode="numeric" min="0" step="1" value={tenderInput} onChange={(event) => setTenderInput(event.target.value)} className="w-full rounded-lg border border-input bg-background p-2.5" />{change !== null && <p className="mt-2 text-sm text-muted-foreground">Tiền thối: {formatCurrency(change)}</p>}</div>}
-            <div className="mt-5 grid grid-cols-2 gap-2">{executable && <button disabled={!validTender} onClick={confirm} className="rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40">Xác nhận thanh toán</button>}<button aria-label="Hủy" onClick={() => onOpenChange(false)} className="rounded-lg border border-input bg-background py-2.5 text-sm font-semibold text-foreground hover:bg-muted">Hủy</button></div>
+            <div className="mt-5 grid grid-cols-2 gap-2">{executable && <button type="button" disabled={!validTender} onClick={confirm} className="rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40">Xác nhận thanh toán</button>}<button type="button" aria-label="Hủy" onClick={() => onOpenChange(false)} className="rounded-lg border border-input bg-background py-2.5 text-sm font-semibold text-foreground hover:bg-muted">Hủy</button></div>
           </>
         )}
       </div>

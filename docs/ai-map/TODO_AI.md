@@ -2,7 +2,7 @@
 
 ## Doing
 
-- StaffManagement shift `aria-pressed` — Sol APPROVE. Remaining: PR + owner review. No deploy.
+- PaymentModal `type="button"` — Sol APPROVE. Remaining: PR + owner review. No deploy.
 
 ## Next
 
@@ -21,6 +21,7 @@
 
 ## Done recently
 
+- StaffManagement shift `aria-pressed` — merged #20 (`79f5716`).
 - ReportsPanel range `aria-pressed` — merged #19 (`8d0df52`).
 - MenuManagement filter `aria-pressed` — merged #18 (`f8b61bd`).
 - MenuGrid searchbox name — merged #17 (`5e82122`).

@@ -230,6 +230,52 @@ describe("PaymentModal", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("method, cancel, and confirm buttons use type=button", () => {
+    render(
+      <PaymentModal
+        open={true}
+        orderTotal={50_000}
+        onOpenChange={vi.fn()}
+        orderId="order-pay"
+        tenantId="tenant-1"
+        staffId="staff-1"
+      />,
+    );
+    for (const name of ["Tiền mặt", "Chuyển khoản", "Thẻ", "Khác", "Hủy", "Xác nhận thanh toán"]) {
+      expect(screen.getByRole("button", { name })).toHaveAttribute("type", "button");
+    }
+  });
+
+  it("receipt print and close buttons use type=button", () => {
+    useOrderPaymentStore.getState().selectOpenOrder({
+      id: "order-pay",
+      tenantId: "tenant-1",
+      tableId: "table-1",
+      staffId: "staff-1",
+      status: "open",
+      items: [{ id: "line-1", orderId: "order-pay", catalogItemId: "c1", name: "Coffee", price: 50_000, quantity: 1 }],
+      subtotal: 50_000,
+      discount: 0,
+      discountType: "amount",
+      total: 50_000,
+      createdAt: 1,
+    });
+    render(
+      <PaymentModal
+        open={true}
+        orderTotal={50_000}
+        onOpenChange={vi.fn()}
+        orderId="order-pay"
+        tenantId="tenant-1"
+        staffId="staff-1"
+      />,
+    );
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "50000" } });
+    fireEvent.click(screen.getByRole("button", { name: /xác nhận thanh toán/i }));
+    expect(screen.getByRole("button", { name: "In hóa đơn" })).toHaveAttribute("type", "button");
+    expect(screen.getByRole("button", { name: "Đóng" })).toHaveAttribute("type", "button");
+  });
+
   it("clicking the backdrop calls onOpenChange(false)", () => {
     const onOpenChange = vi.fn();
     const { container } = render(
