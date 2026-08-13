@@ -104,8 +104,8 @@ Purpose: create ephemeral demo auth records and gate the Lovable POS shell behin
 
 Purpose: owner-approved local payment choice preview for an existing open populated order, deliberately excluding payment execution.
 
-- `src/components/pos/PaymentModal.tsx` — accessible local dialog; reads passed total, stores selection only in component state, cancels/closes without domain write.
-- `src/components/pos/PaymentModal.test.tsx` — dialog, passed-total, method choice, cancel, and no-confirm surface coverage.
+- `src/components/pos/PaymentModal.tsx` — accessible local dialog; reads passed total, stores selection only in component state, cancels/closes without domain write. All buttons set `type="button"`.
+- `src/components/pos/PaymentModal.test.tsx` — dialog, passed-total, method choice, cancel, no-confirm surface, and explicit `type="button"` lock.
 - `src/components/pos/OrderPanel.tsx` — local modal gate restricted to current store order status `open` with items; no `recordPayment` call.
 - `src/components/pos/OrderPanel.test.tsx` / `src/App.test.tsx` — eligibility, dialog and null-order denial boundaries.
 - `e2e/smoke.spec.ts` — fixture-authenticated null-order denial evidence at 390×844, 768×1024, and 1440×900.

@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-13 10:31 - PaymentModal type=button
+
+Repo: `/home/longnick/projects/small-pos-payment-type`
+Branch: `fix/payment-type-button`
+Agent: Hermes / gcli/grok-4.6
+Summary: All PaymentModal buttons now set `type="button"` so they never submit if later wrapped in a form. Payment logic, tender, and receipt flow unchanged.
+Verification: type=button tests 2/2. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-13-1031-payment-type-button.md`
+
 ## 2026-08-13 10:17 - StaffManagement shift aria-pressed
 
 Repo: `/home/longnick/projects/small-pos-staff-pressed`
