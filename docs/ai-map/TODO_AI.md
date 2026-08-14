@@ -2,7 +2,7 @@
 
 ## Doing
 
-- App shell nav `aria-current` — Sol APPROVE. Remaining: PR + owner review. No deploy.
+- MenuManagement search name — Sol APPROVE. Remaining: PR + owner review. No deploy.
 
 ## Next
 
@@ -21,6 +21,7 @@
 
 ## Done recently
 
+- App shell nav `aria-current` — merged #24 (`734ebd4`).
 - StaffManagement trash name — merged #23 (`885542b`).
 - MenuManagement icon pencil/trash names — merged #22 (`829c166`).
 - PaymentModal `type="button"` — merged #21 (`0af55aa`).

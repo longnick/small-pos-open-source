@@ -46,4 +46,9 @@ describe("MenuManagement", () => {
     render(<MenuManagement />);
     expect(screen.getByRole("button", { name: "Xóa Cà phê đen" })).toBeInTheDocument();
   });
+
+  it("names the search field 'Tìm món'", () => {
+    render(<MenuManagement />);
+    expect(screen.getByRole("searchbox", { name: "Tìm món" })).toBeInTheDocument();
+  });
 });

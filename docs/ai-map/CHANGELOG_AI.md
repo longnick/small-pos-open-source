@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-14 03:21 - MenuManagement search name
+
+Repo: `/home/longnick/projects/small-pos-menumgmt-search`
+Branch: `fix/menumgmt-search-name`
+Agent: Hermes / gcli/grok-4.6
+Summary: MenuManagement search Input now has `role="searchbox"` + `aria-label="Tìm món"`. Placeholder `Tìm món...` unchanged. Same class as MenuGrid #17.
+Verification: MenuManagement 6/6. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-14-0321-menumgmt-search-name.md`
+
 ## 2026-08-14 02:01 - App shell nav aria-current
 
 Repo: `/home/longnick/projects/small-pos-app-nav`
