@@ -2,26 +2,28 @@
 
 ## Doing
 
-- MenuManagement empty `Không có món nào` — Sol APPROVE. Remaining: PR + owner review. No deploy.
+- Dexie design PR — docs only. Later #1 still `[ ]`. No adapter.
 
 ## Next
 
-- After this docs PR: IndexedDB/Dexie only with separate design/review.
-- Keep all stores in-memory until approved Dexie hydration phase.
-- Keep `verifyPin` adapter-injected; add bcrypt/cloud adapter only when persistence/auth integration phase requires it.
-- Full payment extras beyond local fixture payment already on `main` still need separate design/review.
+- After owner merge: read-only Dexie hydrate PR (`docs/dexie-design.md`). Not this PR.
+- Keep all stores in-memory until that hydrate PR.
+- Keep `verifyPin` adapter-injected; bcrypt/cloud only in a later auth-persist slice.
+- Later #2–#4 (reload/backup, multi-tab, migration docs) stay separate.
+- Issue #1 stays for a contributor.
 
 ## Blocked
 
-- Notion public/integration unavailable. Task 2.4 record only; no auth attempt.
+- Notion public/integration unavailable. Task 2.4 record only; no auth attempt. (Stale note: key now in Hermes env; 56-task page synced 2026-08-14. Do not write Notion on this PR unless owner asks.)
 
 ## Risks
 
-- All four stores remain in-memory only; no UI, DB, Dexie hydration, raw seed conversion, or inter-store coupling beyond what each task's scope allows.
+- All four stores remain in-memory only. Dexie v1 schema exists unused. Design forbids auto-seed and write-back in the first adapter PR.
 
 ## Done recently
 
-- MenuManagement search name — merged #25 (`95ad81a`).
+- Dexie design (Later #1, docs only) — `docs/ai-map/TASK_LOGS/2026-08-14-0530-dexie-design.md`
+- MenuManagement empty status — merged #26 (`94bb10f`).
 - App shell nav `aria-current` — merged #24 (`734ebd4`).
 - StaffManagement trash name — merged #23 (`885542b`).
 - MenuManagement icon pencil/trash names — merged #22 (`829c166`).

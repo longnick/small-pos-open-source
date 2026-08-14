@@ -3,6 +3,8 @@
 ## Core domain
 
 - `packages/pos-core/src/types.ts` — shared POS domain types.
+- `packages/pos-storage/src/db.ts` — Dexie v1 schema. Unused by app. Design: `docs/dexie-design.md`.
+- `packages/pos-storage/src/backup.ts` — v1 backup import/export. Unused by UI.
 - `packages/pos-core/src/auth.ts` — PIN verifier boundary and role-based permission guard.
 - `packages/pos-core/src/order-calc.ts` — order total calculation.
 - `packages/pos-core/src/shift-report.ts` — shift report calculation.
