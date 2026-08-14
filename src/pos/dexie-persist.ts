@@ -27,10 +27,14 @@ const isOptionalString = (value: unknown): value is string | undefined => value 
 const isMoney = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
 
 const materializeRecord = (value: unknown): Record<string, unknown> | null => {
-  if (!isPlainObject(value)) return null;
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  if (Reflect.ownKeys(descriptors).some((key) => !("value" in descriptors[key as keyof typeof descriptors]))) return null;
-  return Object.fromEntries(Reflect.ownKeys(descriptors).map((key) => [key, descriptors[key as keyof typeof descriptors].value]));
+  try {
+    if (!isPlainObject(value)) return null;
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    if (Reflect.ownKeys(descriptors).some((key) => !("value" in descriptors[key as keyof typeof descriptors]))) return null;
+    return Object.fromEntries(Reflect.ownKeys(descriptors).map((key) => [key, descriptors[key as keyof typeof descriptors].value]));
+  } catch {
+    return null;
+  }
 };
 
 const isOrderItem = (value: Record<string, unknown>): value is Record<string, unknown> & OrderItem =>
@@ -175,8 +179,14 @@ export async function persistAfterOccupy(
   input: DexiePersistInput,
   snapshot: { table: PosTable; order: Order },
 ): Promise<PersistResult> {
-  const table = materializeTable(snapshot?.table);
-  const order = materializeOrder(snapshot?.order);
+  let table: PosTable | null = null;
+  let order: Order | null = null;
+  try {
+    table = materializeTable(snapshot?.table);
+    order = materializeOrder(snapshot?.order);
+  } catch {
+    return false;
+  }
   if (
     !table
     || !order
@@ -200,7 +210,12 @@ export async function persistAfterOrderEdit(
   input: DexiePersistInput,
   snapshot: { order: Order },
 ): Promise<PersistResult> {
-  const order = materializeOrder(snapshot?.order);
+  let order: Order | null = null;
+  try {
+    order = materializeOrder(snapshot?.order);
+  } catch {
+    return false;
+  }
   if (!order || order.tenantId !== input.authenticatedTenantId || order.status !== "open") return false;
 
   const written = await withWritableDb(input, ["orders"], async (database) => {
@@ -214,9 +229,16 @@ export async function persistAfterPay(
   input: DexiePersistInput,
   snapshot: { table: PosTable; order: Order; payment: Payment },
 ): Promise<PersistResult> {
-  const table = materializeTable(snapshot?.table);
-  const order = materializeOrder(snapshot?.order);
-  const payment = materializePayment(snapshot?.payment);
+  let table: PosTable | null = null;
+  let order: Order | null = null;
+  let payment: Payment | null = null;
+  try {
+    table = materializeTable(snapshot?.table);
+    order = materializeOrder(snapshot?.order);
+    payment = materializePayment(snapshot?.payment);
+  } catch {
+    return false;
+  }
   const tableOk = table
     && table.tenantId === input.authenticatedTenantId
     && (

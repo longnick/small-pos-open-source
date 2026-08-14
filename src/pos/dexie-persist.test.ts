@@ -266,6 +266,26 @@ test("returns false on tenant mismatch without changing stores or IDB orders", a
   });
 });
 
+test("returns false for Proxy trap snapshots without writing or changing stores", async () => {
+  const hostile = new Proxy({} as Order, {
+    ownKeys() { throw new Error("trap"); },
+    getOwnPropertyDescriptor() { throw new Error("trap"); },
+    get() { throw new Error("trap"); },
+  });
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(emptyTable());
+  }, async (name) => {
+    const before = snapshotStores();
+    await expect(persistAfterOccupy(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { table: occupiedTable(), order: hostile },
+    )).resolves.toBe(false);
+    expect(snapshotStores()).toEqual(before);
+    expect((await readWritten(name)).orders).toEqual([]);
+  });
+});
+
 test("returns false for hostile accessor snapshots without writing", async () => {
   const hostile = {
     get id() { return "order-1"; },
