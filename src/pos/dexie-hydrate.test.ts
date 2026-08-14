@@ -162,3 +162,69 @@ test("returns null when Dexie open fails without changing stores", async () => {
     indexedDB.open = original;
   }
 });
+
+test("returns null when more than one tenant row exists", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.tenants.add(tenant("tenant-other"));
+    await database.catalogGroups.add(group());
+    await database.catalogItems.add(item());
+    await database.posTables.add(table());
+  }, async (name) => {
+    const before = snapshotStores();
+    await expect(hydrateFromDexie({ authenticatedTenantId: tenantId, databaseName: name })).resolves.toBeNull();
+    expect(snapshotStores()).toEqual(before);
+  });
+});
+
+test("returns null when an item groupId is missing from groups", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.catalogGroups.add(group());
+    await database.catalogItems.add(item("item-1", "missing-group"));
+    await database.posTables.add(table());
+  }, async (name) => {
+    const before = snapshotStores();
+    await expect(hydrateFromDexie({ authenticatedTenantId: tenantId, databaseName: name })).resolves.toBeNull();
+    expect(snapshotStores()).toEqual(before);
+  });
+});
+
+test("returns null when table numbers collide or leave 1-10", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.catalogGroups.add(group());
+    await database.catalogItems.add(item());
+    await database.posTables.add(table("table-1", 1));
+    await database.posTables.add(table("table-2", 1));
+  }, async (name) => {
+    const before = snapshotStores();
+    await expect(hydrateFromDexie({ authenticatedTenantId: tenantId, databaseName: name })).resolves.toBeNull();
+    expect(snapshotStores()).toEqual(before);
+  });
+
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.catalogGroups.add(group());
+    await database.catalogItems.add(item());
+    await database.posTables.add(table("table-11", 11));
+  }, async (name) => {
+    const before = snapshotStores();
+    await expect(hydrateFromDexie({ authenticatedTenantId: tenantId, databaseName: name })).resolves.toBeNull();
+    expect(snapshotStores()).toEqual(before);
+  });
+});
+
+test("does not write Zustand stores on accept", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.catalogGroups.add(group());
+    await database.catalogItems.add(item());
+    await database.posTables.add(table());
+  }, async (name) => {
+    const before = snapshotStores();
+    const result = await hydrateFromDexie({ authenticatedTenantId: tenantId, databaseName: name });
+    expect(result).not.toBeNull();
+    expect(snapshotStores()).toEqual(before);
+  });
+});
