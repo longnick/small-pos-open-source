@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-14 13:46 - Dexie restore / reload design
+
+Repo: `/home/longnick/projects/small-pos-dexie-restore`
+Branch: `docs/dexie-restore`
+Agent: Hermes / gcli/grok-4.6
+Summary: Design-only Later #2. Restore one open order on occupied-table click after hydrate-success session. No boot restore, no adapter, no schema bump, no backup UI. Later #1 and Later #2 stay `[ ]`. Issue #1 / PR #31 untouched.
+Verification: docs only. Sol pending.
+Next: Sol review, PR. No merge. No restore code until owner asks after this merges.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-14-1346-dexie-restore-design.md`
+
 ## 2026-08-14 08:30 - Dexie persist write-back impl
 
 Repo: `/home/longnick/projects/small-pos-dexie-persist-impl`

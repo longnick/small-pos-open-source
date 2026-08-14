@@ -2,14 +2,15 @@
 
 ## Doing
 
-- Dexie persist write-back impl PR. Later #1 still `[ ]`. No currentOrder restore.
+- Dexie restore / reload design PR. Later #1 and Later #2 still `[ ]`. No restore code.
 
 ## Next
 
-- Sol review + owner `Duyệt` for this impl PR. Do not merge here.
+- Sol review + owner `Duyệt` for this design PR. Do not merge here.
+- After merge: restore impl only if owner names it.
 - Keep `verifyPin` adapter-injected; bcrypt/cloud only in a later auth-persist slice.
-- Later #2–#4 (reload/backup, multi-tab, migration docs) stay separate.
-- Issue #1 stays for a contributor.
+- Later #3/#4 stay separate.
+- Issue #1 / PR #31 stay for the contributor.
 
 ## Blocked
 
@@ -17,11 +18,12 @@
 
 ## Risks
 
-- Persist writes only after hydrate-success this session. Empty IDB / E2E fixture stay no-op. Dexie fail does not roll back Zustand. Later #1 stays `[ ]`.
+- Restore design forbids boot-time currentOrder. First impl is occupied-table click only. Empty IDB / E2E stay no-op. Later #1 and Later #2 stay `[ ]`.
 
 ## Done recently
 
-- Dexie persist write-back impl — `docs/ai-map/TASK_LOGS/2026-08-14-0830-dexie-persist.md`
+- Dexie restore / reload design — `docs/ai-map/TASK_LOGS/2026-08-14-1346-dexie-restore-design.md`
+- Dexie persist write-back impl — merged #30 (`50c0fae`).
 - Dexie persist write-back design — merged #29 (`787e940`).
 - Dexie read-only hydrate — merged #28 (`e39858e`).
 - Dexie design (Later #1, docs only) — merged #27 (`cf51044`).

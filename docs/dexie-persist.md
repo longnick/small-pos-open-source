@@ -129,7 +129,7 @@ Empty IDB never reaches these writers (gate + occupy needs hydrated tables).
 
 ## What this is not
 
-- Reload / restore `currentOrder` — Later #2. After persist, reload still hydrates catalog/tables only. Open orders sit in IDB unread. That is intended.
+- Reload / restore `currentOrder` — Later #2: [`docs/dexie-restore.md`](dexie-restore.md). After persist, reload still hydrates catalog/tables only until that impl. Open orders sit in IDB unread. That is intended.
 - Multi-tab / Dexie `liveQuery` / middleware — Later #3.
 - Backup UI / corruption recovery UI — Later #2.
 - Auto-seed `DEMO_*` / `INITIAL_*` into IDB.
@@ -174,7 +174,7 @@ Reviewer: `cx/gpt-5.6-sol`. Trust `returned_model=gpt-5.6-sol`.
 
 ## Later leftovers (not this design)
 
-2. Reload/replay, restore open order, backup UI, corruption (including pay/release split)
+2. Reload/replay, restore open order, backup UI, corruption (including pay/release split) — design: [`docs/dexie-restore.md`](dexie-restore.md)
 3. Idempotency + concurrent-write across tabs
 4. Migration + recovery docs
 

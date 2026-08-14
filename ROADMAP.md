@@ -20,8 +20,8 @@ Small POS is a reference starter. Roadmap items are not promises and should not 
 
 ## Later: persistence and concurrency
 
-- [ ] IndexedDB/Dexie adapter with versioned local schema. Hydrate design: [`docs/dexie-design.md`](docs/dexie-design.md). Write-back design: [`docs/dexie-persist.md`](docs/dexie-persist.md). Hydrate shipped #28; persist implementation is a later PR.
-- [ ] Reload/replay, backup/restore, and corruption handling.
+- [ ] IndexedDB/Dexie adapter with versioned local schema. Hydrate design: [`docs/dexie-design.md`](docs/dexie-design.md). Write-back design: [`docs/dexie-persist.md`](docs/dexie-persist.md). Hydrate shipped #28; persist shipped #30.
+- [ ] Reload/replay, backup/restore, and corruption handling. Restore design: [`docs/dexie-restore.md`](docs/dexie-restore.md).
 - [ ] Idempotency and concurrent-write boundaries across tabs.
 - [ ] Migration and recovery documentation.
 
