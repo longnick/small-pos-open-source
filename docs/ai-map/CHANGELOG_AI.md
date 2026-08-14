@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-14 05:30 - Dexie design (Later #1)
+
+Repo: `/home/longnick/projects/small-pos-dexie-design`
+Branch: `docs/dexie-design`
+Agent: Hermes / gcli/grok-4.6
+Summary: Design-only PR. Reuse Dexie v1. Read-only hydrate contract through existing `replaceTenantData` / `selectOpenOrder`. No adapter, persist, schema bump, or auto-seed. Later #1 stays `[ ]`.
+Verification: docs only. Sol pending.
+Next: Sol review, PR. No merge. No adapter until owner asks.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-14-0530-dexie-design.md`
+
 ## 2026-08-14 03:29 - MenuManagement empty status
 
 Repo: `/home/longnick/projects/small-pos-menumgmt-empty`

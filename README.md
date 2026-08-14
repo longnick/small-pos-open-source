@@ -47,7 +47,7 @@ It uses fake data and a build-time E2E auth fixture. It never uses customer reco
 | Frontend | React 19, TypeScript, Vite 8, Tailwind CSS |
 | Local state | Zustand |
 | UI primitives | Radix UI, Lucide |
-| Planned local persistence | Dexie / IndexedDB — not wired into production flow yet |
+| Planned local persistence | Dexie / IndexedDB — schema exists, not wired. Design: [`docs/dexie-design.md`](docs/dexie-design.md) |
 | Tests | Vitest, Testing Library, Playwright |
 | Automation | GitHub Actions |
 

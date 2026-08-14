@@ -213,3 +213,23 @@ Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutation
   - role: independent typed domain utilities.
   - depends on: `packages/pos-core/src/types.ts` where needed.
   - used by: unit tests and future application adapters.
+
+## Module: Local persistence (unused)
+
+- `packages/pos-storage/src/db.ts`
+  - role: Dexie v1, 9 stores.
+  - depends on: `packages/pos-core/src/types.ts`.
+  - used by: package tests only. App does not import.
+  - notes: Design `docs/dexie-design.md` — first adapter is read-only hydrate. No schema bump.
+
+- `packages/pos-storage/src/backup.ts`
+  - role: v1 JSON export/import, fail-closed.
+  - used by: package tests only. No UI.
+
+- `src/pos/demo-pos-bootstrap.ts`
+  - role: production returns `null`. E2E replaces this module at build time.
+  - notes: First adapter PR must not change its signature.
+
+- `src/pos/dexie-hydrate.ts` (not written yet)
+  - role: future read-only hydrate. Input `authenticatedTenantId`. Output catalog/tables only.
+  - used by: `src/App.tsx` else-branch when `bootstrapDemoPos()` is `null`.
