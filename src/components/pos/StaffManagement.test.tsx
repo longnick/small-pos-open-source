@@ -44,4 +44,9 @@ describe("StaffManagement", () => {
       "false",
     );
   });
+
+  it("names the trash button for 'Nguyễn Minh Anh'", () => {
+    render(<StaffManagement />);
+    expect(screen.getByRole("button", { name: "Xóa Nguyễn Minh Anh" })).toBeInTheDocument();
+  });
 });
