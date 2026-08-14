@@ -2,12 +2,11 @@
 
 ## Doing
 
-- Dexie persist write-back design PR. Later #1 still `[ ]`. No persist code.
+- Dexie persist write-back impl PR. Later #1 still `[ ]`. No currentOrder restore.
 
 ## Next
 
-- Sol review + owner `Duyệt` for this design PR. Do not merge here.
-- After merge: persist impl only if owner names it. Not this PR.
+- Sol review + owner `Duyệt` for this impl PR. Do not merge here.
 - Keep `verifyPin` adapter-injected; bcrypt/cloud only in a later auth-persist slice.
 - Later #2–#4 (reload/backup, multi-tab, migration docs) stay separate.
 - Issue #1 stays for a contributor.
@@ -18,11 +17,12 @@
 
 ## Risks
 
-- Hydrate is live and read-only. Persist design forbids writing until a later impl PR. Empty IDB stays empty-catalog. No auto-seed.
+- Persist writes only after hydrate-success this session. Empty IDB / E2E fixture stay no-op. Dexie fail does not roll back Zustand. Later #1 stays `[ ]`.
 
 ## Done recently
 
-- Dexie persist write-back design — `docs/ai-map/TASK_LOGS/2026-08-14-0750-dexie-persist-design.md`
+- Dexie persist write-back impl — `docs/ai-map/TASK_LOGS/2026-08-14-0830-dexie-persist.md`
+- Dexie persist write-back design — merged #29 (`787e940`).
 - Dexie read-only hydrate — merged #28 (`e39858e`).
 - Dexie design (Later #1, docs only) — merged #27 (`cf51044`).
 - MenuManagement empty status — merged #26 (`94bb10f`).

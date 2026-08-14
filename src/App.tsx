@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { bootstrapDemoAuth } from "@/auth/demo-auth-adapter";
 import { bootstrapDemoPos } from "@/pos/demo-pos-bootstrap";
 import { hydrateFromDexie } from "@/pos/dexie-hydrate";
+import { isDexiePersistSession, persistAfterOccupy, persistAfterPay, setDexiePersistSession } from "@/pos/dexie-persist";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
 import { useCatalogTableStore } from "@/stores/catalog-table-store";
@@ -118,6 +119,11 @@ function PosShell() {
     }
 
     setSelectedTableId(id);
+    if (isDexiePersistSession()) {
+      const table = useCatalogTableStore.getState().tableById(id);
+      const order = useOrderPaymentStore.getState().currentOrder;
+      if (table && order) void persistAfterOccupy({ authenticatedTenantId: tenant.id }, { table, order });
+    }
   };
 
   /**
@@ -137,7 +143,15 @@ function PosShell() {
 
   const handlePaymentSuccess = (): boolean => {
     const order = useOrderPaymentStore.getState().currentOrder;
-    return Boolean(order && releaseTable(order.tableId, order.id));
+    const released = Boolean(order && releaseTable(order.tableId, order.id));
+    if (isDexiePersistSession() && order) {
+      const table = useCatalogTableStore.getState().tableById(order.tableId);
+      const payment = useOrderPaymentStore.getState().payments.find((entry) => entry.orderId === order.id);
+      if (table && payment) {
+        void persistAfterPay({ authenticatedTenantId: order.tenantId }, { table, order, payment });
+      }
+    }
+    return released;
   };
 
   const handleReceiptClose = (): void => {
@@ -358,6 +372,7 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     setAuthenticatedStaff(null);
+    setDexiePersistSession(false);
     Promise.all([bootstrapDemoAuth(), bootstrapDemoPos()])
       .then(async ([{ tenant: t, staff: s, verifier: v }, pos]) => {
         if (cancelled) return;
@@ -371,7 +386,10 @@ function App() {
         } else {
           const hydrated = await hydrateFromDexie({ authenticatedTenantId: t.id });
           if (cancelled) return;
-          if (hydrated) useCatalogTableStore.getState().replaceTenantData(t.id, hydrated);
+          if (hydrated) {
+            useCatalogTableStore.getState().replaceTenantData(t.id, hydrated);
+            setDexiePersistSession(true);
+          }
         }
         setBootState("ready");
       })

@@ -8,9 +8,9 @@ Decision: Persist only after a successful hydrate this session. Write `tables` +
 
 Reason: Memory is already the accepted mutation. Durable copy must not invent a half-occupy or hide a recorded payment. Reload restore and multi-tab are Later #2/#3.
 
-Impact: `docs/dexie-persist.md` locks the impl allowlist. No persist code in this PR.
+Impact: `src/pos/dexie-persist.ts` implements the design. Later #1 stays unchecked until owner ticks after persist is live.
 
-Revisit when: owner names persist impl, or Later #2 restore.
+Revisit when: Later #2 restore, or owner ticks Later #1.
 
 ## 2026-08-14 - Dexie hydrate is read-only v1, no auto-seed
 

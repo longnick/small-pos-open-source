@@ -219,7 +219,7 @@ Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutation
 - `packages/pos-storage/src/db.ts`
   - role: Dexie v1, 9 stores.
   - depends on: `packages/pos-core/src/types.ts`.
-  - used by: package tests + `src/pos/dexie-hydrate.ts`.
+  - used by: package tests + `src/pos/dexie-hydrate.ts` + `src/pos/dexie-persist.ts`.
   - notes: Hydrate `docs/dexie-design.md`. Write-back `docs/dexie-persist.md`. No schema bump.
 
 - `packages/pos-storage/src/backup.ts`
@@ -234,6 +234,7 @@ Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutation
   - role: read-only hydrate. Input `authenticatedTenantId`. Output catalog/tables only.
   - used by: `src/App.tsx` else-branch when `bootstrapDemoPos()` is `null`.
 
-- `docs/dexie-persist.md`
-  - role: write-back design. Occupy/order-edit/pay clusters. No adapter yet.
-  - used by: future `src/pos/dexie-persist.ts` after owner names impl.
+- `src/pos/dexie-persist.ts`
+  - role: write-back occupy/order/pay. Session flag after hydrate success. Writes tables/orders/payments only.
+  - used by: `src/App.tsx`, `src/components/pos/MenuGrid.tsx`, `src/components/pos/OrderPanel.tsx`.
+  - notes: Design `docs/dexie-persist.md`. No currentOrder restore. Later #1 stays `[ ]`.

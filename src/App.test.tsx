@@ -5,6 +5,7 @@ import type { Staff, Tenant } from "../packages/pos-core/src/types";
 import type { PinHashVerifier } from "../packages/pos-core/src/auth";
 import type { DemoAuthBootstrap } from "./auth/demo-auth-adapter";
 import type { DexieHydrateResult } from "./pos/dexie-hydrate";
+import { isDexiePersistSession, setDexiePersistSession } from "./pos/dexie-persist";
 import { useTenantAuthStore } from "./stores/tenant-auth-store";
 import { useCatalogTableStore } from "./stores/catalog-table-store";
 import { useOrderPaymentStore } from "./stores/order-payment-store";
@@ -27,12 +28,34 @@ const hydrate = vi.hoisted(() => ({
   fromDexie: vi.fn(async (_input?: { authenticatedTenantId: string }): Promise<DexieHydrateResult | null> => null),
 }));
 
+const persist = vi.hoisted(() => ({
+  occupy: vi.fn(async () => true),
+  pay: vi.fn(async () => true),
+}));
+
+const posBoot = vi.hoisted(() => ({
+  create: vi.fn<typeof import("./pos/demo-pos-bootstrap").bootstrapDemoPos>(async () => null),
+}));
+
 vi.mock("@/auth/demo-auth-adapter", () => ({
   bootstrapDemoAuth: bootstrap.create,
 }));
 
 vi.mock("@/pos/dexie-hydrate", () => ({
   hydrateFromDexie: hydrate.fromDexie,
+}));
+
+vi.mock("@/pos/dexie-persist", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./pos/dexie-persist")>();
+  return {
+    ...actual,
+    persistAfterOccupy: persist.occupy,
+    persistAfterPay: persist.pay,
+  };
+});
+
+vi.mock("@/pos/demo-pos-bootstrap", () => ({
+  bootstrapDemoPos: posBoot.create,
 }));
 
 import App from "./App";
@@ -99,12 +122,19 @@ async function signInViaUI(staffId: string, pin: string) {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
+  setDexiePersistSession(false);
   useTenantAuthStore.setState({ tenant: null, staff: null });
   useCatalogTableStore.setState({ tenantId: null, catalogGroups: [], catalogItems: [], tables: [] });
   useOrderPaymentStore.getState().clearCurrentOrder();
   bootstrap.create.mockClear();
   hydrate.fromDexie.mockClear();
   hydrate.fromDexie.mockImplementation(async () => null);
+  persist.occupy.mockClear();
+  persist.pay.mockClear();
+  persist.occupy.mockImplementation(async () => true);
+  persist.pay.mockImplementation(async () => true);
+  posBoot.create.mockClear();
+  posBoot.create.mockImplementation(async () => null);
   // Default: bootstrap never resolves (pending forever)
   bootstrap.create.mockImplementation(() => new Promise<DemoAuthBootstrap>(() => {}));
 });
@@ -727,4 +757,88 @@ test("production pos null: hydrates catalog/tables from Dexie and leaves current
     tables,
   });
   expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+});
+
+test("hydrate success enables occupy persist; empty IDB and E2E fixture never call persist", async () => {
+  const catalogGroups = [{ id: "g1", tenantId: tenant.id, name: "Cà phê", sortOrder: 1 }];
+  const catalogItems = [{
+    id: "ci1",
+    tenantId: tenant.id,
+    groupId: "g1",
+    name: "Cà phê đen",
+    price: 25_000,
+    available: true,
+    sortOrder: 1,
+    createdAt: 0,
+    updatedAt: 0,
+  }];
+  const tables = [{
+    id: "t1",
+    tenantId: tenant.id,
+    number: 1,
+    status: "empty" as const,
+    openedAt: 0,
+    staffId: staffRecord.id,
+  }];
+  hydrate.fromDexie.mockImplementation(async () => ({ catalogGroups, catalogItems, tables }));
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  expect(isDexiePersistSession()).toBe(true);
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  await waitFor(() => expect(persist.occupy).toHaveBeenCalledTimes(1));
+  expect(useOrderPaymentStore.getState().currentOrder?.tableId).toBe("t1");
+});
+
+test("empty hydrate does not persist occupy", async () => {
+  hydrate.fromDexie.mockImplementation(async () => null);
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  expect(isDexiePersistSession()).toBe(false);
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  act(() => {
+    useCatalogTableStore.getState().replaceTenantData(tenant.id, {
+      catalogGroups: [],
+      catalogItems: [],
+      tables: [{
+        id: "t1",
+        tenantId: tenant.id,
+        number: 1,
+        status: "empty",
+        openedAt: 0,
+        staffId: staffRecord.id,
+      }],
+    });
+  });
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  expect(persist.occupy).not.toHaveBeenCalled();
+});
+
+test("E2E fixture pos skips persist even when occupy succeeds", async () => {
+  posBoot.create.mockImplementation(async () => ({
+    catalogGroups: [],
+    catalogItems: [],
+    tables: [{
+      id: "t1",
+      tenantId: tenant.id,
+      number: 1,
+      status: "empty" as const,
+      openedAt: 0,
+      staffId: staffRecord.id,
+    }],
+    currentOrder: null,
+  }));
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  expect(hydrate.fromDexie).not.toHaveBeenCalled();
+  expect(isDexiePersistSession()).toBe(false);
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  expect(persist.occupy).not.toHaveBeenCalled();
 });

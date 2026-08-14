@@ -4,6 +4,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { useOrderPaymentStore } from "@/stores/order-payment-store";
+import { useTenantAuthStore } from "@/stores/tenant-auth-store";
+import { isDexiePersistSession, persistAfterOrderEdit } from "@/pos/dexie-persist";
 import { formatCurrency } from "@/lib/pos";
 import type { PosTable } from "../../../packages/pos-core/src/types";
 import { PaymentModal } from "./PaymentModal";
@@ -38,6 +40,13 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
   const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
   const updateItemQuantity = useOrderPaymentStore((state) => state.updateItemQuantity);
   const removeItem = useOrderPaymentStore((state) => state.removeItem);
+
+  const persistEdit = () => {
+    if (!isDexiePersistSession()) return;
+    const tenantId = useTenantAuthStore.getState().tenant?.id;
+    const order = useOrderPaymentStore.getState().currentOrder;
+    if (tenantId && order) void persistAfterOrderEdit({ authenticatedTenantId: tenantId }, { order });
+  };
 
   // Local dialog state – no store write
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -163,11 +172,13 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
                               : `Đã xóa ${item.name} khỏi đơn. Còn ${remaining} món.`,
                           );
                           setPendingFocusTarget(computeFocusTarget(snapshot, deletedIndex));
+                          persistEdit();
                         }
                       } else {
                         const ok = updateItemQuantity(item.id, item.quantity - 1);
                         if (ok) {
                           setAnnouncement(`${item.name}, số lượng ${item.quantity - 1}`);
+                          persistEdit();
                         }
                       }
                     }}
@@ -185,6 +196,7 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
                       const ok = updateItemQuantity(item.id, item.quantity + 1);
                       if (ok) {
                         setAnnouncement(`${item.name}, số lượng ${item.quantity + 1}`);
+                        persistEdit();
                       }
                     }}
                     className="flex h-7 w-7 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors disabled:opacity-40"
@@ -210,6 +222,7 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
                             : `Đã xóa ${item.name} khỏi đơn. Còn ${remaining} món.`,
                         );
                         setPendingFocusTarget(computeFocusTarget(snapshot, deletedIndex));
+                        persistEdit();
                       }
                     }}
                     className="ml-1 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors"
