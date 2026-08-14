@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-14 07:27 - Dexie read-only hydrate
+
+Repo: `/home/longnick/projects/small-pos-dexie-hydrate`
+Branch: `feat/dexie-hydrate`
+Agent: Hermes / gcli/grok-4.6
+Summary: Read-only `hydrateFromDexie` after auth. Four Dexie stores, one transaction. App else-branch only. No persist, no currentOrder, no `bootstrapDemoPos()` signature change. Later #1 stays `[ ]`.
+Verification: focused hydrate + App + order-entry. Full `npm run ci` + Sol pending.
+Next: Sol review, PR. No merge.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-14-0727-dexie-hydrate.md`
+
 ## 2026-08-14 05:30 - Dexie design (Later #1)
 
 Repo: `/home/longnick/projects/small-pos-dexie-design`

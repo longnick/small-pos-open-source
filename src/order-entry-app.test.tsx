@@ -33,6 +33,10 @@ vi.mock("@/auth/demo-auth-adapter", () => ({
   bootstrapDemoAuth: bootstrap.create,
 }));
 
+vi.mock("@/pos/dexie-hydrate", () => ({
+  hydrateFromDexie: vi.fn(async () => null),
+}));
+
 import App from "./App";
 
 // ---------------------------------------------------------------------------

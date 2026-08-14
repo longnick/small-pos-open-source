@@ -8,6 +8,6 @@ Decision: Keep Dexie v1. First adapter PR reads only tenants+catalog+tables in o
 
 Reason: Fail-closed stores already validate. Auto-seed would mix dummy UI data into domain IDB and change the public empty-catalog demo. Write-back, multi-tab, backup UI, and auth persistence are Later #2–#4 / separate slices.
 
-Impact: `ROADMAP.md` Later #1 stays unchecked. Implementation waits for owner after this design merges.
+Impact: hydrate impl started on `feat/dexie-hydrate`. `ROADMAP.md` Later #1 stays unchecked until this PR merges.
 
-Revisit when: owner names the hydrate implementation PR, or a later slice needs `version(2)`.
+Revisit when: persist / currentOrder restore / `version(2)`.
