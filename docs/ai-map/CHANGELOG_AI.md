@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-14 02:01 - App shell nav aria-current
+
+Repo: `/home/longnick/projects/small-pos-app-nav`
+Branch: `fix/app-shell-nav`
+Agent: Hermes / gcli/grok-4.6
+Summary: Owner asked for App shell nav. View buttons now set `type="button"` and `aria-current="page"` on the active view. Visible labels unchanged. No layout/store/Dexie change.
+Verification: App nav tests 2/2. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-14-0201-app-shell-nav.md`
+
 ## 2026-08-13 12:22 - StaffManagement trash name
 
 Repo: `/home/longnick/projects/small-pos-staff-trash`

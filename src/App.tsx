@@ -210,6 +210,8 @@ function PosShell() {
           return (
             <button
               key={v.id}
+              type="button"
+              aria-current={view === v.id ? "page" : undefined}
               onClick={() => setView(v.id)}
               className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${
                 view === v.id
@@ -217,7 +219,7 @@ function PosShell() {
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4" aria-hidden="true" />
               {v.name}
 
             </button>

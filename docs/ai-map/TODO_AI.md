@@ -2,7 +2,7 @@
 
 ## Doing
 
-- StaffManagement trash name — Sol APPROVE. Remaining: PR + owner review. No deploy.
+- App shell nav `aria-current` — Sol APPROVE. Remaining: PR + owner review. No deploy.
 
 ## Next
 
@@ -21,6 +21,7 @@
 
 ## Done recently
 
+- StaffManagement trash name — merged #23 (`885542b`).
 - MenuManagement icon pencil/trash names — merged #22 (`829c166`).
 - PaymentModal `type="button"` — merged #21 (`0af55aa`).
 - StaffManagement shift `aria-pressed` — merged #20 (`79f5716`).

@@ -625,3 +625,56 @@ test("2.9-s3: authenticated shell with null order — Thanh toán disabled and n
   // No accessible dialog named "Thanh toán" must exist in the DOM
   expect(screen.queryByRole("dialog", { name: "Thanh toán" })).toBeNull();
 });
+
+test("authenticated shell nav: default view 'Bán hàng' is current; siblings are not", async () => {
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy()
+  );
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy()
+  );
+
+  const pos = screen.getByRole("button", { name: "Bán hàng" });
+  expect(pos).toHaveAttribute("aria-current", "page");
+  expect(pos).toHaveAttribute("type", "button");
+  expect(screen.getByRole("button", { name: "Bếp" })).not.toHaveAttribute(
+    "aria-current",
+  );
+  expect(screen.getByRole("button", { name: "Quản lý món" })).not.toHaveAttribute(
+    "aria-current",
+  );
+  expect(screen.getByRole("button", { name: "Báo cáo" })).not.toHaveAttribute(
+    "aria-current",
+  );
+  expect(screen.getByRole("button", { name: "Nhân sự" })).not.toHaveAttribute(
+    "aria-current",
+  );
+});
+
+test("authenticated shell nav: clicking 'Bếp' marks only that view current", async () => {
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy()
+  );
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy()
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Bếp" }));
+  expect(screen.getByRole("button", { name: "Bếp" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  expect(screen.getByRole("button", { name: "Bán hàng" })).not.toHaveAttribute(
+    "aria-current",
+  );
+});
