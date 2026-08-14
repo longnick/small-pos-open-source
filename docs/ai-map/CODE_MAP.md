@@ -3,8 +3,9 @@
 ## Core domain
 
 - `packages/pos-core/src/types.ts` — shared POS domain types.
-- `packages/pos-storage/src/db.ts` — Dexie v1 schema. Read by `src/pos/dexie-hydrate.ts`. Design: `docs/dexie-design.md`.
+- `packages/pos-storage/src/db.ts` — Dexie v1 schema. Read by `src/pos/dexie-hydrate.ts`. Hydrate: `docs/dexie-design.md`. Write-back: `docs/dexie-persist.md`.
 - `src/pos/dexie-hydrate.ts` — read-only hydrate of catalog/tables. No persist. No currentOrder.
+- Persist adapter not present. Design only: `docs/dexie-persist.md`.
 - `packages/pos-storage/src/backup.ts` — v1 backup import/export. Unused by UI.
 - `packages/pos-core/src/auth.ts` — PIN verifier boundary and role-based permission guard.
 - `packages/pos-core/src/order-calc.ts` — order total calculation.

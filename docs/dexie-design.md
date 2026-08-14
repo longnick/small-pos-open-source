@@ -157,9 +157,9 @@ On any reject: log nothing secret (no PIN, hash, row payload, accessor dump). Re
 
 ### Do not persist yet
 
-First adapter PR is **read-only hydrate**.
+First adapter PR is **read-only hydrate** (shipped #28).
 
-Out of that PR:
+Write-back is a **separate design**: [`docs/dexie-persist.md`](dexie-persist.md). Out of the hydrate PR:
 
 - write-back on occupy / addItem / pay / shift
 - Dexie `liveQuery` / middleware persist

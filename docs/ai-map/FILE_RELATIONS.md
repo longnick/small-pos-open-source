@@ -220,7 +220,7 @@ Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutation
   - role: Dexie v1, 9 stores.
   - depends on: `packages/pos-core/src/types.ts`.
   - used by: package tests + `src/pos/dexie-hydrate.ts`.
-  - notes: Design `docs/dexie-design.md`. No schema bump.
+  - notes: Hydrate `docs/dexie-design.md`. Write-back `docs/dexie-persist.md`. No schema bump.
 
 - `packages/pos-storage/src/backup.ts`
   - role: v1 JSON export/import, fail-closed.
@@ -233,3 +233,7 @@ Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutation
 - `src/pos/dexie-hydrate.ts`
   - role: read-only hydrate. Input `authenticatedTenantId`. Output catalog/tables only.
   - used by: `src/App.tsx` else-branch when `bootstrapDemoPos()` is `null`.
+
+- `docs/dexie-persist.md`
+  - role: write-back design. Occupy/order-edit/pay clusters. No adapter yet.
+  - used by: future `src/pos/dexie-persist.ts` after owner names impl.
