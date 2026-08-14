@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-14 07:50 - Dexie persist write-back design
+
+Repo: `/home/longnick/projects/small-pos-dexie-persist`
+Branch: `docs/dexie-persist`
+Agent: Hermes / gcli/grok-4.6
+Summary: Design-only persist write-back. After hydrate-success session: occupy+create, order edit, pay+release write `tables`/`orders`/`payments` in one transaction each. No adapter, no schema bump, no currentOrder restore, Later #1 stays `[ ]`.
+Verification: docs only. Sol pending.
+Next: Sol review, PR. No merge. No persist code until owner asks after this merges.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-14-0750-dexie-persist-design.md`
+
 ## 2026-08-14 07:27 - Dexie read-only hydrate
 
 Repo: `/home/longnick/projects/small-pos-dexie-hydrate`

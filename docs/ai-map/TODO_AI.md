@@ -2,11 +2,12 @@
 
 ## Doing
 
-- Dexie read-only hydrate PR. Later #1 still `[ ]` until merge.
+- Dexie persist write-back design PR. Later #1 still `[ ]`. No persist code.
 
 ## Next
 
-- Sol review + owner `Duyệt` for this PR. Do not merge here.
+- Sol review + owner `Duyệt` for this design PR. Do not merge here.
+- After merge: persist impl only if owner names it. Not this PR.
 - Keep `verifyPin` adapter-injected; bcrypt/cloud only in a later auth-persist slice.
 - Later #2–#4 (reload/backup, multi-tab, migration docs) stay separate.
 - Issue #1 stays for a contributor.
@@ -17,11 +18,12 @@
 
 ## Risks
 
-- Hydrate is read-only. Empty IDB stays empty-catalog demo. No auto-seed. No write-back.
+- Hydrate is live and read-only. Persist design forbids writing until a later impl PR. Empty IDB stays empty-catalog. No auto-seed.
 
 ## Done recently
 
-- Dexie read-only hydrate — `docs/ai-map/TASK_LOGS/2026-08-14-0727-dexie-hydrate.md`
+- Dexie persist write-back design — `docs/ai-map/TASK_LOGS/2026-08-14-0750-dexie-persist-design.md`
+- Dexie read-only hydrate — merged #28 (`e39858e`).
 - Dexie design (Later #1, docs only) — merged #27 (`cf51044`).
 - MenuManagement empty status — merged #26 (`94bb10f`).
 - App shell nav `aria-current` — merged #24 (`734ebd4`).
