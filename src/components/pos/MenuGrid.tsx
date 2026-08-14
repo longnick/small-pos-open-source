@@ -3,6 +3,8 @@ import { Search, Plus } from "lucide-react";
 import type { CatalogGroup, CatalogItem } from "../../../packages/pos-core/src/types";
 import { cn } from "@/lib/utils";
 import { useOrderPaymentStore } from "../../stores/order-payment-store";
+import { useTenantAuthStore } from "../../stores/tenant-auth-store";
+import { isDexiePersistSession, persistAfterOrderEdit } from "../../pos/dexie-persist";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -73,18 +75,20 @@ export function MenuGrid({ groups, items }: MenuGridProps) {
       (line) => line.catalogItemId === catalogItem.id,
     );
 
-    if (existingLine) {
-      updateItemQuantity(existingLine.id, existingLine.quantity + 1);
-    } else {
-      const lineId = `${currentOrder.id}-${catalogItem.id}-${Date.now()}`;
-      addItem({
-        id: lineId,
+    const ok = existingLine
+      ? updateItemQuantity(existingLine.id, existingLine.quantity + 1)
+      : addItem({
+        id: `${currentOrder.id}-${catalogItem.id}-${Date.now()}`,
         orderId: currentOrder.id,
         catalogItemId: catalogItem.id,
         name: catalogItem.name,
         price: catalogItem.price,
         quantity: 1,
       });
+    if (ok && isDexiePersistSession()) {
+      const tenantId = useTenantAuthStore.getState().tenant?.id;
+      const order = useOrderPaymentStore.getState().currentOrder;
+      if (tenantId && order) void persistAfterOrderEdit({ authenticatedTenantId: tenantId }, { order });
     }
   }
 

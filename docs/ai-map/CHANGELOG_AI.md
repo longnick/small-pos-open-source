@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-14 08:30 - Dexie persist write-back impl
+
+Repo: `/home/longnick/projects/small-pos-dexie-persist-impl`
+Branch: `feat/dexie-persist`
+Agent: Hermes / gcli/grok-4.6
+Summary: Persist occupy/order/pay to Dexie v1 after hydrate-success session. Session flag in App. No currentOrder restore. No schema bump. Later #1 stays `[ ]`.
+Verification: persist + App + hydrate + UI tests. Full `npm run ci` + Sol pending.
+Next: Sol review, PR. No merge.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-14-0830-dexie-persist.md`
+
 ## 2026-08-14 07:50 - Dexie persist write-back design
 
 Repo: `/home/longnick/projects/small-pos-dexie-persist`
