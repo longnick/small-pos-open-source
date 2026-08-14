@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-14 03:29 - MenuManagement empty status
+
+Repo: `/home/longnick/projects/small-pos-menumgmt-empty`
+Branch: `fix/menumgmt-empty-a11y`
+Agent: Hermes / gcli/grok-4.6
+Summary: Empty `Không có món nào` now has `role="status"` + `aria-label`. Copy/layout unchanged. Same class as empty/no-result #10–#14. Last leftover a11y sibling.
+Verification: MenuManagement 7/7. Full `npm run ci` + Sol review pending.
+Next: Sol review, PR. No deploy.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-14-0329-menumgmt-empty-a11y.md`
+
 ## 2026-08-14 03:21 - MenuManagement search name
 
 Repo: `/home/longnick/projects/small-pos-menumgmt-search`
