@@ -153,7 +153,7 @@ Duplicate open orders across tables are a Later #2 problem. First PR does not in
 
 Empty IDB (no tenant row) is a **valid empty database**. Hydrate returns `null`. App keeps today’s empty-catalog demo. Not an error worth logging.
 
-On any reject: log nothing secret (no PIN, hash, row payload, accessor dump). Return `null` from `bootstrapDemoPos()`. Do **not** auto-seed IDB from `DEMO_*` or `INITIAL_*`.
+On any reject: log nothing secret (no PIN, hash, row payload, accessor dump). Return `null` from `hydrateFromDexie()`. Do **not** auto-seed IDB from `DEMO_*` or `INITIAL_*`.
 
 ### Do not persist yet
 
@@ -199,7 +199,7 @@ Name: `feat(storage): hydrate domain stores from Dexie v1` (suggested).
 Allowed files:
 
 - new `src/pos/dexie-hydrate.ts` + test (`fake-indexeddb`)
-- `src/App.tsx` — only the `else { hydrateFromDexie(t.id) }` branch above
+- `src/App.tsx` — only the `else { hydrateFromDexie({ authenticatedTenantId: t.id }) }` branch above
 - docs/ai-map
 
 Do not change `bootstrapDemoPos()` signature. E2E still replaces that module.
@@ -215,7 +215,7 @@ Forbidden in that PR:
 TDD:
 - RED: populated test DB + matching `authenticatedTenantId`, `bootstrapDemoPos()` still `null`.
 - GREEN: hydrate returns validated catalog/tables; `replaceTenantData(id, result)` succeeds; `currentOrder` stays `null`.
-- Abort: wrong tenant id, empty IDB, hostile row, Dexie open failure — all return `null`, stores unchanged.
+- Abort: wrong tenant id, empty IDB, hostile row, Dexie open failure, `replaceTenantData` false — all return `null`; every Zustand store byte-for-byte unchanged.
 
 Reviewer: `cx/gpt-5.6-sol`. Trust `returned_model=gpt-5.6-sol`.
 
