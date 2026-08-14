@@ -1,0 +1,177 @@
+import { PosDatabase } from "../../packages/pos-storage/src/db";
+import { computeDiscount, computeSubtotal, computeTotal } from "../../packages/pos-core/src/order-calc";
+import type { Order, OrderItem, PosTable } from "../../packages/pos-core/src/types";
+
+export type DexieRestoreInput = {
+  authenticatedTenantId: string;
+  databaseName?: string;
+};
+
+export type TableOrderBind =
+  | "ok"
+  | "missing-order"
+  | "paid-occupied"
+  | "status-mismatch"
+  | "table-mismatch"
+  | "tenant-mismatch"
+  | "duplicate-open"
+  | "invalid-record";
+
+const isPrimitiveNonemptyString = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
+const isMoney = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
+const isDiscountType = (value: unknown): value is "amount" | "percent" => value === "amount" || value === "percent";
+
+const materializeRecord = (value: unknown): Record<string, unknown> | null => {
+  try {
+    if (!isPlainObject(value)) return null;
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    if (Reflect.ownKeys(descriptors).some((key) => !("value" in descriptors[key as keyof typeof descriptors]))) return null;
+    return Object.fromEntries(Reflect.ownKeys(descriptors).map((key) => [key, descriptors[key as keyof typeof descriptors].value]));
+  } catch {
+    return null;
+  }
+};
+
+const isOrderItem = (value: Record<string, unknown>): value is Record<string, unknown> & OrderItem =>
+  isPrimitiveNonemptyString(value.id)
+  && isPrimitiveNonemptyString(value.orderId)
+  && isPrimitiveNonemptyString(value.catalogItemId)
+  && isPrimitiveNonemptyString(value.name)
+  && isMoney(value.price)
+  && Number.isSafeInteger(value.quantity)
+  && (value.quantity as number) > 0
+  && (value.note === undefined || typeof value.note === "string")
+  && (value.cancelledAt === undefined || Number.isSafeInteger(value.cancelledAt))
+  && (value.cancelReason === undefined || typeof value.cancelReason === "string");
+
+const canonicalItem = (item: OrderItem): OrderItem => ({
+  id: item.id,
+  orderId: item.orderId,
+  catalogItemId: item.catalogItemId,
+  name: item.name,
+  price: item.price,
+  quantity: item.quantity,
+  ...(item.note !== undefined ? { note: item.note } : {}),
+  ...(item.cancelledAt !== undefined ? { cancelledAt: item.cancelledAt } : {}),
+  ...(item.cancelReason !== undefined ? { cancelReason: item.cancelReason } : {}),
+});
+
+const materializeOpenOrder = (value: unknown): Order | null => {
+  let order: Record<string, unknown> | null = null;
+  try {
+    order = materializeRecord(value);
+  } catch {
+    return null;
+  }
+  if (
+    !order
+    || !isPrimitiveNonemptyString(order.id)
+    || !isPrimitiveNonemptyString(order.tenantId)
+    || !isPrimitiveNonemptyString(order.tableId)
+    || !isPrimitiveNonemptyString(order.staffId)
+    || order.status !== "open"
+    || Object.hasOwn(order, "sentAt")
+    || Object.hasOwn(order, "paidAt")
+    || Object.hasOwn(order, "cancelledAt")
+    || !Array.isArray(order.items)
+    || !isMoney(order.subtotal)
+    || !isMoney(order.discount)
+    || !isDiscountType(order.discountType)
+    || !isMoney(order.total)
+    || !Number.isSafeInteger(order.createdAt)
+    || (order.discountPercent !== undefined && !isMoney(order.discountPercent))
+    || (order.discountType === "amount" && order.discountPercent !== undefined)
+  ) return null;
+  const createdAt = order.createdAt as number;
+  const items = order.items.map(materializeRecord);
+  if (items.some((item) => !item || !isOrderItem(item))) return null;
+  const validOrder: Order = {
+    id: order.id,
+    tenantId: order.tenantId,
+    tableId: order.tableId,
+    staffId: order.staffId,
+    status: "open",
+    items: (items as (Record<string, unknown> & OrderItem)[]).map(canonicalItem),
+    subtotal: order.subtotal,
+    discount: order.discount,
+    discountType: order.discountType,
+    total: order.total,
+    createdAt,
+    ...(order.discountPercent !== undefined ? { discountPercent: order.discountPercent } : {}),
+  };
+  try {
+    const subtotal = computeSubtotal(validOrder.items);
+    const discountValue = validOrder.discountType === "percent" ? validOrder.discountPercent : validOrder.discount;
+    return discountValue !== undefined
+      && validOrder.discount === computeDiscount(subtotal, validOrder.discountType, discountValue)
+      && validOrder.subtotal === subtotal
+      && validOrder.total === computeTotal(subtotal, validOrder.discount)
+      ? validOrder
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+export function classifyTableOrderBind(
+  table: PosTable,
+  order: Order | null,
+  extras?: { openOrdersForTable: Order[] },
+): TableOrderBind {
+  if (extras && extras.openOrdersForTable.length > 1) return "duplicate-open";
+  if (order === null) return "missing-order";
+  if (order.tenantId !== table.tenantId) return "tenant-mismatch";
+  if (order.tableId !== table.id) return "table-mismatch";
+  if (table.status !== "occupied" && table.status !== "waiting_payment") return "status-mismatch";
+  if (order.status === "paid") return "paid-occupied";
+  if (order.status !== "open") return "status-mismatch";
+  return "ok";
+}
+
+export async function loadOpenOrderForTable(
+  input: DexieRestoreInput,
+  ref: { tableId: string; expectedOrderId: string },
+): Promise<Order | null> {
+  try {
+    if (
+      !input
+      || !ref
+      || !isPrimitiveNonemptyString(input.authenticatedTenantId)
+      || !isPrimitiveNonemptyString(ref.tableId)
+      || !isPrimitiveNonemptyString(ref.expectedOrderId)
+    ) return null;
+    const database = new PosDatabase(input.databaseName ?? "small-pos");
+    try {
+      await database.open();
+      const snapshot = await database.transaction("r", ["orders"], async () => ({
+        order: await database.orders.get(ref.expectedOrderId),
+        sameTable: await database.orders.where("tableId").equals(ref.tableId).toArray(),
+      }));
+      const order = materializeOpenOrder(snapshot.order);
+      if (
+        !order
+        || order.tenantId !== input.authenticatedTenantId
+        || order.id !== ref.expectedOrderId
+        || order.tableId !== ref.tableId
+      ) return null;
+      let openCount = 0;
+      for (const raw of snapshot.sameTable) {
+        let record: Record<string, unknown> | null = null;
+        try {
+          record = materializeRecord(raw);
+        } catch {
+          return null;
+        }
+        if (!record) return null;
+        if (record.status === "open") openCount += 1;
+      }
+      return openCount === 1 ? order : null;
+    } finally {
+      database.close();
+    }
+  } catch {
+    return null;
+  }
+}

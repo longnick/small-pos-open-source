@@ -33,6 +33,10 @@ const persist = vi.hoisted(() => ({
   pay: vi.fn(async () => true),
 }));
 
+const restore = vi.hoisted(() => ({
+  load: vi.fn(async () => null as import("../packages/pos-core/src/types").Order | null),
+}));
+
 const posBoot = vi.hoisted(() => ({
   create: vi.fn<typeof import("./pos/demo-pos-bootstrap").bootstrapDemoPos>(async () => null),
 }));
@@ -53,6 +57,10 @@ vi.mock("@/pos/dexie-persist", async (importOriginal) => {
     persistAfterPay: persist.pay,
   };
 });
+
+vi.mock("@/pos/dexie-restore", () => ({
+  loadOpenOrderForTable: restore.load,
+}));
 
 vi.mock("@/pos/demo-pos-bootstrap", () => ({
   bootstrapDemoPos: posBoot.create,
@@ -133,6 +141,8 @@ beforeEach(() => {
   persist.pay.mockClear();
   persist.occupy.mockImplementation(async () => true);
   persist.pay.mockImplementation(async () => true);
+  restore.load.mockClear();
+  restore.load.mockImplementation(async () => null);
   posBoot.create.mockClear();
   posBoot.create.mockImplementation(async () => null);
   // Default: bootstrap never resolves (pending forever)
@@ -841,4 +851,130 @@ test("E2E fixture pos skips persist even when occupy succeeds", async () => {
   await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
   fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
   expect(persist.occupy).not.toHaveBeenCalled();
+  expect(restore.load).not.toHaveBeenCalled();
+});
+
+const occupiedHydrate = {
+  catalogGroups: [{ id: "g1", tenantId: tenant.id, name: "Cà phê", sortOrder: 1 }],
+  catalogItems: [{
+    id: "ci1",
+    tenantId: tenant.id,
+    groupId: "g1",
+    name: "Cà phê đen",
+    price: 25_000,
+    available: true,
+    sortOrder: 1,
+    createdAt: 0,
+    updatedAt: 0,
+  }],
+  tables: [{
+    id: "t1",
+    tenantId: tenant.id,
+    number: 1,
+    status: "occupied" as const,
+    openedAt: 0,
+    staffId: staffRecord.id,
+    currentOrderId: "order-1",
+  }],
+};
+
+const restoredOrder = {
+  id: "order-1",
+  tenantId: tenant.id,
+  tableId: "t1",
+  staffId: staffRecord.id,
+  status: "open" as const,
+  items: [],
+  subtotal: 0,
+  discount: 0,
+  discountType: "amount" as const,
+  total: 0,
+  createdAt: 1,
+};
+
+test("hydrate success + occupied table click restores the bound open order", async () => {
+  hydrate.fromDexie.mockImplementation(async () => occupiedHydrate);
+  restore.load.mockImplementation(async () => restoredOrder);
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  expect(isDexiePersistSession()).toBe(true);
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  await waitFor(() => expect(restore.load).toHaveBeenCalledTimes(1));
+  expect(restore.load).toHaveBeenCalledWith(
+    { authenticatedTenantId: tenant.id },
+    { tableId: "t1", expectedOrderId: "order-1" },
+  );
+  await waitFor(() => expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-1"));
+  expect(persist.occupy).not.toHaveBeenCalled();
+  expect(screen.getAllByRole("button", { name: /Bàn 1/i })[0].getAttribute("aria-pressed")).toBe("true");
+});
+
+test("occupied click with missing currentOrderId does not call restore", async () => {
+  hydrate.fromDexie.mockImplementation(async () => ({
+    ...occupiedHydrate,
+    tables: [{ ...occupiedHydrate.tables[0], currentOrderId: undefined }],
+  }));
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  expect(restore.load).not.toHaveBeenCalled();
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+  expect(screen.getAllByRole("button", { name: /Bàn 1/i })[0].getAttribute("aria-pressed")).toBe("false");
+});
+
+test("empty IDB never calls restore on occupied click", async () => {
+  hydrate.fromDexie.mockImplementation(async () => null);
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  expect(isDexiePersistSession()).toBe(false);
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  act(() => {
+    useCatalogTableStore.getState().replaceTenantData(tenant.id, {
+      catalogGroups: [],
+      catalogItems: [],
+      tables: occupiedHydrate.tables,
+    });
+  });
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  expect(restore.load).not.toHaveBeenCalled();
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+});
+
+test("existing currentOrder + other occupied table only changes highlight", async () => {
+  hydrate.fromDexie.mockImplementation(async () => ({
+    ...occupiedHydrate,
+    tables: [
+      occupiedHydrate.tables[0],
+      {
+        id: "t2",
+        tenantId: tenant.id,
+        number: 2,
+        status: "occupied" as const,
+        openedAt: 0,
+        staffId: staffRecord.id,
+        currentOrderId: "order-2",
+      },
+    ],
+  }));
+  restore.load.mockImplementation(async () => restoredOrder);
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  await waitFor(() => expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-1"));
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 2/i })[0]);
+  expect(restore.load).toHaveBeenCalledTimes(1);
+  expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-1");
+  expect(screen.getAllByRole("button", { name: /Bàn 2/i })[0].getAttribute("aria-pressed")).toBe("true");
 });

@@ -3,6 +3,7 @@ import { bootstrapDemoAuth } from "@/auth/demo-auth-adapter";
 import { bootstrapDemoPos } from "@/pos/demo-pos-bootstrap";
 import { hydrateFromDexie } from "@/pos/dexie-hydrate";
 import { isDexiePersistSession, persistAfterOccupy, persistAfterPay, setDexiePersistSession } from "@/pos/dexie-persist";
+import { loadOpenOrderForTable } from "@/pos/dexie-restore";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
 import { useCatalogTableStore } from "@/stores/catalog-table-store";
@@ -70,12 +71,11 @@ function PosShell() {
   /**
    * Atomic table-selection handler.
    *
-   * If the selected table is empty and no currentOrder exists:
-   *   1. Construct a safe order ID and timestamp.
-   *   2. occupyTable first (writes the table state).
-   *   3. createOpenOrder — if it fails, rollback by releasing the just-occupied table.
-   * Any other condition (occupied table, currentOrder already present, missing
-   * tenant/staff) leaves all stores unchanged.
+   * If currentOrder exists: only highlight (React state). Never swap the order.
+   * If occupied / waiting_payment, no currentOrder, persist session on:
+   *   load the bound open order, then selectOpenOrder, then highlight.
+   * If empty and no currentOrder:
+   *   occupyTable then createOpenOrder; rollback occupy on create fail.
    */
   const handleTableSelect = (id: string): void => {
     // Never replace an existing order.
@@ -84,10 +84,26 @@ function PosShell() {
       return;
     }
     const table = useCatalogTableStore.getState().tableById(id);
-    if (!table || table.status !== "empty") {
-      // Selecting an occupied/invalid table must not mutate anything.
+    if (!table) return;
+    if (table.status === "occupied" || table.status === "waiting_payment") {
+      if (!isDexiePersistSession() || !tenant) return;
+      const expectedOrderId = table.currentOrderId;
+      if (typeof expectedOrderId !== "string" || expectedOrderId.trim().length === 0) return;
+      const tenantId = tenant.id;
+      const tableId = table.id;
+      void loadOpenOrderForTable(
+        { authenticatedTenantId: tenantId },
+        { tableId, expectedOrderId },
+      ).then((order) => {
+        if (!order) return;
+        if (useOrderPaymentStore.getState().currentOrder !== null) return;
+        if (useOrderPaymentStore.getState().selectOpenOrder(order)) {
+          setSelectedTableId(tableId);
+        }
+      });
       return;
     }
+    if (table.status !== "empty") return;
     if (!tenant || !staff) return;
 
     const now = Date.now();

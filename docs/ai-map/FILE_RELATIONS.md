@@ -239,6 +239,11 @@ Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutation
   - used by: `src/App.tsx`, `src/components/pos/MenuGrid.tsx`, `src/components/pos/OrderPanel.tsx`.
   - notes: Design `docs/dexie-persist.md`. No currentOrder restore. Later #1 stays `[ ]`.
 
+- `src/pos/dexie-restore.ts`
+  - role: read-only load of one open order for occupied / waiting_payment table. No Zustand write. No Dexie write.
+  - used by: `src/App.tsx` `handleTableSelect` after persist-session check.
+  - notes: Design `docs/dexie-restore.md`. Later #1 and Later #2 stay `[ ]`.
+
 - `docs/dexie-restore.md`
-  - role: Later #2 restore design. Occupied-table click loads matching open order. No adapter yet.
-  - used by: future `src/pos/dexie-restore.ts` after owner names impl.
+  - role: Later #2 restore design. Occupied-table click loads matching open order.
+  - used by: `src/pos/dexie-restore.ts`.

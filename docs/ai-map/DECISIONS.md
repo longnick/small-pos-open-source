@@ -1,5 +1,17 @@
 # Decisions
 
+## 2026-08-14 - Restore impl is occupied-table click only
+
+Context: Owner said `Làm tiếp đi` after #32 design merged `08d0a8f`.
+
+Decision: Implement `loadOpenOrderForTable` + `classifyTableOrderBind`. App occupied / waiting_payment branch loads then `selectOpenOrder`, then React `setSelectedTableId`. No boot restore. No Dexie write. No ROADMAP tick. Issue #1 / PR #31 untouched.
+
+Reason: Design already locked the pick rule. One currentOrder slot.
+
+Impact: Reload can reopen a persisted open order by clicking its table.
+
+Revisit when: Later #3 multi-tab, backup UI, or paid-occupied repair.
+
 ## 2026-08-14 - Dexie restore is occupied-table click, not boot
 
 Context: Owner named Later #2 after #30 persist. Hydrate still catalog/tables only. Occupied table click is a no-op when `currentOrder` is null. Backup helpers exist unused.
