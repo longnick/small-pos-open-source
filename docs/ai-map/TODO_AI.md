@@ -2,12 +2,11 @@
 
 ## Doing
 
-- Dexie design PR — docs only. Later #1 still `[ ]`. No adapter.
+- Dexie read-only hydrate PR. Later #1 still `[ ]` until merge.
 
 ## Next
 
-- After owner merge: read-only Dexie hydrate PR (`docs/dexie-design.md`). Not this PR.
-- Keep all stores in-memory until that hydrate PR.
+- Sol review + owner `Duyệt` for this PR. Do not merge here.
 - Keep `verifyPin` adapter-injected; bcrypt/cloud only in a later auth-persist slice.
 - Later #2–#4 (reload/backup, multi-tab, migration docs) stay separate.
 - Issue #1 stays for a contributor.
@@ -18,11 +17,12 @@
 
 ## Risks
 
-- All four stores remain in-memory only. Dexie v1 schema exists unused. Design forbids auto-seed and write-back in the first adapter PR.
+- Hydrate is read-only. Empty IDB stays empty-catalog demo. No auto-seed. No write-back.
 
 ## Done recently
 
-- Dexie design (Later #1, docs only) — `docs/ai-map/TASK_LOGS/2026-08-14-0530-dexie-design.md`
+- Dexie read-only hydrate — `docs/ai-map/TASK_LOGS/2026-08-14-0727-dexie-hydrate.md`
+- Dexie design (Later #1, docs only) — merged #27 (`cf51044`).
 - MenuManagement empty status — merged #26 (`94bb10f`).
 - App shell nav `aria-current` — merged #24 (`734ebd4`).
 - StaffManagement trash name — merged #23 (`885542b`).

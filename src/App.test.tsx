@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { Staff, Tenant } from "../packages/pos-core/src/types";
 import type { PinHashVerifier } from "../packages/pos-core/src/auth";
 import type { DemoAuthBootstrap } from "./auth/demo-auth-adapter";
+import type { DexieHydrateResult } from "./pos/dexie-hydrate";
 import { useTenantAuthStore } from "./stores/tenant-auth-store";
 import { useCatalogTableStore } from "./stores/catalog-table-store";
 import { useOrderPaymentStore } from "./stores/order-payment-store";
@@ -22,8 +23,16 @@ const bootstrap = vi.hoisted(() => {
   };
 });
 
+const hydrate = vi.hoisted(() => ({
+  fromDexie: vi.fn(async (_input?: { authenticatedTenantId: string }): Promise<DexieHydrateResult | null> => null),
+}));
+
 vi.mock("@/auth/demo-auth-adapter", () => ({
   bootstrapDemoAuth: bootstrap.create,
+}));
+
+vi.mock("@/pos/dexie-hydrate", () => ({
+  hydrateFromDexie: hydrate.fromDexie,
 }));
 
 import App from "./App";
@@ -94,6 +103,8 @@ beforeEach(() => {
   useCatalogTableStore.setState({ tenantId: null, catalogGroups: [], catalogItems: [], tables: [] });
   useOrderPaymentStore.getState().clearCurrentOrder();
   bootstrap.create.mockClear();
+  hydrate.fromDexie.mockClear();
+  hydrate.fromDexie.mockImplementation(async () => null);
   // Default: bootstrap never resolves (pending forever)
   bootstrap.create.mockImplementation(() => new Promise<DemoAuthBootstrap>(() => {}));
 });
@@ -677,4 +688,43 @@ test("authenticated shell nav: clicking 'Bếp' marks only that view current", a
   expect(screen.getByRole("button", { name: "Bán hàng" })).not.toHaveAttribute(
     "aria-current",
   );
+});
+
+test("production pos null: hydrates catalog/tables from Dexie and leaves currentOrder null", async () => {
+  const catalogGroups = [{ id: "g1", tenantId: tenant.id, name: "Cà phê", sortOrder: 1 }];
+  const catalogItems = [{
+    id: "ci1",
+    tenantId: tenant.id,
+    groupId: "g1",
+    name: "Cà phê đen",
+    price: 25_000,
+    available: true,
+    sortOrder: 1,
+    createdAt: 0,
+    updatedAt: 0,
+  }];
+  const tables = [{
+    id: "t1",
+    tenantId: tenant.id,
+    number: 1,
+    status: "empty" as const,
+    openedAt: 0,
+    staffId: staffRecord.id,
+  }];
+  hydrate.fromDexie.mockImplementation(async () => ({ catalogGroups, catalogItems, tables }));
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy()
+  );
+  expect(hydrate.fromDexie).toHaveBeenCalledWith({ authenticatedTenantId: tenant.id });
+  expect(useCatalogTableStore.getState()).toMatchObject({
+    tenantId: tenant.id,
+    catalogGroups,
+    catalogItems,
+    tables,
+  });
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
 });

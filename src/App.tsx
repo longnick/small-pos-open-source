@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { bootstrapDemoAuth } from "@/auth/demo-auth-adapter";
 import { bootstrapDemoPos } from "@/pos/demo-pos-bootstrap";
+import { hydrateFromDexie } from "@/pos/dexie-hydrate";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
 import { useCatalogTableStore } from "@/stores/catalog-table-store";
@@ -358,7 +359,7 @@ function App() {
     let cancelled = false;
     setAuthenticatedStaff(null);
     Promise.all([bootstrapDemoAuth(), bootstrapDemoPos()])
-      .then(([{ tenant: t, staff: s, verifier: v }, pos]) => {
+      .then(async ([{ tenant: t, staff: s, verifier: v }, pos]) => {
         if (cancelled) return;
         verifierRef.current = v;
         setTenant(t);
@@ -367,6 +368,10 @@ function App() {
         if (pos) {
           useCatalogTableStore.getState().replaceTenantData(t.id, pos);
           if (pos.currentOrder) useOrderPaymentStore.getState().selectOpenOrder(pos.currentOrder);
+        } else {
+          const hydrated = await hydrateFromDexie({ authenticatedTenantId: t.id });
+          if (cancelled) return;
+          if (hydrated) useCatalogTableStore.getState().replaceTenantData(t.id, hydrated);
         }
         setBootState("ready");
       })

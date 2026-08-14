@@ -96,9 +96,9 @@ Purpose: create ephemeral demo auth records and gate the Lovable POS shell behin
 
 - `src/auth/demo-auth-adapter.ts` — maps demo seed into core records and injected native Web Crypto verifier; no storage or raw PIN output.
 - `src/components/auth/PinLogin.tsx` — presentation-only accessible staff/PIN form with generic error and synchronous submit lock.
-- `src/App.tsx` — bootstraps adapter, delegates sign-in to tenant auth store, and renders shell only after bootstrap-local successful session. View nav buttons expose `aria-current="page"` on the active view.
+- `src/App.tsx` — bootstraps adapter, hydrates catalog/tables from Dexie when production `pos` is null, delegates sign-in to tenant auth store, and renders shell only after bootstrap-local successful session. View nav buttons expose `aria-current="page"` on the active view.
 - `src/auth/demo-auth-adapter.test.ts`, `src/components/auth/PinLogin.test.tsx`, `src/App.test.tsx` — adapter, form, and fail-closed gate coverage.
-- Scope: no Dexie, routing, event bus, persistence, or other-store coupling.
+- Scope: PIN path stays in-memory. Dexie hydrate is catalog/tables only, after auth, via `src/pos/dexie-hydrate.ts`.
 
 ## Module: Minimal payment modal (Task 2.9)
 
@@ -214,13 +214,13 @@ Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutation
   - depends on: `packages/pos-core/src/types.ts` where needed.
   - used by: unit tests and future application adapters.
 
-## Module: Local persistence (unused)
+## Module: Local persistence
 
 - `packages/pos-storage/src/db.ts`
   - role: Dexie v1, 9 stores.
   - depends on: `packages/pos-core/src/types.ts`.
-  - used by: package tests only. App does not import.
-  - notes: Design `docs/dexie-design.md` — first adapter is read-only hydrate. No schema bump.
+  - used by: package tests + `src/pos/dexie-hydrate.ts`.
+  - notes: Design `docs/dexie-design.md`. No schema bump.
 
 - `packages/pos-storage/src/backup.ts`
   - role: v1 JSON export/import, fail-closed.
@@ -228,8 +228,8 @@ Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutation
 
 - `src/pos/demo-pos-bootstrap.ts`
   - role: production returns `null`. E2E replaces this module at build time.
-  - notes: First adapter PR must not change its signature.
+  - notes: Signature unchanged.
 
-- `src/pos/dexie-hydrate.ts` (not written yet)
-  - role: future read-only hydrate. Input `authenticatedTenantId`. Output catalog/tables only.
+- `src/pos/dexie-hydrate.ts`
+  - role: read-only hydrate. Input `authenticatedTenantId`. Output catalog/tables only.
   - used by: `src/App.tsx` else-branch when `bootstrapDemoPos()` is `null`.
