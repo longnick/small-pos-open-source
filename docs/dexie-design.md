@@ -136,7 +136,7 @@ First adapter PR sets **no** current order.
 
 - IDB may contain 0, 1, or many `status: "open"` orders. Ignored.
 - No “active table” input exists at boot (`App.tsx` hydrates before PIN UI).
-- Restoring one open order needs a later design: pick rule, table bind, payments/shifts. Later #2.
+- Restoring one open order needs a later design: pick rule, table bind, payments/shifts. Later #2: [`docs/dexie-restore.md`](dexie-restore.md).
 
 Duplicate open orders across tables are a Later #2 problem. First PR does not interpret them.
 

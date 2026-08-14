@@ -1,5 +1,17 @@
 # Decisions
 
+## 2026-08-14 - Dexie restore is occupied-table click, not boot
+
+Context: Owner named Later #2 after #30 persist. Hydrate still catalog/tables only. Occupied table click is a no-op when `currentOrder` is null. Backup helpers exist unused.
+
+Decision: Design only. Restore one open order when the cashier selects its occupied / waiting_payment table after a hydrate-success session. Do not restore at boot (PIN not yet chosen; many tables). Do not swap an existing `currentOrder`. Do not auto-repair paid-occupied. Missing / invalid `currentOrderId` is `missing-order`: no Dexie read, no Zustand write, no highlight. After a successful `selectOpenOrder`, `setSelectedTableId` is App React `useState`, not a second Zustand write. Backup UI is a later increment. No schema bump. Later #1 and Later #2 stay unchecked.
+
+Reason: One `currentOrder` slot. Boot has no selected table. Persist already wrote the bind `table.currentOrderId === order.id`. Click is the existing UI that can name that bind.
+
+Impact: `docs/dexie-restore.md` locks the impl allowlist. No restore code in this PR.
+
+Revisit when: owner names restore impl, or Later #3 multi-tab.
+
 ## 2026-08-14 - Dexie persist is post-hydrate, three clusters, no restore
 
 Context: Owner named persist write-back after #28 hydrate. Occupy/create, order edit, and pay/release already succeed in memory. IDB still unread for orders.
