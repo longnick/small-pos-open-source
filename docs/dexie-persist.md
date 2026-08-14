@@ -67,9 +67,9 @@ persistAfterOrderEdit(input, { order: Order }): Promise<PersistResult>
 persistAfterPay(input, { table: PosTable; order: Order; payment: Payment }): Promise<PersistResult>
 ```
 
-Call **after** the Zustand cluster returns success. Pass materialized snapshots from `getState()`, not the raw click payload.
+Call **after** the Zustand cluster returns success (pay: after `recordPayment` true, even if `releaseTable` is false). Pass materialized snapshots from `getState()`, not the raw click payload.
 
-Hydrate does not write stores. Persist does not write stores. Same split.
+Hydrate does not mutate Zustand. Persist does not mutate Zustand. Persist writes Dexie only. Same split.
 
 ## Clusters
 
@@ -98,17 +98,15 @@ No table write. No payment write.
 
 ### 3. Pay + release
 
-After `recordPayment` **and** `releaseTable` both return `true`:
+Call `persistAfterPay` **after** `recordPayment` returns `true`, **regardless** of `releaseTable`. Snapshot **after** the release attempt.
 
-One transaction:
+| `recordPayment` | `releaseTable` | Persist? | Snapshot |
+|---|---|---|---|
+| false | not called | No | — |
+| true | true | Yes | paid order + payment + empty table |
+| true | false | Yes | paid order + payment + occupied table (memory split) |
 
-1. `orders.put(order)` — paid (`status`, `paidAt` as store left them)
-2. `payments.put(payment)`
-3. `posTables.put(table)` — empty, `currentOrderId` cleared
-
-If `recordPayment` fails: no Dexie write.
-
-If `recordPayment` succeeds and `releaseTable` fails: **pre-existing memory split** (paid order, table still occupied). Persist that split as-is (paid order + payment + occupied table). Do not invent a rollback. Do not hide the payment. Later #2 must treat this as corruption.
+One transaction writes those three rows as memory left them. Do not invent a rollback. Do not hide the payment. Later #2 treats the occupied+paid split as corruption.
 
 `clearCurrentOrder` on receipt close is UI-only. No Dexie delete.
 
@@ -121,7 +119,7 @@ Before any `put`:
 3. `materializeRecord` the same way stores do. Accessor / Proxy ⇒ `false`.
 4. Every row `tenantId === authenticatedTenantId`.
 5. Occupy: `table.status === "occupied"` and `table.currentOrderId === order.id` and `order.status === "open"`.
-6. Pay: `order.status === "paid"` and `payment.orderId === order.id` and `payment.tenantId === authenticatedTenantId`.
+6. Pay: `order.status === "paid"` and `payment.orderId === order.id` and `payment.tenantId === authenticatedTenantId`. Table may be empty (release ok) or still occupied with `currentOrderId === order.id` (release failed). Reject any other table snapshot.
 7. Order document: items array on the row. No `orderItems` store.
 8. `put` by `id`. Overwrite same id is the idempotency story for this slice.
 
@@ -147,7 +145,7 @@ Allowed files:
 
 - new `src/pos/dexie-persist.ts` + `src/pos/dexie-persist.test.ts` (`fake-indexeddb`)
 - `src/App.tsx` — session flag after successful hydrate; call `persistAfterOccupy` after occupy+create; pass snapshots into pay success
-- `src/components/pos/PaymentModal.tsx` — call `persistAfterPay` only after record+release succeed, or keep the call in `App` via existing callbacks
+- `src/components/pos/PaymentModal.tsx` — call `persistAfterPay` after `recordPayment` true (then `releaseTable` attempt), or keep the call in `App` via existing callbacks using post-release snapshots
 - `src/components/pos/MenuGrid.tsx` / `OrderPanel.tsx` — `persistAfterOrderEdit` after mutator `true`
 - docs/ai-map
 
@@ -168,7 +166,7 @@ TDD:
 - RED: hydrate-success session + occupy cluster; IDB has no order row.
 - GREEN: one transaction wrote occupied table + open order; stores unchanged by persist itself.
 - Order edit: `orders` row items/totals match `currentOrder`.
-- Pay: paid order + payment + empty table in one transaction.
+- Pay: paid order + payment + empty table in one transaction. Also lock pay-true / release-false → occupied table + paid order + payment.
 - Abort: no hydrate flag; Dexie open fail; hostile snapshot; tenant mismatch — return `false`; Zustand byte-for-byte unchanged (already true if called after success; also lock “no write when mutator returned false”).
 - E2E / `pos != null`: persist functions never called (App/PaymentModal tests).
 
