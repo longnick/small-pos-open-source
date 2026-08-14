@@ -64,38 +64,96 @@ Rules already locked by tests:
 
 One function, called from the existing `bootstrapDemoPos` slot (or a sibling imported there). Stores stay the source of runtime truth after boot.
 
+Auth still comes from `bootstrapDemoAuth()`. Hydrate **must** take that tenant id as input. Do not load a tenant from IDB independently.
+
 ```ts
+type DexieHydrateInput = {
+  authenticatedTenantId: string; // t.id from bootstrapDemoAuth()
+};
+
 type DexieHydrateResult = {
-  tenant: Tenant;
-  staff: Staff[];          // pinHash only; never pin
   catalogGroups: CatalogGroup[];
   catalogItems: CatalogItem[];
   tables: PosTable[];
-  currentOrder: Order | null;   // at most one open order for the active table, or null
 };
 ```
 
+No `tenant`. No `staff`. No `currentOrder`. First adapter PR does not replace auth and does not restore an open order.
+
+Boot stays `Promise.all([bootstrapDemoAuth(), bootstrapDemoPos()])` so the E2E module swap still works. Hydrate runs **after** that, only when production `pos` is `null`:
+
+```ts
+if (pos) {
+  useCatalogTableStore.getState().replaceTenantData(t.id, pos);
+  if (pos.currentOrder) useOrderPaymentStore.getState().selectOpenOrder(pos.currentOrder);
+} else {
+  const hydrated = await hydrateFromDexie({ authenticatedTenantId: t.id });
+  if (hydrated) useCatalogTableStore.getState().replaceTenantData(t.id, hydrated);
+}
+```
+
+`bootstrapDemoPos()` signature unchanged. E2E fixture may still ship `currentOrder`. Dexie path never does.
+
+### Read set (first PR)
+
+Read **only** these Dexie stores, in **one** read transaction:
+
+- `tenants`
+- `catalogGroups`
+- `catalogItems`
+- `tables`
+
+Do **not** read `staff`, `orders`, `payments`, `shifts`, `auditLog`. Those stay unused until a later slice defines restore rules. Backup JSON still has 9 keys; hydrate is not backup.
+
 ### Accept
 
-1. Open `PosDatabase` (`small-pos`). Isolated tests keep random names.
-2. Read all 9 stores.
-3. Require exactly one `Tenant`.
-4. Every `Staff` / group / item / table / order / payment / shift / audit `tenantId` matches that tenant.
-5. Pass catalog+tables through `replaceTenantData` (existing validator). If it returns `false`, **abort hydrate**. Leave stores empty. Do not partial-set.
-6. `currentOrder`, if present, must already be `status: "open"` and pass `selectOpenOrder`. Else omit it (`null`).
-7. Do not call `recordPayment`, `occupyTable`, `openShift`, or any mutator during hydrate.
+1. Open `PosDatabase` (`small-pos`). Isolated tests keep random names. Open/read throw or reject ⇒ return `null`.
+2. One Dexie read transaction across the four stores. Mixed snapshots are a reject.
+3. Require exactly one `Tenant` row and `tenant.id === authenticatedTenantId`.
+4. Materialize every group / item / table with the same fail-closed rules as `replaceTenantData` (`materializeRecord`, no accessors / Proxy).
+5. Required strings:
+   - tenant: `id`, `name`, `address`, `phone`; `currency === "VND"`
+   - group: `id`, `tenantId`, `name`
+   - item: `id`, `tenantId`, `groupId`, `name`
+   - table: `id`, `tenantId`, `staffId`
+6. Every group / item / table `tenantId === authenticatedTenantId`.
+7. Item `groupId` exists in the hydrated groups. Table `number` unique and in 1–10.
+8. Run the **same** checks `replaceTenantData` would run, in memory, **before** any Zustand `set`.
+9. Only then call `replaceTenantData(authenticatedTenantId, result)`. If it returns `false`, treat as reject even though pre-check passed (belt).
+10. Do not call `selectOpenOrder`, `recordPayment`, `occupyTable`, `openShift`, or any other mutator.
+
+### Atomic commit
+
+Validate the full `DexieHydrateResult` first. Zero store writes until that object is complete and valid.
+
+`replaceTenantData` is the only allowed mutation. It already no-ops on failure. First PR must **not** also call `selectOpenOrder`, so there is no catalog-ok / order-fail partial state.
+
+If a later slice restores `currentOrder`, it must validate the order **before** either store write, then commit catalog/tables and order only if both validators would accept. This design forbids that restore.
+
+### currentOrder (explicit non-goal)
+
+First adapter PR sets **no** current order.
+
+- IDB may contain 0, 1, or many `status: "open"` orders. Ignored.
+- No “active table” input exists at boot (`App.tsx` hydrates before PIN UI).
+- Restoring one open order needs a later design: pick rule, table bind, payments/shifts. Later #2.
+
+Duplicate open orders across tables are a Later #2 problem. First PR does not interpret them.
 
 ### Reject (fail closed, no throw into UI)
 
-- 0 or >1 tenant
-- empty required string ids
+- Dexie open / read / transaction error
+- 0 tenants, >1 tenant, or `tenant.id !== authenticatedTenantId`
+- empty required strings listed above
 - catalog item `groupId` missing from groups
 - table `number` outside 1–10 or duplicate number
-- raw `pin` field on a staff row
-- hostile / accessor / Proxy records (same materialize rules as stores)
+- hostile / accessor / Proxy records
 - backup-shaped blob in the wrong place
+- `replaceTenantData` returns `false`
 
-On reject: log nothing secret. Return `null` from bootstrap. App stays on PIN screen with empty catalog (today’s production demo). Do **not** auto-seed IDB from `DEMO_*` or `INITIAL_*`.
+Empty IDB (no tenant row) is a **valid empty database**. Hydrate returns `null`. App keeps today’s empty-catalog demo. Not an error worth logging.
+
+On any reject: log nothing secret (no PIN, hash, row payload, accessor dump). Return `null` from `bootstrapDemoPos()`. Do **not** auto-seed IDB from `DEMO_*` or `INITIAL_*`.
 
 ### Do not persist yet
 
@@ -140,9 +198,11 @@ Name: `feat(storage): hydrate domain stores from Dexie v1` (suggested).
 
 Allowed files:
 
-- `src/pos/demo-pos-bootstrap.ts` (or new `src/pos/dexie-hydrate.ts` imported by it)
-- tests next to it (`fake-indexeddb`)
+- new `src/pos/dexie-hydrate.ts` + test (`fake-indexeddb`)
+- `src/App.tsx` — only the `else { hydrateFromDexie(t.id) }` branch above
 - docs/ai-map
+
+Do not change `bootstrapDemoPos()` signature. E2E still replaces that module.
 
 Forbidden in that PR:
 
@@ -152,7 +212,10 @@ Forbidden in that PR:
 - payment / shift / cloud / Firebase
 - checking `ROADMAP.md` Later #1 until hydrate is real and reviewed
 
-TDD: RED = `bootstrapDemoPos()` still `null` with a populated test DB; GREEN = hydrate returns validated `DexieHydrateResult` and `replaceTenantData` succeeds. Abort path covered.
+TDD:
+- RED: populated test DB + matching `authenticatedTenantId`, `bootstrapDemoPos()` still `null`.
+- GREEN: hydrate returns validated catalog/tables; `replaceTenantData(id, result)` succeeds; `currentOrder` stays `null`.
+- Abort: wrong tenant id, empty IDB, hostile row, Dexie open failure — all return `null`, stores unchanged.
 
 Reviewer: `cx/gpt-5.6-sol`. Trust `returned_model=gpt-5.6-sol`.
 

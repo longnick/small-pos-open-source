@@ -227,5 +227,9 @@ Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutation
   - used by: package tests only. No UI.
 
 - `src/pos/demo-pos-bootstrap.ts`
-  - role: production returns `null`. Approved future hydrate insertion point (`App.tsx`).
-  - notes: E2E replaces this module at build time. Do not break that path.
+  - role: production returns `null`. E2E replaces this module at build time.
+  - notes: First adapter PR must not change its signature.
+
+- `src/pos/dexie-hydrate.ts` (not written yet)
+  - role: future read-only hydrate. Input `authenticatedTenantId`. Output catalog/tables only.
+  - used by: `src/App.tsx` else-branch when `bootstrapDemoPos()` is `null`.
