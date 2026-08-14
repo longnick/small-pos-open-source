@@ -62,17 +62,29 @@ npm ci
 npm run dev
 ```
 
-Open URL printed by Vite. Demo data only.
+Open the exact local URL printed by Vite. Stop the development server with
+`Ctrl+C`.
+
+The development server runs only the browser frontend. It does not start a
+backend, database server, cloud service, or payment gateway. The first screen
+is a demo-only PIN login; select a staff member and use the corresponding
+public sample PIN defined in [`src/data/demo-seed.ts`](src/data/demo-seed.ts).
+Do not enter real staff credentials or business data.
 
 Run full local verification:
 
 ```bash
 npm run ci
+npx playwright install --with-deps chromium
 npm run test:e2e
 npm run test:e2e:payment
 npm run test:e2e:order
 npm run test:e2e:visual
 ```
+
+`npm run ci` covers type checking, unit/component tests, the production build,
+and the source-leakage scan. The Playwright install is required once per
+machine before running the browser suites that follow it.
 
 ## Project boundaries
 
