@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-14 15:10 - Dexie restore occupied-table impl
+
+Repo: `/home/longnick/projects/small-pos-dexie-restore-impl`
+Branch: `feat/dexie-restore`
+Agent: Hermes / gcli/grok-4.6
+Summary: Occupied / waiting_payment table click loads matching open order after hydrate-success. No boot restore. No Dexie write. Later #1/#2 stay `[ ]`. Issue #1 / PR #31 untouched.
+Verification: restore + App tests. Full `npm run ci` + Sol pending.
+Next: Sol review, PR. No merge.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-14-1510-dexie-restore.md`
+
 ## 2026-08-14 13:46 - Dexie restore / reload design
 
 Repo: `/home/longnick/projects/small-pos-dexie-restore`
