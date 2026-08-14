@@ -58,11 +58,11 @@ Sequence:
 1. Existing guards stay first: if `currentOrder !== null`, only `setSelectedTableId`. Do **not** swap the in-memory order.
 2. Empty table path unchanged (occupy + create + persist).
 3. If table is `occupied` or `waiting_payment` and `currentOrder === null` and persist session is on:
-   1. Snapshot `table.currentOrderId`.
+   1. Snapshot `table.currentOrderId`. If it is missing, empty, or not a nonempty string, stop. No Dexie read. No Zustand write. No `setSelectedTableId`. Classify `missing-order`.
    2. `await loadOpenOrderForTable({ authenticatedTenantId }, { tableId: table.id, expectedOrderId })`.
-   3. If the function returns an order, `selectOpenOrder(order)` then `setSelectedTableId(table.id)`.
-   4. If `selectOpenOrder` returns `false`, leave stores unchanged. Do not occupy a new order on that table.
-   5. If the function returns `null` (missing / corrupt / paid-occupied), leave stores unchanged. Do not auto-release. Do not create a replacement order.
+   3. If the function returns an order, `selectOpenOrder(order)`. That is the **only Zustand write**. Then `setSelectedTableId(table.id)` — App React `useState`, not a store. It only highlights the table. It must not swap or clear `currentOrder`.
+   4. If `selectOpenOrder` returns `false`, leave Zustand unchanged. Do not occupy a new order on that table. Do not change `selectedTableId`.
+   5. If the function returns `null` (missing / corrupt / paid-occupied), leave Zustand unchanged. Do not change `selectedTableId`. Do not auto-release. Do not create a replacement order.
 
 Clicking another occupied table while `currentOrder` is already set still only changes the highlight. Multi-order switching is out of this slice.
 
@@ -98,7 +98,7 @@ classifyTableOrderBind(
 ): TableOrderBind
 ```
 
-`loadOpenOrderForTable` reads Dexie. It does **not** mutate Zustand. App calls `selectOpenOrder` only after a non-null return.
+`loadOpenOrderForTable` reads Dexie. It does **not** mutate Zustand. App calls `selectOpenOrder` only after a non-null return. `setSelectedTableId` is React local state in `App.tsx`, not Zustand. After a successful `selectOpenOrder`, highlighting the table is allowed. It is not a second store write.
 
 Read set: `orders` (required). `payments` only to classify `paid-occupied`. Do **not** write. Do **not** read `staff` / `shifts` / `auditLog` / catalog.
 
@@ -188,8 +188,8 @@ Forbidden in that PR:
 TDD:
 
 - RED: hydrate-success session, occupied table + matching open order in IDB, `currentOrder` null; click does not load the order.
-- GREEN: click calls `loadOpenOrderForTable` then `selectOpenOrder`; store matches the Dexie document; Dexie unread for writes.
-- Reject: missing order, paid-occupied, table mismatch, tenant mismatch, duplicate open, hostile Proxy, Dexie open fail → `null`, Zustand `currentOrder` stays null, table row unchanged.
+- GREEN: click calls `loadOpenOrderForTable` then `selectOpenOrder`; store matches the Dexie document; Dexie unread for writes. `selectedTableId` may update via React state only after `selectOpenOrder` true.
+- Reject: missing / invalid `currentOrderId`, missing order, paid-occupied, table mismatch, tenant mismatch, duplicate open, hostile Proxy, Dexie open fail → `null`, Zustand `currentOrder` stays null, `selectedTableId` unchanged, table row unchanged.
 - Existing `currentOrder` + click other occupied table: only `selectedTableId` changes.
 - Empty IDB / E2E `pos != null`: restore never called.
 

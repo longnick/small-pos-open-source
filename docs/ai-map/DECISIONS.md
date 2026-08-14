@@ -4,7 +4,7 @@
 
 Context: Owner named Later #2 after #30 persist. Hydrate still catalog/tables only. Occupied table click is a no-op when `currentOrder` is null. Backup helpers exist unused.
 
-Decision: Design only. Restore one open order when the cashier selects its occupied / waiting_payment table after a hydrate-success session. Do not restore at boot (PIN not yet chosen; many tables). Do not swap an existing `currentOrder`. Do not auto-repair paid-occupied. Backup UI is a later increment. No schema bump. Later #1 and Later #2 stay unchecked.
+Decision: Design only. Restore one open order when the cashier selects its occupied / waiting_payment table after a hydrate-success session. Do not restore at boot (PIN not yet chosen; many tables). Do not swap an existing `currentOrder`. Do not auto-repair paid-occupied. Missing / invalid `currentOrderId` is `missing-order`: no Dexie read, no Zustand write, no highlight. After a successful `selectOpenOrder`, `setSelectedTableId` is App React `useState`, not a second Zustand write. Backup UI is a later increment. No schema bump. Later #1 and Later #2 stay unchecked.
 
 Reason: One `currentOrder` slot. Boot has no selected table. Persist already wrote the bind `table.currentOrderId === order.id`. Click is the existing UI that can name that bind.
 
