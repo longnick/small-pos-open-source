@@ -4,7 +4,7 @@
 
 Context: Owner named persist write-back after #28 hydrate. Occupy/create, order edit, and pay/release already succeed in memory. IDB still unread for orders.
 
-Decision: Persist only after a successful hydrate this session. Write `tables` + `orders` + `payments` only, one transaction per cluster. Occupy writes table+order together. Pay writes paid order + payment + released table together. Dexie fail does not roll back Zustand. No currentOrder restore. No schema bump. No auto-seed. Later #1 stays unchecked in this design PR.
+Decision: Persist only after a successful hydrate this session. Write `tables` + `orders` + `payments` only, one transaction per cluster. Occupy writes table+order together. Pay: after `recordPayment` true, attempt `releaseTable`, then persist the post-attempt snapshot (empty table if release ok; occupied table + paid order + payment if release fails). Dexie fail does not roll back Zustand. No currentOrder restore. No schema bump. No auto-seed. Later #1 stays unchecked in this design PR.
 
 Reason: Memory is already the accepted mutation. Durable copy must not invent a half-occupy or hide a recorded payment. Reload restore and multi-tab are Later #2/#3.
 

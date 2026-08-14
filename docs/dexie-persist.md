@@ -98,7 +98,7 @@ No table write. No payment write.
 
 ### 3. Pay + release
 
-Call `persistAfterPay` **after** `recordPayment` returns `true`, **regardless** of `releaseTable`. Snapshot **after** the release attempt.
+Sequence after `recordPayment` returns `true`: (1) attempt `releaseTable`, (2) snapshot `getState()`, (3) `persistAfterPay`. Never persist before the release attempt. Persist **regardless** of `releaseTable` result.
 
 | `recordPayment` | `releaseTable` | Persist? | Snapshot |
 |---|---|---|---|
@@ -145,7 +145,7 @@ Allowed files:
 
 - new `src/pos/dexie-persist.ts` + `src/pos/dexie-persist.test.ts` (`fake-indexeddb`)
 - `src/App.tsx` — session flag after successful hydrate; call `persistAfterOccupy` after occupy+create; pass snapshots into pay success
-- `src/components/pos/PaymentModal.tsx` — call `persistAfterPay` after `recordPayment` true (then `releaseTable` attempt), or keep the call in `App` via existing callbacks using post-release snapshots
+- `src/components/pos/PaymentModal.tsx` / `App` — after `recordPayment` true: (1) attempt `releaseTable`, (2) snapshot `getState()`, (3) `persistAfterPay`. Never persist before the release attempt.
 - `src/components/pos/MenuGrid.tsx` / `OrderPanel.tsx` — `persistAfterOrderEdit` after mutator `true`
 - docs/ai-map
 
