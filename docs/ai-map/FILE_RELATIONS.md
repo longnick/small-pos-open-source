@@ -187,8 +187,8 @@ Purpose: render hardcoded kitchen tickets in the Lovable shell. No store, no fix
 
 Purpose: render hardcoded catalog rows in the Lovable shell. No store, no mutations.
 
-- `src/components/pos/MenuManagement.tsx` — local search + category filter over `INITIAL_MENU_ITEMS`; filter chips expose `aria-pressed`; icon pencil/trash named `Sửa {item}` / `Xóa {item}`; search named `Tìm món`.
-- `src/components/pos/MenuManagement.test.tsx` — default pressed, unpressed siblings, click exclusivity, named pencil/trash, named searchbox.
+- `src/components/pos/MenuManagement.tsx` — local search + category filter over `INITIAL_MENU_ITEMS`; filter chips expose `aria-pressed`; icon pencil/trash named `Sửa {item}` / `Xóa {item}`; search named `Tìm món`; empty `Không có món nào` is `role="status"`.
+- `src/components/pos/MenuManagement.test.tsx` — default pressed, unpressed siblings, click exclusivity, named pencil/trash, named searchbox, named empty status.
 - `src/App.tsx` — mounts `MenuManagement` in the menu tab.
 
 ## Module: Reports panel (presentation dummy)

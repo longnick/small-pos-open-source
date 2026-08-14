@@ -51,4 +51,13 @@ describe("MenuManagement", () => {
     render(<MenuManagement />);
     expect(screen.getByRole("searchbox", { name: "Tìm món" })).toBeInTheDocument();
   });
+
+  it("names the empty state when search has no matches", () => {
+    render(<MenuManagement />);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Tìm món" }), {
+      target: { value: "xyz-no-match" },
+    });
+    expect(screen.getByText("Không có món nào")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Không có món nào" })).toBeInTheDocument();
+  });
 });

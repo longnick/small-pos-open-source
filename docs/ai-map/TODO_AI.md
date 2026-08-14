@@ -2,7 +2,7 @@
 
 ## Doing
 
-- MenuManagement search name — Sol APPROVE. Remaining: PR + owner review. No deploy.
+- MenuManagement empty `Không có món nào` — Sol APPROVE. Remaining: PR + owner review. No deploy.
 
 ## Next
 
@@ -21,6 +21,7 @@
 
 ## Done recently
 
+- MenuManagement search name — merged #25 (`95ad81a`).
 - App shell nav `aria-current` — merged #24 (`734ebd4`).
 - StaffManagement trash name — merged #23 (`885542b`).
 - MenuManagement icon pencil/trash names — merged #22 (`829c166`).
