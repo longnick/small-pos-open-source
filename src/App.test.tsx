@@ -42,6 +42,12 @@ const backup = vi.hoisted(() => ({
   importBackup: vi.fn(async () => false as const),
 }));
 
+const tabs = vi.hoisted(() => ({
+  listen: vi.fn<(handler: (event: { tenantId: string; kind: "occupy" | "edit" | "pay" }) => void) => () => void>(
+    () => () => undefined,
+  ),
+}));
+
 const posBoot = vi.hoisted(() => ({
   create: vi.fn<typeof import("./pos/demo-pos-bootstrap").bootstrapDemoPos>(async () => null),
 }));
@@ -70,6 +76,10 @@ vi.mock("@/pos/dexie-restore", () => ({
 vi.mock("@/pos/dexie-backup", () => ({
   exportDexieBackup: backup.exportBackup,
   importDexieBackup: backup.importBackup,
+}));
+
+vi.mock("@/pos/dexie-tabs", () => ({
+  listenDexieTabEvents: tabs.listen,
 }));
 
 vi.mock("@/pos/demo-pos-bootstrap", () => ({
@@ -157,6 +167,8 @@ beforeEach(() => {
   backup.importBackup.mockClear();
   backup.exportBackup.mockImplementation(async () => null);
   backup.importBackup.mockImplementation(async () => false);
+  tabs.listen.mockClear();
+  tabs.listen.mockImplementation(() => () => undefined);
   posBoot.create.mockClear();
   posBoot.create.mockImplementation(async () => null);
   // Default: bootstrap never resolves (pending forever)
@@ -1019,4 +1031,51 @@ test("empty IDB backup actions stay disabled", async () => {
   expect(screen.getByRole("button", { name: "Tải sao lưu" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Nhập sao lưu" })).toBeDisabled();
   expect(backup.exportBackup).not.toHaveBeenCalled();
+});
+
+test("tab listener ignores events until persist session is on", async () => {
+  let onEvent: ((event: { tenantId: string; kind: "occupy" | "edit" | "pay" }) => void) | null = null;
+  tabs.listen.mockImplementation((handler) => {
+    onEvent = handler;
+    return () => undefined;
+  });
+  hydrate.fromDexie.mockImplementation(async () => null);
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  expect(isDexiePersistSession()).toBe(false);
+  expect(tabs.listen).toHaveBeenCalled();
+  hydrate.fromDexie.mockClear();
+  await act(async () => {
+    onEvent?.({ tenantId: tenant.id, kind: "pay" });
+  });
+  expect(hydrate.fromDexie).not.toHaveBeenCalled();
+});
+
+test("other-tab persist event rehydrates catalog/tables for the same tenant", async () => {
+  let onEvent: ((event: { tenantId: string; kind: "occupy" | "edit" | "pay" }) => void) | null = null;
+  tabs.listen.mockImplementation((handler) => {
+    onEvent = handler;
+    return () => undefined;
+  });
+  hydrate.fromDexie.mockImplementation(async () => occupiedHydrate);
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  expect(tabs.listen).toHaveBeenCalled();
+  hydrate.fromDexie.mockImplementation(async () => ({
+    ...occupiedHydrate,
+    tables: [{ ...occupiedHydrate.tables[0], status: "empty" as const, currentOrderId: undefined }],
+  }));
+  useOrderPaymentStore.getState().selectOpenOrder(restoredOrder);
+  await act(async () => {
+    onEvent?.({ tenantId: tenant.id, kind: "pay" });
+  });
+  await waitFor(() => expect(useCatalogTableStore.getState().tables[0]?.status).toBe("empty"));
+  expect(useCatalogTableStore.getState().tables[0]?.currentOrderId).toBeUndefined();
+  expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-1");
 });

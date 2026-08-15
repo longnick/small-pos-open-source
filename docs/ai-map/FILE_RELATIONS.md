@@ -244,9 +244,13 @@ Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutation
   - used by: `src/App.tsx` else-branch when `bootstrapDemoPos()` is `null`.
 
 - `src/pos/dexie-persist.ts`
-  - role: write-back occupy/order/pay. Session flag after hydrate success. Writes tables/orders/payments only.
+  - role: write-back occupy/order/pay. Session flag after hydrate success. Writes tables/orders/payments only. CAS refuse conflicting Dexie rows.
   - used by: `src/App.tsx`, `src/components/pos/MenuGrid.tsx`, `src/components/pos/OrderPanel.tsx`.
-  - notes: Design `docs/dexie-persist.md`. No currentOrder restore. Later #1 stays `[ ]`.
+  - notes: Design `docs/dexie-persist.md` + `docs/dexie-tabs.md`. No currentOrder restore.
+
+- `src/pos/dexie-tabs.ts`
+  - role: BroadcastChannel notify after persist write; listen rehydrates catalog/tables.
+  - used by: `src/pos/dexie-persist.ts`, `src/App.tsx`.
 
 - `src/pos/dexie-restore.ts`
   - role: read-only load of one open order for occupied / waiting_payment table. No Zustand write. No Dexie write.

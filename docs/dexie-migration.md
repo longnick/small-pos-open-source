@@ -6,7 +6,7 @@ Base: `main` `cc6c52e` (#33 restore) + this backup UI
 
 This document is the recovery map for the live Dexie v1 adapter. It does **not** bump the schema. It does **not** add auto-repair writes.
 
-`ROADMAP.md` Later #3 (multi-tab / idempotent concurrent writes) stays `[ ]`.
+`ROADMAP.md` Later #3 is implemented: [`docs/dexie-tabs.md`](dexie-tabs.md).
 
 ## Schema
 
@@ -54,7 +54,7 @@ Backup import is fail-closed (`packages/pos-storage/src/backup.ts`):
 
 ## What this is not
 
-- Multi-tab `liveQuery` / BroadcastChannel — Later #3
+- Multi-tab `BroadcastChannel` catalog refresh — [`docs/dexie-tabs.md`](dexie-tabs.md)
 - Auto-repair of `paid-occupied`
 - Schema `version(2)`
 - Cloud backup, Firebase, Capacitor
