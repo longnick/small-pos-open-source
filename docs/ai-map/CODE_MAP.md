@@ -7,7 +7,9 @@
 - `src/pos/dexie-hydrate.ts` — read-only hydrate of catalog/tables. No persist. No currentOrder.
 - `src/pos/dexie-persist.ts` — write-back occupy/order/pay after hydrate-success session. No currentOrder restore.
 - `src/pos/dexie-restore.ts` — read-only load of one open order on occupied-table click. Design: `docs/dexie-restore.md`.
-- `packages/pos-storage/src/backup.ts` — v1 backup import/export. Unused by UI.
+- `packages/pos-storage/src/backup.ts` — v1 backup import/export. Wired by `src/pos/dexie-backup.ts`.
+- `src/pos/dexie-backup.ts` — session-gated export/import + rehydrate. UI: `src/components/pos/BackupPanel.tsx`.
+- `docs/dexie-migration.md` — Later #4 recovery map. No schema bump.
 - `packages/pos-core/src/auth.ts` — PIN verifier boundary and role-based permission guard.
 - `packages/pos-core/src/order-calc.ts` — order total calculation.
 - `packages/pos-core/src/shift-report.ts` — shift report calculation.
@@ -36,7 +38,9 @@
 - `src/auth/demo-auth-adapter.ts` — in-memory Web Crypto PBKDF2 adapter from demo seed to core tenant/staff/verifier; no persistence. (Task 2.5)
 - `src/auth/demo-auth-adapter.test.ts` — adapter mapping, verification, malformed-hash, and raw-PIN boundary tests. (Task 2.5)
 - `src/components/auth/PinLogin.tsx` — accessible staff-select and masked PIN screen; no seed/store knowledge. (Task 2.5)
-- `src/App.test.tsx` — login, shell-gate, Dexie hydrate, persist session, occupied-table restore. (Task 2.5 + Later #1/#2)
+- `src/App.test.tsx` — login, shell-gate, Dexie hydrate, persist session, occupied-table restore, backup tab. (Task 2.5 + Later #1/#2)
+- `src/pos/dexie-backup.test.ts` — fake-indexeddb export/import + session gate.
+- `src/components/pos/BackupPanel.test.tsx` — named actions, confirm, no pinHash.
 - `src/pos/dexie-hydrate.test.ts` — fake-indexeddb accept/abort for read-only hydrate.
 - `src/pos/dexie-persist.test.ts` — fake-indexeddb occupy/edit/pay write-back + abort.
 - `src/pos/dexie-restore.test.ts` — fake-indexeddb occupied-table restore + reject binds.

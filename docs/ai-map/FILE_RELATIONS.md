@@ -224,7 +224,16 @@ Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutation
 
 - `packages/pos-storage/src/backup.ts`
   - role: v1 JSON export/import, fail-closed.
-  - used by: package tests only. No UI.
+  - used by: package tests + `src/pos/dexie-backup.ts`.
+
+- `src/pos/dexie-backup.ts`
+  - role: session-gated export/import. Import clears currentOrder then rehydrates catalog/tables.
+  - used by: `src/components/pos/BackupPanel.tsx` via `src/App.tsx`.
+  - notes: Empty IDB / E2E fixture stay off. No pinHash in UI.
+
+- `docs/dexie-migration.md`
+  - role: Later #4 recovery map.
+  - used by: operators. No schema bump. Later #3 stays open.
 
 - `src/pos/demo-pos-bootstrap.ts`
   - role: production returns `null`. E2E replaces this module at build time.
