@@ -1,5 +1,6 @@
 import { PosDatabase } from "../../packages/pos-storage/src/db";
 import type { Order, OrderItem, Payment, PosTable } from "../../packages/pos-core/src/types";
+import { notifyDexieTabWrite } from "./dexie-tabs";
 
 export type DexiePersistInput = {
   authenticatedTenantId: string;
@@ -199,10 +200,13 @@ export async function persistAfterOccupy(
   ) return false;
 
   const written = await withWritableDb(input, ["tables", "orders"], async (database) => {
+    const existing = await database.table<PosTable>("tables").get(table.id);
+    if (existing && existing.status !== "empty" && existing.currentOrderId !== order.id) return false;
     await database.posTables.put(table);
     await database.orders.put(order);
     return true;
   });
+  if (written === true) notifyDexieTabWrite({ tenantId: input.authenticatedTenantId, kind: "occupy" });
   return written === true;
 }
 
@@ -219,9 +223,12 @@ export async function persistAfterOrderEdit(
   if (!order || order.tenantId !== input.authenticatedTenantId || order.status !== "open") return false;
 
   const written = await withWritableDb(input, ["orders"], async (database) => {
+    const existing = await database.orders.get(order.id);
+    if (existing && existing.status !== "open") return false;
     await database.orders.put(order);
     return true;
   });
+  if (written === true) notifyDexieTabWrite({ tenantId: input.authenticatedTenantId, kind: "edit" });
   return written === true;
 }
 
@@ -258,10 +265,19 @@ export async function persistAfterPay(
   ) return false;
 
   const written = await withWritableDb(input, ["tables", "orders", "payments"], async (database) => {
+    const existingTable = await database.table<PosTable>("tables").get(table.id);
+    if (
+      existingTable
+      && existingTable.status !== "empty"
+      && existingTable.currentOrderId !== order.id
+    ) return false;
+    const existingPayment = await database.payments.get(payment.id);
+    if (existingPayment && existingPayment.orderId !== payment.orderId) return false;
     await database.orders.put(order);
     await database.payments.put(payment);
     await database.posTables.put(table);
     return true;
   });
+  if (written === true) notifyDexieTabWrite({ tenantId: input.authenticatedTenantId, kind: "pay" });
   return written === true;
 }

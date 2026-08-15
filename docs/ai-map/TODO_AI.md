@@ -2,13 +2,12 @@
 
 ## Doing
 
-- Dexie backup UI + Later #4 docs PR. Official after merge: Later #1/#2/#4 `[x]`, Later #3 `[ ]` (13/14).
+- Later #3 multi-tab CAS + BroadcastChannel PR. Official after merge: **14/14**.
 
 ## Next
 
 - Sol review + owner `Duyệt` for this PR. Do not merge here.
 - Keep `verifyPin` adapter-injected; bcrypt/cloud only in a later auth-persist slice.
-- Later #3 (multi-tab) stays separate.
 - Issue #1 / PR #31 stay for the contributor.
 
 ## Blocked
@@ -17,11 +16,11 @@
 
 ## Risks
 
-- Backup UI only after hydrate-success this session. Import is destructive and confirm-gated. Later #3 stays `[ ]`.
+- Backup UI only after hydrate-success this session. Import is destructive and confirm-gated. Multi-tab CAS does not roll back Zustand.
 
 ## Done recently
 
-- Dexie backup UI + Later #4 docs — `docs/ai-map/TASK_LOGS/2026-08-15-0719-dexie-backup-ui.md`
+- Dexie Later #3 multi-tab CAS + BroadcastChannel — `docs/ai-map/TASK_LOGS/2026-08-15-1145-dexie-tabs.md`
 - Dexie restore impl — `docs/ai-map/TASK_LOGS/2026-08-14-1510-dexie-restore.md`
 - Dexie restore / reload design — `docs/ai-map/TASK_LOGS/2026-08-14-1346-dexie-restore-design.md`
 - Dexie persist write-back impl — merged #30 (`50c0fae`).

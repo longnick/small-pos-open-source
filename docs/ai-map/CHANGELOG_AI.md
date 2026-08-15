@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-15 11:45 - Dexie Later #3 multi-tab CAS
+
+Repo: `/home/longnick/projects/small-pos-dexie-tabs`
+Branch: `feat/dexie-tabs`
+Agent: Hermes / gcli/grok-4.6
+Summary: Persist occupy/edit/pay refuse conflicting Dexie rows. Successful writes notify other tabs. Listener rehydrates catalog/tables only. Tick ROADMAP Later #3. Issue #1 / PR #31 untouched.
+Verification: persist + tabs + App tests. Full `npm run ci` + Sol pending.
+Next: Sol review, PR. No merge.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-15-1145-dexie-tabs.md`
+
 ## 2026-08-15 07:19 - Dexie backup UI + Later #4 docs
 
 Repo: `/home/longnick/projects/small-pos-dexie-backup-ui`

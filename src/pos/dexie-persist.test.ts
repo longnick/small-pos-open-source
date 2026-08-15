@@ -312,6 +312,121 @@ test("returns false for hostile accessor snapshots without writing", async () =>
   });
 });
 
+test("occupy refuses when Dexie table is already occupied by another order", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable("order-other"));
+    await database.orders.add(openOrder({ id: "order-other" }));
+  }, async (name) => {
+    await expect(persistAfterOccupy(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { table: occupiedTable("order-1"), order: openOrder() },
+    )).resolves.toBe(false);
+    const written = await readWritten(name);
+    expect(written.tables).toEqual([occupiedTable("order-other")]);
+    expect(written.orders.map((row) => row.id)).toEqual(["order-other"]);
+  });
+});
+
+test("order edit refuses when Dexie order is already paid", async () => {
+  const edited = openOrder({ items: [line()], subtotal: 25_000, total: 25_000 });
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(paidOrder());
+  }, async (name) => {
+    await expect(persistAfterOrderEdit(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { order: edited },
+    )).resolves.toBe(false);
+    expect((await readWritten(name)).orders).toEqual([paidOrder()]);
+  });
+});
+
+test("pay is idempotent on the same payment id", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(openOrder({ items: [line()], subtotal: 25_000, total: 25_000 }));
+  }, async (name) => {
+    const input = { authenticatedTenantId: tenantId, databaseName: name };
+    const snapshot = { table: emptyTable(), order: paidOrder(), payment: payment() };
+    await expect(persistAfterPay(input, snapshot)).resolves.toBe(true);
+    await expect(persistAfterPay(input, snapshot)).resolves.toBe(true);
+    const written = await readWritten(name);
+    expect(written.payments).toEqual([payment()]);
+    expect(written.orders).toEqual([paidOrder()]);
+    expect(written.tables).toEqual([emptyTable()]);
+  });
+});
+
+test("pay snapshot waiting_payment is rejected without write", async () => {
+  const waiting = { ...occupiedTable(), status: "waiting_payment" as const };
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(openOrder({ items: [line()], subtotal: 25_000, total: 25_000 }));
+  }, async (name) => {
+    await expect(persistAfterPay(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { table: waiting, order: paidOrder(), payment: payment() },
+    )).resolves.toBe(false);
+    const written = await readWritten(name);
+    expect(written.tables).toEqual([occupiedTable()]);
+    expect(written.payments).toEqual([]);
+  });
+});
+
+test("pay refuses when Dexie table is occupied by another order", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable("order-other"));
+    await database.orders.add(openOrder({ id: "order-other" }));
+  }, async (name) => {
+    await expect(persistAfterPay(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { table: emptyTable(), order: paidOrder(), payment: payment() },
+    )).resolves.toBe(false);
+    const written = await readWritten(name);
+    expect(written.tables).toEqual([occupiedTable("order-other")]);
+    expect(written.orders.map((row) => row.id)).toEqual(["order-other"]);
+    expect(written.payments).toEqual([]);
+  });
+});
+
+test("pay refuses when Dexie table is non-empty without currentOrderId", async () => {
+  const broken = { ...occupiedTable(), currentOrderId: undefined };
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(broken);
+    await database.orders.add(openOrder({ items: [line()], subtotal: 25_000, total: 25_000 }));
+  }, async (name) => {
+    await expect(persistAfterPay(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { table: emptyTable(), order: paidOrder(), payment: payment() },
+    )).resolves.toBe(false);
+    const written = await readWritten(name);
+    expect(written.tables).toEqual([broken]);
+    expect(written.payments).toEqual([]);
+  });
+});
+
+test("pay refuses when payment id already belongs to another order", async () => {
+  const otherPay = { ...payment(), orderId: "order-other" };
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(openOrder({ items: [line()], subtotal: 25_000, total: 25_000 }));
+    await database.payments.add(otherPay);
+  }, async (name) => {
+    await expect(persistAfterPay(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { table: emptyTable(), order: paidOrder(), payment: payment() },
+    )).resolves.toBe(false);
+    expect((await readWritten(name)).payments).toEqual([otherPay]);
+  });
+});
+
 test("returns false when Dexie open fails without changing stores", async () => {
   const original = indexedDB.open.bind(indexedDB);
   indexedDB.open = (() => { throw new Error("open fail"); }) as typeof indexedDB.open;

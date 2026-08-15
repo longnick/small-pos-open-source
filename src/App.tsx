@@ -5,6 +5,7 @@ import { hydrateFromDexie } from "@/pos/dexie-hydrate";
 import { isDexiePersistSession, persistAfterOccupy, persistAfterPay, setDexiePersistSession } from "@/pos/dexie-persist";
 import { loadOpenOrderForTable } from "@/pos/dexie-restore";
 import { exportDexieBackup, importDexieBackup } from "@/pos/dexie-backup";
+import { listenDexieTabEvents } from "@/pos/dexie-tabs";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
 import { useCatalogTableStore } from "@/stores/catalog-table-store";
@@ -62,6 +63,21 @@ function PosShell() {
   const orderItemCount = useOrderPaymentStore((state) => state.currentOrder?.items.length ?? 0);
   const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
   const { tenant, staff } = useTenantAuthStore();
+
+  useEffect(() => {
+    if (!tenant) return undefined;
+    const tenantId = tenant.id;
+    return listenDexieTabEvents((event) => {
+      if (event.tenantId !== tenantId) return;
+      if (!isDexiePersistSession()) return;
+      void hydrateFromDexie({ authenticatedTenantId: tenantId }).then((hydrated) => {
+        if (!hydrated) return;
+        if (!isDexiePersistSession()) return;
+        if (useTenantAuthStore.getState().tenant?.id !== tenantId) return;
+        useCatalogTableStore.getState().replaceTenantData(tenantId, hydrated);
+      }).catch(() => undefined);
+    });
+  }, [tenant]);
 
   // Clear selection when the selected table no longer exists in the store
   useEffect(() => {
