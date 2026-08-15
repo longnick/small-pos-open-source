@@ -37,6 +37,11 @@ const restore = vi.hoisted(() => ({
   load: vi.fn(async () => null as import("../packages/pos-core/src/types").Order | null),
 }));
 
+const backup = vi.hoisted(() => ({
+  exportBackup: vi.fn(async () => null as string | null),
+  importBackup: vi.fn(async () => false as const),
+}));
+
 const posBoot = vi.hoisted(() => ({
   create: vi.fn<typeof import("./pos/demo-pos-bootstrap").bootstrapDemoPos>(async () => null),
 }));
@@ -60,6 +65,11 @@ vi.mock("@/pos/dexie-persist", async (importOriginal) => {
 
 vi.mock("@/pos/dexie-restore", () => ({
   loadOpenOrderForTable: restore.load,
+}));
+
+vi.mock("@/pos/dexie-backup", () => ({
+  exportDexieBackup: backup.exportBackup,
+  importDexieBackup: backup.importBackup,
 }));
 
 vi.mock("@/pos/demo-pos-bootstrap", () => ({
@@ -143,6 +153,10 @@ beforeEach(() => {
   persist.pay.mockImplementation(async () => true);
   restore.load.mockClear();
   restore.load.mockImplementation(async () => null);
+  backup.exportBackup.mockClear();
+  backup.importBackup.mockClear();
+  backup.exportBackup.mockImplementation(async () => null);
+  backup.importBackup.mockImplementation(async () => false);
   posBoot.create.mockClear();
   posBoot.create.mockImplementation(async () => null);
   // Default: bootstrap never resolves (pending forever)
@@ -705,6 +719,9 @@ test("authenticated shell nav: default view 'Bán hàng' is current; siblings ar
   expect(screen.getByRole("button", { name: "Nhân sự" })).not.toHaveAttribute(
     "aria-current",
   );
+  expect(screen.getByRole("button", { name: "Sao lưu" })).not.toHaveAttribute(
+    "aria-current",
+  );
 });
 
 test("authenticated shell nav: clicking 'Bếp' marks only that view current", async () => {
@@ -977,4 +994,29 @@ test("existing currentOrder + other occupied table only changes highlight", asyn
   expect(restore.load).toHaveBeenCalledTimes(1);
   expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-1");
   expect(screen.getAllByRole("button", { name: /Bàn 2/i })[0].getAttribute("aria-pressed")).toBe("true");
+});
+
+test("hydrate success enables backup export; empty IDB disables it", async () => {
+  hydrate.fromDexie.mockImplementation(async () => occupiedHydrate);
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getByRole("button", { name: "Sao lưu" }));
+  expect(screen.getByRole("heading", { name: "Sao lưu dữ liệu" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Tải sao lưu" })).toBeEnabled();
+});
+
+test("empty IDB backup actions stay disabled", async () => {
+  hydrate.fromDexie.mockImplementation(async () => null);
+  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getByRole("button", { name: "Sao lưu" }));
+  expect(screen.getByRole("button", { name: "Tải sao lưu" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Nhập sao lưu" })).toBeDisabled();
+  expect(backup.exportBackup).not.toHaveBeenCalled();
 });

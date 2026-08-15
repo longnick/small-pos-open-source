@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-15 07:19 - Dexie backup UI + Later #4 docs
+
+Repo: `/home/longnick/projects/small-pos-dexie-backup-ui`
+Branch: `feat/dexie-backup-ui`
+Agent: Hermes / gcli/grok-4.6
+Summary: Manager Sao lưu tab exports/imports Dexie v1 JSON after hydrate-success. Confirm-gated import. No pinHash on screen. Later #4 recovery doc. Tick ROADMAP #1/#2/#4. Later #3 stays `[ ]`. Issue #1 / PR #31 untouched.
+Verification: backup + panel + App tests. Full `npm run ci` + Sol pending.
+Next: Sol review, PR. No merge.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-15-0719-dexie-backup-ui.md`
+
 ## 2026-08-14 15:10 - Dexie restore occupied-table impl
 
 Repo: `/home/longnick/projects/small-pos-dexie-restore-impl`

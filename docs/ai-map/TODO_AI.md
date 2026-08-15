@@ -2,13 +2,13 @@
 
 ## Doing
 
-- Dexie restore impl PR. Occupied-table click loads matching open order. Later #1 and Later #2 still `[ ]`.
+- Dexie backup UI + Later #4 docs PR. Official after merge: Later #1/#2/#4 `[x]`, Later #3 `[ ]` (13/14).
 
 ## Next
 
-- Sol review + owner `Duyệt` for this impl PR. Do not merge here.
+- Sol review + owner `Duyệt` for this PR. Do not merge here.
 - Keep `verifyPin` adapter-injected; bcrypt/cloud only in a later auth-persist slice.
-- Later #3/#4 stay separate. Backup UI later.
+- Later #3 (multi-tab) stays separate.
 - Issue #1 / PR #31 stay for the contributor.
 
 ## Blocked
@@ -17,10 +17,11 @@
 
 ## Risks
 
-- Restore reads only after hydrate-success this session. No boot currentOrder. Existing currentOrder never swapped. Later #1 and Later #2 stay `[ ]`.
+- Backup UI only after hydrate-success this session. Import is destructive and confirm-gated. Later #3 stays `[ ]`.
 
 ## Done recently
 
+- Dexie backup UI + Later #4 docs — `docs/ai-map/TASK_LOGS/2026-08-15-0719-dexie-backup-ui.md`
 - Dexie restore impl — `docs/ai-map/TASK_LOGS/2026-08-14-1510-dexie-restore.md`
 - Dexie restore / reload design — `docs/ai-map/TASK_LOGS/2026-08-14-1346-dexie-restore-design.md`
 - Dexie persist write-back impl — merged #30 (`50c0fae`).

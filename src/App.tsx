@@ -4,6 +4,7 @@ import { bootstrapDemoPos } from "@/pos/demo-pos-bootstrap";
 import { hydrateFromDexie } from "@/pos/dexie-hydrate";
 import { isDexiePersistSession, persistAfterOccupy, persistAfterPay, setDexiePersistSession } from "@/pos/dexie-persist";
 import { loadOpenOrderForTable } from "@/pos/dexie-restore";
+import { exportDexieBackup, importDexieBackup } from "@/pos/dexie-backup";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
 import { useCatalogTableStore } from "@/stores/catalog-table-store";
@@ -19,6 +20,7 @@ import {
   BookOpen,
   BarChart3,
   Users,
+  Download,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +30,7 @@ import { MenuManagement } from "@/components/pos/MenuManagement";
 import { ReportsPanel } from "@/components/pos/ReportsPanel";
 import { StaffManagement } from "@/components/pos/StaffManagement";
 import { KitchenPanel } from "@/components/pos/KitchenPanel";
+import { BackupPanel } from "@/components/pos/BackupPanel";
 import { TableMap } from "@/components/pos/TableMap";
 import { OrderPanel } from "@/components/pos/OrderPanel";
 
@@ -37,6 +40,7 @@ const VIEWS = [
   { id: "menu", name: "Quản lý món", icon: BookOpen },
   { id: "report", name: "Báo cáo", icon: BarChart3 },
   { id: "staff", name: "Nhân sự", icon: Users },
+  { id: "backup", name: "Sao lưu", icon: Download },
 ] as const;
 
 type ViewId = (typeof VIEWS)[number]["id"];
@@ -323,6 +327,13 @@ function PosShell() {
             {view === "staff" && <StaffManagement />}
             {view === "kitchen" && (
               <KitchenPanel />
+            )}
+            {view === "backup" && tenant && (
+              <BackupPanel
+                persistSession={isDexiePersistSession()}
+                onExport={() => exportDexieBackup({ authenticatedTenantId: tenant.id })}
+                onImport={(json) => importDexieBackup({ authenticatedTenantId: tenant.id }, json)}
+              />
             )}
           </section>
         </main>
