@@ -44,11 +44,14 @@ Do not replace type labels with `scope:*` in templates. `documentation` and `sco
 ```bash
 npm ci
 npm run ci
+npx playwright install --with-deps chromium
 npm run test:e2e
 npm run test:e2e:visual
 ```
 
-Use Node.js 22. The browser suite runs against a fixture-only authentication adapter; never replace it with real credentials or services.
+Use Node.js 22. Installing Chromium is required once per machine before the
+browser tests. The browser suite runs against a fixture-only authentication
+adapter; never replace it with real credentials or services.
 
 ## Pull requests
 
@@ -59,6 +62,7 @@ Use Node.js 22. The browser suite runs against a fixture-only authentication ada
 
    ```bash
    npm run ci
+   npx playwright install --with-deps chromium
    npm run test:e2e
    ```
 
