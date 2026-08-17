@@ -176,6 +176,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -1078,4 +1079,18 @@ test("other-tab persist event rehydrates catalog/tables for the same tenant", as
   await waitFor(() => expect(useCatalogTableStore.getState().tables[0]?.status).toBe("empty"));
   expect(useCatalogTableStore.getState().tables[0]?.currentOrderId).toBeUndefined();
   expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-1");
+});
+
+test("production-local mode skips demo auth and shows empty venue login", async () => {
+  vi.stubEnv("VITE_POS_MODE", "production-local");
+  render(<App />);
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy(),
+  );
+  expect(bootstrap.create).not.toHaveBeenCalled();
+  expect(posBoot.create).not.toHaveBeenCalled();
+  expect(screen.getByText("Chưa thiết lập quán")).toBeTruthy();
+  expect(screen.queryByText("Quán Demo")).toBeNull();
+  expect(screen.queryByRole("heading", { name: "CafePOS" })).toBeNull();
+  expect(screen.queryByRole("option", { name: "Manager" })).toBeNull();
 });

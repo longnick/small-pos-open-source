@@ -1,5 +1,17 @@
 # Decisions
 
+## 2026-08-17 - Demo and production-local are separate runtimes
+
+Context: Owner asked to finish Small POS into a testable offline POS. Public Pages is fixture/demo. Demo PINs must not be the production-local bootstrap.
+
+Decision: Add `resolvePosMode`. Missing/unknown `VITE_POS_MODE` is `demo`. Exact `production-local` skips `bootstrapDemoAuth`/`bootstrapDemoPos` and shows `Chưa thiết lập quán` with empty staff. Pages stays demo. No onboarding UI, PWA, or Dexie staff write in this slice.
+
+Reason: Smallest fail-closed cut. Onboarding and PWA need their own TDD slices.
+
+Impact: GitHub Pages demo unchanged. Local `VITE_POS_MODE=production-local` no longer seeds Manager/`0000`.
+
+Revisit when: owner names onboarding or PWA after this PR merges.
+
 ## 2026-08-14 - Restore impl is occupied-table click only
 
 Context: Owner said `Làm tiếp đi` after #32 design merged `08d0a8f`.

@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-08-17 09:20 - production-local mode gate
+
+Repo: `/tmp/small-pos-production-local`
+Branch: `feat/production-local-mode`
+Agent: Hermes / gcli/grok-4.6
+Summary: Add fail-closed `resolvePosMode`. Pages/default stay demo. `VITE_POS_MODE=production-local` skips demo auth/POS bootstrap and shows empty-venue login. No PWA, no onboarding, no merge. Issue #1 untouched.
+Verification: targeted pos-mode + PinLogin + App tests, then `npm run ci`.
+Next: Sol review + PR. Do not merge.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-17-0920-production-local-mode.md`
+
 ## 2026-08-15 11:45 - Dexie Later #3 multi-tab CAS
 
 Repo: `/home/longnick/projects/small-pos-dexie-tabs`
