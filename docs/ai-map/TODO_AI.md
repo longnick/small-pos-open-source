@@ -2,13 +2,15 @@
 
 ## Doing
 
-- Later #3 multi-tab CAS + BroadcastChannel PR. Official after merge: **14/14**.
+- `feat/production-local-mode`: demo vs production-local gate. No merge until owner `Duyệt`.
 
 ## Next
 
 - Sol review + owner `Duyệt` for this PR. Do not merge here.
+- Local onboarding (venue + first manager PIN) after this merges.
+- PWA/service worker + airplane-mode E2E after onboarding.
 - Keep `verifyPin` adapter-injected; bcrypt/cloud only in a later auth-persist slice.
-- Issue #1 / PR #31 stay for the contributor.
+- Issue #1 stays for the contributor.
 
 ## Blocked
 

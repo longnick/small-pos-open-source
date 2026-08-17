@@ -33,6 +33,14 @@ Small POS is a reference starter. Roadmap items are not promises and should not 
 - E-invoices, refunds, payroll, daily close, tax, and revenue reporting.
 - Production deployment guidance.
 
+## Offline POS v1 productization
+
+- [x] Separate `demo` vs `production-local` runtime. Pages stay `demo`. `VITE_POS_MODE=production-local` skips demo staff/PIN bootstrap.
+- [ ] Local onboarding: create venue + first manager PIN, persist hashed staff.
+- [ ] PWA/service worker + airplane-mode / restart E2E proof.
+- [ ] Daily operations: shift close, void/refund with reason/audit, local daily report.
+- [ ] One-device 7-day pilot. Printer / VietQR / Cloud Sync only after evidence.
+
 ## Where Codex helps
 
 Codex can accelerate issue triage, test expansion, accessible UI work, code review, docs, and bounded persistence experiments. It must not bypass the safety boundaries above or merge unreviewed changes.

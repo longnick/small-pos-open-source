@@ -1,4 +1,9 @@
 /// <reference types="vite/client" />
-declare module "*.svg" { const src: string; export default src; }
-declare module "*.png" { const src: string; export default src; }
-declare module "*.css" {}
+
+interface ImportMetaEnv {
+  readonly VITE_POS_MODE?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}

@@ -2,6 +2,7 @@
 
 ## Core domain
 
+- `src/runtime/pos-mode.ts` — fail-closed `demo` / `production-local` resolver. Unknown env is demo.
 - `packages/pos-core/src/types.ts` — shared POS domain types.
 - `packages/pos-storage/src/db.ts` — Dexie v1 schema. Read by `src/pos/dexie-hydrate.ts`. Hydrate: `docs/dexie-design.md`. Write-back: `docs/dexie-persist.md`.
 - `src/pos/dexie-hydrate.ts` — read-only hydrate of catalog/tables. No persist. No currentOrder.

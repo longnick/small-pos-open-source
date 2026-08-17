@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { bootstrapDemoAuth } from "@/auth/demo-auth-adapter";
 import { bootstrapDemoPos } from "@/pos/demo-pos-bootstrap";
+import { loginVenueName, resolvePosMode, shouldBootstrapDemoAuth } from "@/runtime/pos-mode";
 import { hydrateFromDexie } from "@/pos/dexie-hydrate";
 import { isDexiePersistSession, persistAfterOccupy, persistAfterPay, setDexiePersistSession } from "@/pos/dexie-persist";
 import { loadOpenOrderForTable } from "@/pos/dexie-restore";
@@ -416,9 +417,22 @@ function App() {
     let cancelled = false;
     setAuthenticatedStaff(null);
     setDexiePersistSession(false);
-    Promise.all([bootstrapDemoAuth(), bootstrapDemoPos()])
-      .then(async ([{ tenant: t, staff: s, verifier: v }, pos]) => {
+    const mode = resolvePosMode(import.meta.env.VITE_POS_MODE);
+    const boot = shouldBootstrapDemoAuth(mode)
+      ? Promise.all([bootstrapDemoAuth(), bootstrapDemoPos()])
+      : Promise.resolve([null, null] as const);
+    boot
+      .then(async (result) => {
         if (cancelled) return;
+        if (!result[0]) {
+          verifierRef.current = null;
+          setTenant(null);
+          setBootTenant(null);
+          setStaffList([]);
+          setBootState("ready");
+          return;
+        }
+        const [{ tenant: t, staff: s, verifier: v }, pos] = result;
         verifierRef.current = v;
         setTenant(t);
         setBootTenant(t);
@@ -493,6 +507,7 @@ function App() {
     <PinLoginScreen
       state={bootState}
       staff={staffList}
+      tenantName={loginVenueName(resolvePosMode(import.meta.env.VITE_POS_MODE), bootTenant?.name)}
       onSignIn={handleSignIn}
     />
   );

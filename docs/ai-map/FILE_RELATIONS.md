@@ -6,6 +6,12 @@ Purpose: validate staff PIN through injected hash verifier and enforce POS actio
 
 Related files:
 
+- `src/runtime/pos-mode.ts`
+  - role: fail-closed demo / production-local resolver and login venue copy.
+  - depends on: none.
+  - used by: `src/App.tsx`.
+  - notes: unknown `VITE_POS_MODE` is demo. production-local skips demo bootstrap.
+
 - `packages/pos-core/src/auth.ts`
   - role: exports `PinHashVerifier`, `verifyPin`, and `canAccess`.
   - depends on: `packages/pos-core/src/types.ts` for `Role`.
