@@ -202,7 +202,7 @@ describe("PinLoginScreen – Slice 2.5-F: tenant context persistence", () => {
     const { PinLoginScreen } = await import("./PinLogin");
     const { staff } = await bootstrapDemoAuth();
     render(
-      <PinLoginScreen state="ready" staff={staff} onSignIn={async () => false} />,
+      <PinLoginScreen state="ready" staff={staff} tenantName="Quán Demo" onSignIn={async () => false} />,
     );
 
     // Tenant name is visible before selection

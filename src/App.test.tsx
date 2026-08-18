@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { Staff, Tenant } from "../packages/pos-core/src/types";
 import type { PinHashVerifier } from "../packages/pos-core/src/auth";
-import type { DemoAuthBootstrap } from "./auth/demo-auth-adapter";
+import type { ProductBootstrap } from "./pos/product-bootstrap";
 import type { DexieHydrateResult } from "./pos/dexie-hydrate";
 import { isDexiePersistSession, setDexiePersistSession } from "./pos/dexie-persist";
 import { useTenantAuthStore } from "./stores/tenant-auth-store";
@@ -15,14 +15,16 @@ import { useOrderPaymentStore } from "./stores/order-payment-store";
 // ---------------------------------------------------------------------------
 
 const bootstrap = vi.hoisted(() => {
-  // Typed as () => Promise<DemoAuthBootstrap> so mockImplementation accepts resolved values.
-  // vi.fn<T> in vitest 4 takes a single function-type argument.
   return {
-    create: vi.fn<() => Promise<DemoAuthBootstrap>>(
-      () => new Promise<DemoAuthBootstrap>(() => {})
+    create: vi.fn<() => Promise<ProductBootstrap>>(
+      () => new Promise<ProductBootstrap>(() => {}),
     ),
   };
 });
+
+const setup = vi.hoisted(() => ({
+  complete: vi.fn(async () => ({ ok: false as const })),
+}));
 
 const hydrate = vi.hoisted(() => ({
   fromDexie: vi.fn(async (_input?: { authenticatedTenantId: string }): Promise<DexieHydrateResult | null> => null),
@@ -52,8 +54,12 @@ const posBoot = vi.hoisted(() => ({
   create: vi.fn<typeof import("./pos/demo-pos-bootstrap").bootstrapDemoPos>(async () => null),
 }));
 
-vi.mock("@/auth/demo-auth-adapter", () => ({
-  bootstrapDemoAuth: bootstrap.create,
+vi.mock("@/pos/product-bootstrap", () => ({
+  loadProductBootstrap: bootstrap.create,
+}));
+
+vi.mock("@/pos/product-setup", () => ({
+  completeFirstRun: setup.complete,
 }));
 
 vi.mock("@/pos/dexie-hydrate", () => ({
@@ -76,6 +82,7 @@ vi.mock("@/pos/dexie-restore", () => ({
 vi.mock("@/pos/dexie-backup", () => ({
   exportDexieBackup: backup.exportBackup,
   importDexieBackup: backup.importBackup,
+  importDexieRecoveryBackup: backup.importBackup,
 }));
 
 vi.mock("@/pos/dexie-tabs", () => ({
@@ -117,11 +124,21 @@ const staffRecord: Staff = {
 /** Mock verifier that accepts any PIN — skips PBKDF2 in tests. */
 const acceptAllVerifier: PinHashVerifier = async () => true;
 
-function makeReadyBootstrap() {
+function makeReadyBootstrap(extra?: {
+  catalogGroups?: DexieHydrateResult["catalogGroups"];
+  catalogItems?: DexieHydrateResult["catalogItems"];
+  tables?: DexieHydrateResult["tables"];
+  persistable?: boolean;
+}): Promise<ProductBootstrap> {
   return Promise.resolve({
+    kind: "ready",
     tenant,
     staff: [staffRecord],
+    catalogGroups: extra?.catalogGroups ?? [],
+    catalogItems: extra?.catalogItems ?? [],
+    tables: extra?.tables ?? [],
     verifier: acceptAllVerifier,
+    persistable: extra?.persistable === true,
   });
 }
 
@@ -172,7 +189,9 @@ beforeEach(() => {
   posBoot.create.mockClear();
   posBoot.create.mockImplementation(async () => null);
   // Default: bootstrap never resolves (pending forever)
-  bootstrap.create.mockImplementation(() => new Promise<DemoAuthBootstrap>(() => {}));
+  setup.complete.mockClear();
+  setup.complete.mockImplementation(async () => ({ ok: false }));
+  bootstrap.create.mockImplementation(() => new Promise<ProductBootstrap>(() => {}));
 });
 
 afterEach(() => {
@@ -188,6 +207,23 @@ test("bootstrap pending: CafePOS shell is absent, loading indicator shown", () =
 
   expect(screen.getByRole("status")).toBeTruthy();
   expect(screen.queryByRole("heading", { name: "CafePOS" })).toBeNull();
+});
+
+test("empty product bootstrap shows first-run wizard, not demo login", async () => {
+  bootstrap.create.mockImplementation(async () => ({ kind: "needs-setup" }));
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Thiết lập quán" })).toBeTruthy());
+  expect(screen.queryByRole("heading", { name: "Đăng nhập" })).toBeNull();
+  expect(screen.queryByText("Quán Demo")).toBeNull();
+  expect(screen.queryByText("0000")).toBeNull();
+});
+
+test("corrupt product bootstrap shows recovery, not demo PIN", async () => {
+  bootstrap.create.mockImplementation(async () => ({ kind: "corrupt" }));
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Không thể đọc dữ liệu quán" })).toBeTruthy());
+  expect(screen.queryByRole("heading", { name: "Đăng nhập" })).toBeNull();
+  expect(screen.queryByText("0000")).toBeNull();
 });
 
 test("bootstrap failure/fatal: CafePOS shell is absent, error alert shown", async () => {
@@ -229,9 +265,14 @@ test("tenant/staff tenantId mismatch: CafePOS shell is absent", async () => {
 
   bootstrap.create.mockImplementation(() =>
     Promise.resolve({
+      kind: "ready",
       tenant,
       staff: [mismatchedStaff],
+      catalogGroups: [],
+      catalogItems: [],
+      tables: [],
       verifier: acceptAllVerifier,
+      persistable: false,
     })
   );
 
@@ -780,15 +821,15 @@ test("production pos null: hydrates catalog/tables from Dexie and leaves current
     openedAt: 0,
     staffId: staffRecord.id,
   }];
-  hydrate.fromDexie.mockImplementation(async () => ({ catalogGroups, catalogItems, tables }));
-  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ catalogGroups, catalogItems, tables, persistable: true }),
+  );
 
   render(<App />);
 
   await waitFor(() =>
     expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy()
   );
-  expect(hydrate.fromDexie).toHaveBeenCalledWith({ authenticatedTenantId: tenant.id });
   expect(useCatalogTableStore.getState()).toMatchObject({
     tenantId: tenant.id,
     catalogGroups,
@@ -819,8 +860,9 @@ test("hydrate success enables occupy persist; empty IDB and E2E fixture never ca
     openedAt: 0,
     staffId: staffRecord.id,
   }];
-  hydrate.fromDexie.mockImplementation(async () => ({ catalogGroups, catalogItems, tables }));
-  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ catalogGroups, catalogItems, tables, persistable: true }),
+  );
   render(<App />);
   await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
   expect(isDexiePersistSession()).toBe(true);
@@ -832,8 +874,7 @@ test("hydrate success enables occupy persist; empty IDB and E2E fixture never ca
 });
 
 test("empty hydrate does not persist occupy", async () => {
-  hydrate.fromDexie.mockImplementation(async () => null);
-  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  bootstrap.create.mockImplementation(() => makeReadyBootstrap({ persistable: false }));
   render(<App />);
   await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
   expect(isDexiePersistSession()).toBe(false);
@@ -874,7 +915,6 @@ test("E2E fixture pos skips persist even when occupy succeeds", async () => {
   bootstrap.create.mockImplementation(makeReadyBootstrap);
   render(<App />);
   await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
-  expect(hydrate.fromDexie).not.toHaveBeenCalled();
   expect(isDexiePersistSession()).toBe(false);
   await signInViaUI(staffRecord.id, "7890");
   await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
@@ -922,9 +962,10 @@ const restoredOrder = {
 };
 
 test("hydrate success + occupied table click restores the bound open order", async () => {
-  hydrate.fromDexie.mockImplementation(async () => occupiedHydrate);
   restore.load.mockImplementation(async () => restoredOrder);
-  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
+  );
   render(<App />);
   await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
   expect(isDexiePersistSession()).toBe(true);
@@ -943,11 +984,13 @@ test("hydrate success + occupied table click restores the bound open order", asy
 });
 
 test("occupied click with missing currentOrderId does not call restore", async () => {
-  hydrate.fromDexie.mockImplementation(async () => ({
-    ...occupiedHydrate,
-    tables: [{ ...occupiedHydrate.tables[0], currentOrderId: undefined }],
-  }));
-  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({
+      ...occupiedHydrate,
+      tables: [{ ...occupiedHydrate.tables[0], currentOrderId: undefined }],
+      persistable: true,
+    }),
+  );
   render(<App />);
   await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
   await signInViaUI(staffRecord.id, "7890");
@@ -959,8 +1002,7 @@ test("occupied click with missing currentOrderId does not call restore", async (
 });
 
 test("empty IDB never calls restore on occupied click", async () => {
-  hydrate.fromDexie.mockImplementation(async () => null);
-  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  bootstrap.create.mockImplementation(() => makeReadyBootstrap({ persistable: false }));
   render(<App />);
   await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
   expect(isDexiePersistSession()).toBe(false);
@@ -979,23 +1021,25 @@ test("empty IDB never calls restore on occupied click", async () => {
 });
 
 test("existing currentOrder + other occupied table only changes highlight", async () => {
-  hydrate.fromDexie.mockImplementation(async () => ({
-    ...occupiedHydrate,
-    tables: [
-      occupiedHydrate.tables[0],
-      {
-        id: "t2",
-        tenantId: tenant.id,
-        number: 2,
-        status: "occupied" as const,
-        openedAt: 0,
-        staffId: staffRecord.id,
-        currentOrderId: "order-2",
-      },
-    ],
-  }));
   restore.load.mockImplementation(async () => restoredOrder);
-  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({
+      ...occupiedHydrate,
+      tables: [
+        occupiedHydrate.tables[0],
+        {
+          id: "t2",
+          tenantId: tenant.id,
+          number: 2,
+          status: "occupied" as const,
+          openedAt: 0,
+          staffId: staffRecord.id,
+          currentOrderId: "order-2",
+        },
+      ],
+      persistable: true,
+    }),
+  );
   render(<App />);
   await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
   await signInViaUI(staffRecord.id, "7890");
@@ -1009,8 +1053,9 @@ test("existing currentOrder + other occupied table only changes highlight", asyn
 });
 
 test("hydrate success enables backup export; empty IDB disables it", async () => {
-  hydrate.fromDexie.mockImplementation(async () => occupiedHydrate);
-  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
+  );
   render(<App />);
   await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
   await signInViaUI(staffRecord.id, "7890");
@@ -1021,8 +1066,7 @@ test("hydrate success enables backup export; empty IDB disables it", async () =>
 });
 
 test("empty IDB backup actions stay disabled", async () => {
-  hydrate.fromDexie.mockImplementation(async () => null);
-  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  bootstrap.create.mockImplementation(() => makeReadyBootstrap({ persistable: false }));
   render(<App />);
   await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
   await signInViaUI(staffRecord.id, "7890");
@@ -1039,8 +1083,7 @@ test("tab listener ignores events until persist session is on", async () => {
     onEvent = handler;
     return () => undefined;
   });
-  hydrate.fromDexie.mockImplementation(async () => null);
-  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  bootstrap.create.mockImplementation(() => makeReadyBootstrap({ persistable: false }));
   render(<App />);
   await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
   await signInViaUI(staffRecord.id, "7890");
@@ -1060,8 +1103,9 @@ test("other-tab persist event rehydrates catalog/tables for the same tenant", as
     onEvent = handler;
     return () => undefined;
   });
-  hydrate.fromDexie.mockImplementation(async () => occupiedHydrate);
-  bootstrap.create.mockImplementation(makeReadyBootstrap);
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
+  );
   render(<App />);
   await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
   await signInViaUI(staffRecord.id, "7890");
