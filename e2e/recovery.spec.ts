@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
-import path from "node:path";
 
 const shop = "Quán Khôi Phục";
 const manager = "Chủ khôi phục";

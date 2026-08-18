@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 07:26 - Sprint 1 Sol P1 validator follow-up
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
+Branch: `feat/sprint-1-product-bootstrap`
+Agent: Hermes / gcli/grok-4.6
+Summary: Shared product-record validators for backup and setup-state. Strict v1 PIN hash lengths. Recovery verifier proof. Drop unused node:path.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0726-sprint-1-p1-validators.md`
+
 ## 2026-08-18 07:15 - Sprint 1 Sol BLOCKED fixes
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
