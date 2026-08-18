@@ -38,3 +38,23 @@ test("recovery import restores a first-run backup without persist session", asyn
   if (boot.kind !== "ready") return;
   expect(boot.tenant.name).toBe("Quán Nhà");
 });
+
+test("recovery import rejects a bad backup and leaves the existing database", async () => {
+  const target = new PosDatabase(`pos-recovery-keep-${crypto.randomUUID()}`);
+  opened.push(target);
+  await target.open();
+  const setup = await completeFirstRun(target, {
+    shopName: "Quán Giữ",
+    tableCount: 1,
+    managerName: "Chủ quán",
+    pin: "5821",
+    seedSampleMenu: false,
+  });
+  expect(setup.ok).toBe(true);
+  await target.appConfig.clear();
+  const before = await target.tenants.toArray();
+  const imported = await importDexieRecoveryBackup({ databaseName: target.name }, "{");
+  expect(imported).toBe(false);
+  expect(await target.tenants.toArray()).toEqual(before);
+  expect(await target.appConfig.count()).toBe(0);
+});
