@@ -24,6 +24,10 @@ export type DurablePaySnapshot = {
   audits: AuditEntry[];
 };
 
+export type DurablePayLoad =
+  | { kind: "ok" } & DurablePaySnapshot
+  | { kind: "corrupt" };
+
 let persistSession = false;
 
 export function setDexiePersistSession(enabled: boolean): void {
@@ -351,7 +355,7 @@ async function withPayDb<T>(
 export async function loadDurablePaySnapshot(
   input: DexiePersistInput,
   ids: { tableId: string; orderId: string },
-): Promise<DurablePaySnapshot | null> {
+): Promise<DurablePayLoad | null> {
   if (!isPrimitiveNonemptyString(input.authenticatedTenantId) || !isPrimitiveNonemptyString(ids.tableId) || !isPrimitiveNonemptyString(ids.orderId)) {
     return null;
   }
@@ -362,15 +366,33 @@ export async function loadDurablePaySnapshot(
       return await database.transaction("r", ["tables", "orders", "payments", "auditLog"], async () => {
         const table = materializeTable(await database.table<PosTable>("tables").get(ids.tableId));
         if (!table || table.tenantId !== input.authenticatedTenantId) return null;
-        const order = materializeOrder(await database.orders.get(ids.orderId));
-        if (order && order.tenantId !== input.authenticatedTenantId) return null;
-        const payments = (await database.payments.where("orderId").equals(ids.orderId).toArray())
-          .map(materializePayment)
-          .filter((row): row is Payment => Boolean(row && row.tenantId === input.authenticatedTenantId));
-        const audits = (await database.auditLog.where("tenantId").equals(input.authenticatedTenantId).toArray())
-          .map(canonicalAudit)
-          .filter((row): row is AuditEntry => Boolean(row && row.entityId === ids.orderId && (row.action === "payment.recorded" || row.action === "order.sent")));
-        return { table, order, payments, audits };
+        const rawOrder = await database.orders.get(ids.orderId);
+        const order = rawOrder === undefined ? null : materializeOrder(rawOrder);
+        if (rawOrder !== undefined && (!order || order.tenantId !== input.authenticatedTenantId)) return { kind: "corrupt" as const };
+        const rawPayments = await database.payments.where("orderId").equals(ids.orderId).toArray();
+        const payments: Payment[] = [];
+        for (const raw of rawPayments) {
+          const payment = materializePayment(raw);
+          if (!payment || payment.tenantId !== input.authenticatedTenantId) return { kind: "corrupt" as const };
+          payments.push(payment);
+        }
+        const rawAudits = await database.auditLog.toArray();
+        const audits: AuditEntry[] = [];
+        for (const raw of rawAudits) {
+          const record = raw as { entityId?: unknown; action?: unknown; id?: unknown };
+          const relatedByEntity = record.entityId === ids.orderId;
+          const relatedById = typeof record.id === "string" && (
+            record.id === `send:${ids.orderId}`
+            || payments.some((payment) => record.id === `payment:${payment.id}`)
+          );
+          if (!relatedByEntity && !relatedById) continue;
+          const audit = canonicalAudit(raw);
+          if (!audit || audit.tenantId !== input.authenticatedTenantId || audit.entityId !== ids.orderId) {
+            return { kind: "corrupt" as const };
+          }
+          if (audit.action === "payment.recorded" || audit.action === "order.sent") audits.push(audit);
+        }
+        return { kind: "ok" as const, table, order, payments, audits };
       });
     } finally {
       database.close();

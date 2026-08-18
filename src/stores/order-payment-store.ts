@@ -20,6 +20,7 @@ type OrderPaymentState = {
   sendToKitchen: (sentAt: unknown) => boolean;
   revertSendToKitchen: (expectedSentAt: unknown) => boolean;
   revertUnpersistedPayment: (input: unknown) => boolean;
+  applyDurablePaySnapshot: (input: unknown) => boolean;
   recordPayment: (payment: unknown) => boolean;
 };
 
@@ -194,6 +195,61 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
       currentOrder: freezeOrder(predecessor),
       payments: freezePayments(get().payments.filter((payment) => payment.id !== raw.paymentId)),
       auditEntries: freezeAuditEntries(get().auditEntries.filter((entry) => entry.id !== `payment:${raw.paymentId}`)),
+      lastReceipt: null,
+    });
+    return true;
+  },
+  applyDurablePaySnapshot: (input) => {
+    const raw = materializeRecord(input);
+    if (!raw) return false;
+    const orderRecord = materializeRecord(raw.order);
+    if (!orderRecord || !isNonemptyString(orderRecord.id) || !isNonemptyString(orderRecord.tenantId)) return false;
+    if (raw.payments !== undefined && !Array.isArray(raw.payments)) return false;
+    if (raw.audits !== undefined && !Array.isArray(raw.audits)) return false;
+    const payments = Array.isArray(raw.payments)
+      ? raw.payments.map((row) => materializeRecord(row)).filter((row): row is Record<string, unknown> => Boolean(row && isPayment(row))).map((row) => canonicalPayment(row as unknown as Payment))
+      : [];
+    if (Array.isArray(raw.payments) && payments.length !== raw.payments.length) return false;
+    const audits = Array.isArray(raw.audits)
+      ? (raw.audits as unknown[]).map((row) => materializeRecord(row)).filter((row): row is Record<string, unknown> => Boolean(row))
+      : [];
+    if (Array.isArray(raw.audits) && audits.length !== raw.audits.length) return false;
+    if (orderRecord.status === "paid") {
+      if (!isSafeInteger(orderRecord.paidAt) || payments.length !== 1 || payments[0].orderId !== orderRecord.id) return false;
+      const payment = payments[0];
+      const change = payment.method === "cash" && isMoney(payment.tender) ? payment.tender - payment.amount : 0;
+      const receipt: PaymentReceipt = Object.freeze({
+        paymentId: payment.id, orderId: payment.orderId, tenantId: payment.tenantId,
+        staffId: payment.staffId, method: payment.method, paidTotal: payment.amount, change, timestamp: payment.createdAt,
+      });
+      set({
+        currentOrder: freezeOrder({
+          id: orderRecord.id as string,
+          tenantId: orderRecord.tenantId as string,
+          tableId: orderRecord.tableId as string,
+          staffId: orderRecord.staffId as string,
+          status: "paid",
+          items: Array.isArray(orderRecord.items) ? orderRecord.items as Order["items"] : [],
+          subtotal: orderRecord.subtotal as number,
+          discount: orderRecord.discount as number,
+          discountType: orderRecord.discountType as DiscountType,
+          total: orderRecord.total as number,
+          createdAt: orderRecord.createdAt as number,
+          paidAt: orderRecord.paidAt as number,
+          ...(orderRecord.sentAt !== undefined ? { sentAt: orderRecord.sentAt as number } : {}),
+        }),
+        payments: freezePayments(payments),
+        auditEntries: freezeAuditEntries(audits as unknown as AuditEntry[]),
+        lastReceipt: receipt,
+      });
+      return true;
+    }
+    const open = materializeOpenOrder(orderRecord);
+    if (!open) return false;
+    set({
+      currentOrder: freezeOrder(open),
+      payments: freezePayments(payments),
+      auditEntries: freezeAuditEntries(audits as unknown as AuditEntry[]),
       lastReceipt: null,
     });
     return true;

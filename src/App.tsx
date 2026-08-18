@@ -190,7 +190,7 @@ function PosShell() {
   };
 
   const handlePaymentSuccess = async (): Promise<boolean> => {
-    const startedStaffId = useTenantAuthStore.getState().staff?.id;
+    const startedToken = useTenantAuthStore.getState().sessionToken;
     const order = useOrderPaymentStore.getState().currentOrder;
     if (!order || order.status !== "paid") return false;
     const table = useCatalogTableStore.getState().tableById(order.tableId);
@@ -206,42 +206,34 @@ function PosShell() {
     if (!table || !payment || !audit) return false;
     const emptyTable = { ...table, status: "empty" as const, currentOrderId: undefined };
     const persistInput = { authenticatedTenantId: order.tenantId };
-    const applyDurable = async (forceReceipt: boolean): Promise<boolean> => {
+    const applyDurable = async (): Promise<boolean> => {
       const durable = await loadDurablePaySnapshot(persistInput, { tableId: order.tableId, orderId: order.id });
-      if (!durable) return false;
+      if (!durable || durable.kind !== "ok") return false;
       reconcileLocalPayFromDurable(durable, { localPaymentId: payment.id, predecessor });
-      if (forceReceipt) {
-        releaseTable(order.tableId, order.id);
-        return true;
-      }
       return false;
     };
     try {
-      if (useTenantAuthStore.getState().staff?.id !== startedStaffId || !isDexiePersistSession()) {
-        return applyDurable(false);
+      if (useTenantAuthStore.getState().sessionToken !== startedToken || !isDexiePersistSession()) {
+        return false;
       }
       const outcome = await persistAfterPay(
         persistInput,
         { table: emptyTable, order, payment, audit, expectedPredecessor: predecessor },
       );
-      if (useTenantAuthStore.getState().staff?.id !== startedStaffId) {
-        return applyDurable(false);
+      if (useTenantAuthStore.getState().sessionToken !== startedToken) {
+        return false;
       }
       if (outcome.kind === "committed" || outcome.kind === "idempotent") {
-        if (!releaseTable(order.tableId, order.id)) {
-          useCatalogTableStore.getState().replaceTenantData(order.tenantId, {
-            catalogGroups: useCatalogTableStore.getState().catalogGroups,
-            catalogItems: useCatalogTableStore.getState().catalogItems,
-            tables: useCatalogTableStore.getState().tables.map((row) => (
-              row.id === order.tableId ? { ...row, status: "empty" as const, currentOrderId: undefined } : row
-            )),
-          });
-        }
-        return true;
+        if (releaseTable(order.tableId, order.id)) return true;
+        const durable = await loadDurablePaySnapshot(persistInput, { tableId: order.tableId, orderId: order.id });
+        if (!durable || durable.kind !== "ok") return false;
+        const decision = reconcileLocalPayFromDurable(durable, { localPaymentId: payment.id, predecessor });
+        return decision.kind === "winner";
       }
-      return applyDurable(false);
+      return applyDurable();
     } catch {
-      return applyDurable(false);
+      if (useTenantAuthStore.getState().sessionToken !== startedToken) return false;
+      return applyDurable();
     }
   };
 

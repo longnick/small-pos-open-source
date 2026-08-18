@@ -27,6 +27,7 @@ type CatalogTableState = TenantData & {
    */
   occupyTable: (tableId: string, orderId: string, tenantId: string) => boolean;
   restoreOccupiedTable: (tableId: string, orderId: string, tenantId: string) => boolean;
+  applyDurableTable: (table: PosTable, orderId: string) => boolean;
   /**
    * Release a table back to `empty` after a matching paid order.
    *
@@ -170,6 +171,22 @@ export const useCatalogTableStore = create<CatalogTableState>((set, get) => ({
           ? { ...t, status: "occupied" as const, currentOrderId: orderId }
           : { ...t },
       ),
+    });
+    return true;
+  },
+  applyDurableTable: (table, orderId) => {
+    if (!isPrimitiveNonemptyString(orderId) || get().tenantId !== table.tenantId) return false;
+    const local = get().tables.find((row) => row.id === table.id);
+    if (!local || local.tenantId !== table.tenantId) return false;
+    if (table.status === "empty") {
+      if (local.status === "occupied" && local.currentOrderId !== undefined && local.currentOrderId !== orderId) return false;
+    } else if (table.status === "occupied" && table.currentOrderId === orderId) {
+      if (local.status !== "empty" && local.currentOrderId !== orderId) return false;
+    } else {
+      return false;
+    }
+    set({
+      tables: get().tables.map((row) => (row.id === table.id ? { ...table } : { ...row })),
     });
     return true;
   },

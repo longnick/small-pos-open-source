@@ -34,10 +34,11 @@ const persist = vi.hoisted(() => ({
   occupy: vi.fn(async () => true),
   pay: vi.fn(async (): Promise<{ kind: "committed" | "idempotent" | "conflict" | "io-error" | "invalid" }> => ({ kind: "committed" })),
   loadPay: vi.fn(async () => null as null | {
-    table: import("../packages/pos-core/src/types").PosTable;
-    order: import("../packages/pos-core/src/types").Order | null;
-    payments: import("../packages/pos-core/src/types").Payment[];
-    audits: import("../packages/pos-core/src/types").AuditEntry[];
+    kind: "ok" | "corrupt";
+    table?: import("../packages/pos-core/src/types").PosTable;
+    order?: import("../packages/pos-core/src/types").Order | null;
+    payments?: import("../packages/pos-core/src/types").Payment[];
+    audits?: import("../packages/pos-core/src/types").AuditEntry[];
   }),
 }));
 
@@ -1203,6 +1204,7 @@ async function openPayModal() {
 test("conflict persist reconciles local loser to durable paid/empty and does not show receipt", async () => {
   persist.pay.mockImplementation(async () => ({ kind: "conflict" as const }));
   persist.loadPay.mockImplementation(async () => ({
+    kind: "ok" as const,
     table: { ...occupiedHydrate.tables[0], status: "empty" as const, currentOrderId: undefined },
     order: { ...payOpenOrder, status: "paid" as const, paidAt: 20 },
     payments: [winnerPayment],
@@ -1221,6 +1223,7 @@ test("conflict persist reconciles local loser to durable paid/empty and does not
 test("io-error with durable predecessor rolls local payment back", async () => {
   persist.pay.mockImplementation(async () => ({ kind: "io-error" as const }));
   persist.loadPay.mockImplementation(async () => ({
+    kind: "ok" as const,
     table: occupiedHydrate.tables[0],
     order: payOpenOrder,
     payments: [],
@@ -1236,9 +1239,16 @@ test("io-error with durable predecessor rolls local payment back", async () => {
   expect(screen.queryByText(/thanh toán thành công/i)).toBeNull();
 });
 
-test("local release fail after durable commit still empties the table", async () => {
+test("local release fail after durable commit leaves a rebound table untouched and suppresses receipt", async () => {
   let resolvePay!: (value: { kind: "committed" }) => void;
   persist.pay.mockImplementation(() => new Promise((resolve) => { resolvePay = resolve; }));
+  persist.loadPay.mockImplementation(async () => ({
+    kind: "ok" as const,
+    table: { ...occupiedHydrate.tables[0], status: "empty" as const, currentOrderId: undefined },
+    order: { ...payOpenOrder, status: "paid" as const, paidAt: 20 },
+    payments: [winnerPayment],
+    audits: [winnerAudit],
+  }));
   await openPayModal();
   act(() => {
     useCatalogTableStore.setState({
@@ -1247,17 +1257,20 @@ test("local release fail after durable commit still empties the table", async ()
   });
   await act(async () => { resolvePay({ kind: "committed" }); });
   await waitFor(() => {
-    expect(screen.getByText(/thanh toán thành công/i)).toBeTruthy();
+    expect(screen.getByRole("alert")).toHaveTextContent("Không lưu được thanh toán. Kiểm tra lại đơn trước khi thu tiếp.");
   });
-  expect(useCatalogTableStore.getState().tables[0]?.status).toBe("empty");
+  expect(useCatalogTableStore.getState().tables[0]).toMatchObject({ status: "occupied", currentOrderId: "order-other" });
+  expect(screen.queryByText(/thanh toán thành công/i)).toBeNull();
 });
 
-test("auth change while persist awaits reconciles durable and suppresses receipt", async () => {
+test("logout then same-staff login while persist awaits does not show receipt or mutate the new session", async () => {
   persist.pay.mockImplementation(async () => {
-    useTenantAuthStore.setState({ tenant: null, staff: null });
+    useTenantAuthStore.getState().signOut();
+    await useTenantAuthStore.getState().signIn("7890", staffRecord, acceptAllVerifier);
     return { kind: "committed" as const };
   });
   persist.loadPay.mockImplementation(async () => ({
+    kind: "ok" as const,
     table: { ...occupiedHydrate.tables[0], status: "empty" as const, currentOrderId: undefined },
     order: { ...payOpenOrder, status: "paid" as const, paidAt: 20 },
     payments: [winnerPayment],
@@ -1265,7 +1278,8 @@ test("auth change while persist awaits reconciles durable and suppresses receipt
   }));
   await openPayModal();
   await waitFor(() => {
-    expect(persist.loadPay).toHaveBeenCalled();
+    expect(persist.pay).toHaveBeenCalled();
   });
   expect(screen.queryByText(/thanh toán thành công/i)).toBeNull();
+  expect(persist.loadPay).not.toHaveBeenCalled();
 });

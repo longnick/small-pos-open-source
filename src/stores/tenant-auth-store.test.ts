@@ -35,7 +35,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
-  useTenantAuthStore.setState({ tenant: null, staff: null });
+  useTenantAuthStore.setState({ tenant: null, staff: null, sessionToken: 0 });
 });
 
 test("sets and clears tenant", () => {
@@ -121,11 +121,22 @@ test("latest concurrent sign-in wins", async () => {
   expect(useTenantAuthStore.getState().staff).toEqual(manager);
 });
 
-test("sign-out preserves tenant", () => {
-  useTenantAuthStore.setState({ tenant, staff: cashier });
+test("session token changes on sign-in, sign-out, and same-staff re-login", async () => {
+  useTenantAuthStore.getState().setTenant(tenant);
+  const before = useTenantAuthStore.getState().sessionToken;
+  expect(typeof before).toBe("number");
+
+  await expect(useTenantAuthStore.getState().signIn("1234", cashier, async () => true)).resolves.toBe(true);
+  const afterSignIn = useTenantAuthStore.getState().sessionToken;
+  expect(afterSignIn).not.toBe(before);
 
   useTenantAuthStore.getState().signOut();
-  expect(useTenantAuthStore.getState()).toMatchObject({ tenant, staff: null });
+  const afterSignOut = useTenantAuthStore.getState().sessionToken;
+  expect(afterSignOut).not.toBe(afterSignIn);
+
+  await expect(useTenantAuthStore.getState().signIn("1234", cashier, async () => true)).resolves.toBe(true);
+  expect(useTenantAuthStore.getState().sessionToken).not.toBe(afterSignOut);
+  expect(useTenantAuthStore.getState().staff).toEqual(cashier);
 });
 
 test("can delegates core policy and fails closed without staff", () => {

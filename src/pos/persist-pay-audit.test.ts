@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import type { AuditEntry, Order, Payment, PosTable, Tenant } from "../../packages/pos-core/src/types";
 import { PosDatabase } from "../../packages/pos-storage/src/db";
-import { persistAfterPay, setDexiePersistSession } from "./dexie-persist";
+import { persistAfterPay, loadDurablePaySnapshot, setDexiePersistSession } from "./dexie-persist";
 
 const tenantId = "tenant-demo";
 
@@ -368,8 +368,8 @@ test("two connections: loser reconciles local memory to durable paid/empty", asy
     expect(results.map((row) => row.kind).sort()).toEqual(["committed", "conflict"]);
     const { loadDurablePaySnapshot } = await import("./dexie-persist");
     const durable = await loadDurablePaySnapshot(input, { tableId: "table-1", orderId: "order-1" });
-    expect(durable?.payments).toEqual([payment()]);
-    expect(durable?.table.status).toBe("empty");
+    expect(durable).toMatchObject({ kind: "ok", payments: [payment()], table: expect.objectContaining({ status: "empty" }) });
+    if (!durable || durable.kind !== "ok") throw new Error("expected ok snapshot");
 
     useTenantAuthStore.setState({
       tenant: null,
@@ -380,9 +380,37 @@ test("two connections: loser reconciles local memory to durable paid/empty", asy
     useOrderPaymentStore.setState({ payments: Object.freeze([]) as never, auditEntries: [], lastReceipt: null });
     useOrderPaymentStore.getState().selectOpenOrder(openOrder());
     expect(useOrderPaymentStore.getState().recordPayment(secondPay)).toBe(true);
-    expect(reconcileLocalPayFromDurable(durable!, { localPaymentId: "pay-2", predecessor: openOrder() })).toBe("winner");
+    expect(reconcileLocalPayFromDurable(durable!, { localPaymentId: "pay-2", predecessor: openOrder() })).toEqual({ kind: "winner" });
     expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).toEqual(["pay-1"]);
     expect(useCatalogTableStore.getState().tableById("table-1")?.status).toBe("empty");
     expect(useOrderPaymentStore.getState().recordPayment({ ...secondPay, id: "pay-3", createdAt: 22 })).toBe(false);
+  });
+});
+
+test("loadDurablePaySnapshot returns corrupt when a related payment or audit row is malformed or cross-tenant", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(emptyTable());
+    await database.orders.add(paidOrder());
+    await database.payments.add({ ...payment(), tenantId: "other-tenant" });
+    await database.auditLog.add(payAudit());
+  }, async (name) => {
+    await expect(loadDurablePaySnapshot(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", orderId: "order-1" },
+    )).resolves.toEqual({ kind: "corrupt" });
+  });
+
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(emptyTable());
+    await database.orders.add(paidOrder());
+    await database.payments.add(payment());
+    await database.auditLog.add({ id: "payment:pay-1", tenantId, staffId: "staff-1" } as never);
+  }, async (name) => {
+    await expect(loadDurablePaySnapshot(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", orderId: "order-1" },
+    )).resolves.toEqual({ kind: "corrupt" });
   });
 });

@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 10:05 - Sprint 2 fail-closed reconcile + session token
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Atomic reconcile only reports winner after local apply. Rebound table untouched. Session token blocks receipt after same-staff re-login. Corrupt snapshot fail-closed.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1005-sprint-2-pay-session.md`
+
 ## 2026-08-18 09:35 - Sprint 2 pay typed outcome + durable reconcile
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`

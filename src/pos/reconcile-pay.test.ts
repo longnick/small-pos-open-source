@@ -48,7 +48,7 @@ test("reconcile restores predecessor only when durable is occupied, exact predec
     order: openOrder(),
     payments: [],
     audits: [],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toBe("predecessor");
+  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "predecessor" });
 
   expect(useOrderPaymentStore.getState().currentOrder).toMatchObject({ status: "open", id: "order-1" });
   expect(useOrderPaymentStore.getState().payments).toEqual([]);
@@ -64,10 +64,53 @@ test("reconcile adopts durable winner paid + empty table and blocks a second loc
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toBe("winner");
+  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "winner" });
 
   expect(useOrderPaymentStore.getState().currentOrder).toMatchObject({ status: "paid", paidAt: 20 });
   expect(useOrderPaymentStore.getState().payments).toEqual([payment("pay-1")]);
   expect(useCatalogTableStore.getState().tableById("table-1")).toMatchObject({ status: "empty" });
   expect(useOrderPaymentStore.getState().recordPayment(payment("pay-3"))).toBe(false);
+});
+
+test("reconcile does not report winner when local table is rebound to another order", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(openOrder());
+  expect(useOrderPaymentStore.getState().recordPayment(payment("pay-loser"))).toBe(true);
+  useCatalogTableStore.setState({
+    tenantId,
+    catalogGroups: [],
+    catalogItems: [],
+    tables: [{ ...occupied(), currentOrderId: "order-other" }],
+  });
+  const before = useCatalogTableStore.getState().tableById("table-1");
+
+  expect(reconcileLocalPayFromDurable({
+    table: empty(),
+    order: paidOrder(),
+    payments: [payment("pay-1")],
+    audits: [payAudit("pay-1")],
+  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+
+  expect(useCatalogTableStore.getState().tableById("table-1")).toEqual(before);
+});
+
+test("reconcile does not report winner when winner graph is incomplete or extra payment audit exists", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(openOrder());
+  expect(useOrderPaymentStore.getState().recordPayment(payment("pay-loser"))).toBe(true);
+  const beforePay = useOrderPaymentStore.getState().payments.map((row) => row.id);
+
+  expect(reconcileLocalPayFromDurable({
+    table: empty(),
+    order: paidOrder(),
+    payments: [payment("pay-1")],
+    audits: [],
+  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+
+  expect(reconcileLocalPayFromDurable({
+    table: empty(),
+    order: paidOrder(),
+    payments: [payment("pay-1")],
+    audits: [payAudit("pay-1"), { ...payAudit("pay-extra"), id: "payment:pay-extra", details: { ...payAudit("pay-extra").details, paymentId: "pay-extra" } }],
+  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+
+  expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).toEqual(beforePay);
 });
