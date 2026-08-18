@@ -2,12 +2,12 @@
 
 ## Doing
 
-- Later #3 multi-tab CAS + BroadcastChannel PR. Official after merge: **14/14**.
+- Sprint 1 product bootstrap. Sol review next. Do not merge here.
 
 ## Next
 
 - Sol review + owner `Duyệt` for this PR. Do not merge here.
-- Keep `verifyPin` adapter-injected; bcrypt/cloud only in a later auth-persist slice.
+- Sprint 2 canonical sell flow after Sprint 1 review.
 - Issue #1 / PR #31 stay for the contributor.
 
 ## Blocked

@@ -58,18 +58,20 @@ It uses fake data and a build-time E2E auth fixture. It never uses customer reco
 ```bash
 git clone https://github.com/longnick/small-pos-open-source.git
 cd small-pos-open-source
-npm ci
-npm run dev
+npm install
+npm run setup
+npm start
 ```
 
-Open the exact local URL printed by Vite. Stop the development server with
-`Ctrl+C`.
+Open the exact local URL printed by Vite preview (`http://127.0.0.1:4173` by
+default). Stop the server with `Ctrl+C`.
 
-The development server runs only the browser frontend. It does not start a
-backend, database server, cloud service, or payment gateway. The first screen
-is a demo-only PIN login; select a staff member and use the corresponding
-public sample PIN defined in [`src/data/demo-seed.ts`](src/data/demo-seed.ts).
-Do not enter real staff credentials or business data.
+The first launch is a shop setup wizard: shop name, 1–10 tables, manager name,
+and a 4-digit PIN. Optional sample menu. There is no public demo PIN. Data stays
+in this browser profile. `npm run dev` remains the Vite development server.
+
+The server runs only the browser frontend. It does not start a backend, database
+server, cloud service, or payment gateway. Do not enter real payment credentials.
 
 Run full local verification:
 
@@ -95,7 +97,7 @@ This repository deliberately does **not** include:
 - electronic invoices, refunds, payroll, taxes, or production deployment guidance;
 - real staff credentials or customer data.
 
-The demo PIN verifier is ephemeral. Do not use it as production authentication. See [ROADMAP.md](ROADMAP.md) and [SECURITY.md](SECURITY.md) before extending this project.
+The local PIN is hashed in the browser with Web Crypto. It is not production authentication. See [ROADMAP.md](ROADMAP.md) and [SECURITY.md](SECURITY.md) before extending this project.
 
 ## Architecture
 
@@ -103,7 +105,7 @@ The demo PIN verifier is ephemeral. Do not use it as production authentication. 
 packages/pos-core/     Pure domain types and integer-VND calculations
 src/stores/            Local Zustand state and trust-boundary guards
 src/components/        React POS UI
-src/auth/              Demo-only local authentication adapter
+src/auth/              Legacy demo adapter (tests/fixtures only)
 e2e/                   Fixture-authenticated Playwright tests
 scripts/               Leakage scanner and verification helpers
 ```

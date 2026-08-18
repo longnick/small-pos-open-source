@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 06:10 - Sprint 1 product bootstrap
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
+Branch: `feat/sprint-1-product-bootstrap`
+Agent: Hermes / gcli/grok-4.6
+Summary: First-run wizard, Dexie v2 appConfig, product bootstrap, salted PIN, setup/start scripts, clean-profile E2E. Demo PIN no longer product default.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0610-sprint-1-product-bootstrap.md`
+
 ## 2026-08-15 11:45 - Dexie Later #3 multi-tab CAS
 
 Repo: `/home/longnick/projects/small-pos-dexie-tabs`
