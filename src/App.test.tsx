@@ -32,11 +32,18 @@ const hydrate = vi.hoisted(() => ({
 
 const persist = vi.hoisted(() => ({
   occupy: vi.fn(async () => true),
-  pay: vi.fn(async () => true),
+  pay: vi.fn(async (): Promise<{ kind: "committed" | "idempotent" | "conflict" | "io-error" | "invalid" }> => ({ kind: "committed" })),
+  loadPay: vi.fn(async () => null as null | {
+    kind: "ok" | "corrupt";
+    table?: import("../packages/pos-core/src/types").PosTable;
+    order?: import("../packages/pos-core/src/types").Order | null;
+    payments?: import("../packages/pos-core/src/types").Payment[];
+    audits?: import("../packages/pos-core/src/types").AuditEntry[];
+  }),
 }));
 
 const restore = vi.hoisted(() => ({
-  load: vi.fn(async () => null as import("../packages/pos-core/src/types").Order | null),
+  load: vi.fn(async () => null as { order: import("../packages/pos-core/src/types").Order; audits: import("../packages/pos-core/src/types").AuditEntry[] } | null),
 }));
 
 const backup = vi.hoisted(() => ({
@@ -72,11 +79,16 @@ vi.mock("@/pos/dexie-persist", async (importOriginal) => {
     ...actual,
     persistAfterOccupy: persist.occupy,
     persistAfterPay: persist.pay,
+    loadDurablePaySnapshot: persist.loadPay,
   };
 });
 
 vi.mock("@/pos/dexie-restore", () => ({
-  loadOpenOrderForTable: restore.load,
+  loadRestoredOrderForTable: restore.load,
+  loadOpenOrderForTable: async (...args: unknown[]) => {
+    const restored = await restore.load(...args as []);
+    return restored?.order ?? null;
+  },
 }));
 
 vi.mock("@/pos/dexie-backup", () => ({
@@ -171,13 +183,16 @@ beforeEach(() => {
   useTenantAuthStore.setState({ tenant: null, staff: null });
   useCatalogTableStore.setState({ tenantId: null, catalogGroups: [], catalogItems: [], tables: [] });
   useOrderPaymentStore.getState().clearCurrentOrder();
+  useOrderPaymentStore.setState({ payments: Object.freeze([]) as never, auditEntries: [], lastReceipt: null });
   bootstrap.create.mockClear();
   hydrate.fromDexie.mockClear();
   hydrate.fromDexie.mockImplementation(async () => null);
   persist.occupy.mockClear();
   persist.pay.mockClear();
   persist.occupy.mockImplementation(async () => true);
-  persist.pay.mockImplementation(async () => true);
+  persist.pay.mockImplementation(async () => ({ kind: "committed" as const }));
+  persist.loadPay.mockClear();
+  persist.loadPay.mockImplementation(async () => null);
   restore.load.mockClear();
   restore.load.mockImplementation(async () => null);
   backup.exportBackup.mockClear();
@@ -962,7 +977,7 @@ const restoredOrder = {
 };
 
 test("hydrate success + occupied table click restores the bound open order", async () => {
-  restore.load.mockImplementation(async () => restoredOrder);
+  restore.load.mockImplementation(async () => ({ order: restoredOrder, audits: [] }));
   bootstrap.create.mockImplementation(() =>
     makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
   );
@@ -976,11 +991,99 @@ test("hydrate success + occupied table click restores the bound open order", asy
   await waitFor(() => expect(restore.load).toHaveBeenCalledTimes(1));
   expect(restore.load).toHaveBeenCalledWith(
     { authenticatedTenantId: tenant.id },
-    { tableId: "t1", expectedOrderId: "order-1" },
+    { tableId: "t1", expectedOrderId: "order-1", expectedStaffId: staffRecord.id },
   );
   await waitFor(() => expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-1"));
   expect(persist.occupy).not.toHaveBeenCalled();
   expect(screen.getAllByRole("button", { name: /Bàn 1/i })[0].getAttribute("aria-pressed")).toBe("true");
+});
+
+test("same-staff relogin without unmount clears POS state and selected table", async () => {
+  restore.load.mockImplementation(async () => ({ order: restoredOrder, audits: [] }));
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
+  );
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  await waitFor(() => expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-1"));
+  expect(screen.getAllByRole("button", { name: /Bàn 1/i })[0].getAttribute("aria-pressed")).toBe("true");
+  useOrderPaymentStore.setState({
+    payments: [{ id: "pay-1", tenantId: tenant.id, orderId: "order-1", amount: 0, tender: 0, method: "cash", staffId: staffRecord.id, createdAt: 2 }] as never,
+    auditEntries: [{ id: "payment:pay-1", tenantId: tenant.id, staffId: staffRecord.id, action: "payment.recorded", entityType: "order", entityId: "order-1", details: {}, timestamp: 2 }] as never,
+    lastReceipt: { paymentId: "pay-1", orderId: "order-1", tenantId: tenant.id, staffId: staffRecord.id, method: "cash", paidTotal: 0, change: 0, timestamp: 2 },
+  });
+  await act(async () => {
+    await useTenantAuthStore.getState().signIn("7890", staffRecord, acceptAllVerifier);
+  });
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+  expect(useOrderPaymentStore.getState().payments).toEqual([]);
+  expect(useOrderPaymentStore.getState().auditEntries).toEqual([]);
+  expect(useOrderPaymentStore.getState().lastReceipt).toBeNull();
+  expect(screen.getAllByRole("button", { name: /Bàn 1/i })[0].getAttribute("aria-pressed")).toBe("false");
+  expect(useCatalogTableStore.getState().tables).toHaveLength(occupiedHydrate.tables.length);
+});
+
+test("occupied restore after logout/relogin does not mutate the new session", async () => {
+  let resolveRestore!: (value: { order: typeof restoredOrder; audits: [] }) => void;
+  restore.load.mockImplementation(() => new Promise((resolve) => { resolveRestore = resolve; }));
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
+  );
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  await waitFor(() => expect(restore.load).toHaveBeenCalledTimes(1));
+  useTenantAuthStore.getState().signOut();
+  await useTenantAuthStore.getState().signIn("7890", staffRecord, acceptAllVerifier);
+  await act(async () => { resolveRestore({ order: restoredOrder, audits: [] }); });
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+});
+
+test("occupied restore after table rebind during await does not apply the old order", async () => {
+  let resolveRestore!: (value: { order: typeof restoredOrder; audits: [] }) => void;
+  restore.load.mockImplementation(() => new Promise((resolve) => { resolveRestore = resolve; }));
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
+  );
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  await waitFor(() => expect(restore.load).toHaveBeenCalledTimes(1));
+  act(() => {
+    useCatalogTableStore.setState({
+      tables: [{ ...occupiedHydrate.tables[0], currentOrderId: "order-other" }],
+    });
+  });
+  await act(async () => { resolveRestore({ order: restoredOrder, audits: [] }); });
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+});
+
+test("occupied restore after staffId change during await does not apply", async () => {
+  let resolveRestore!: (value: { order: typeof restoredOrder; audits: [] }) => void;
+  restore.load.mockImplementation(() => new Promise((resolve) => { resolveRestore = resolve; }));
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
+  );
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  await waitFor(() => expect(restore.load).toHaveBeenCalledTimes(1));
+  act(() => {
+    useCatalogTableStore.setState({
+      tables: [{ ...occupiedHydrate.tables[0], staffId: "staff-other" }],
+    });
+  });
+  await act(async () => { resolveRestore({ order: restoredOrder, audits: [] }); });
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
 });
 
 test("occupied click with missing currentOrderId does not call restore", async () => {
@@ -1021,7 +1124,7 @@ test("empty IDB never calls restore on occupied click", async () => {
 });
 
 test("existing currentOrder + other occupied table only changes highlight", async () => {
-  restore.load.mockImplementation(async () => restoredOrder);
+  restore.load.mockImplementation(async () => ({ order: restoredOrder, audits: [] }));
   bootstrap.create.mockImplementation(() =>
     makeReadyBootstrap({
       ...occupiedHydrate,
@@ -1122,4 +1225,149 @@ test("other-tab persist event rehydrates catalog/tables for the same tenant", as
   await waitFor(() => expect(useCatalogTableStore.getState().tables[0]?.status).toBe("empty"));
   expect(useCatalogTableStore.getState().tables[0]?.currentOrderId).toBeUndefined();
   expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-1");
+});
+
+const payOpenOrder = {
+  id: "order-1",
+  tenantId: tenant.id,
+  tableId: "t1",
+  staffId: staffRecord.id,
+  status: "open" as const,
+  items: [{
+    id: "line-1",
+    orderId: "order-1",
+    catalogItemId: "ci1",
+    name: "Cà phê đen",
+    price: 25_000,
+    quantity: 1,
+  }],
+  subtotal: 25_000,
+  discount: 0,
+  discountType: "amount" as const,
+  total: 25_000,
+  createdAt: 1,
+};
+
+const winnerPayment = {
+  id: "pay-win",
+  tenantId: tenant.id,
+  orderId: "order-1",
+  amount: 25_000,
+  tender: 25_000,
+  method: "cash" as const,
+  staffId: staffRecord.id,
+  createdAt: 20,
+};
+
+const winnerAudit = {
+  id: "payment:pay-win",
+  tenantId: tenant.id,
+  staffId: staffRecord.id,
+  action: "payment.recorded",
+  entityType: "order",
+  entityId: "order-1",
+  details: { paymentId: "pay-win", method: "cash", paidTotal: 25_000, tender: 25_000, change: 0 },
+  timestamp: 20,
+};
+
+async function openPayModal() {
+  restore.load.mockImplementation(async () => ({ order: payOpenOrder, audits: [] }));
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
+  );
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  await waitFor(() => expect(useOrderPaymentStore.getState().currentOrder?.items.length).toBe(1));
+  const payButton = screen.getAllByRole("button", { name: /Thanh toán/i }).find((button) => !(button as HTMLButtonElement).disabled);
+  expect(payButton).toBeTruthy();
+  fireEvent.click(payButton!);
+  await waitFor(() => expect(screen.getByLabelText("Số tiền khách đưa")).toBeTruthy());
+  fireEvent.change(screen.getByLabelText("Số tiền khách đưa"), { target: { value: "25000" } });
+  fireEvent.click(screen.getByRole("button", { name: /xác nhận thanh toán/i }));
+}
+
+test("conflict persist reconciles local loser to durable paid/empty and does not show receipt", async () => {
+  persist.pay.mockImplementation(async () => ({ kind: "conflict" as const }));
+  persist.loadPay.mockImplementation(async () => ({
+    kind: "ok" as const,
+    table: { ...occupiedHydrate.tables[0], status: "empty" as const, currentOrderId: undefined },
+    order: { ...payOpenOrder, status: "paid" as const, paidAt: 20 },
+    payments: [winnerPayment],
+    audits: [winnerAudit],
+  }));
+  await openPayModal();
+  await waitFor(() => {
+    expect(useCatalogTableStore.getState().tables[0]?.status).toBe("empty");
+  });
+  expect(useOrderPaymentStore.getState().currentOrder?.status).toBe("paid");
+  expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).toEqual(["pay-win"]);
+  expect(screen.queryByText(/thanh toán thành công/i)).toBeNull();
+  expect(useOrderPaymentStore.getState().recordPayment({ ...winnerPayment, id: "pay-again", createdAt: 21 })).toBe(false);
+});
+
+test("io-error with durable predecessor rolls local payment back", async () => {
+  persist.pay.mockImplementation(async () => ({ kind: "io-error" as const }));
+  persist.loadPay.mockImplementation(async () => ({
+    kind: "ok" as const,
+    table: occupiedHydrate.tables[0],
+    order: payOpenOrder,
+    payments: [],
+    audits: [],
+  }));
+  await openPayModal();
+  await waitFor(() => {
+    expect(persist.loadPay).toHaveBeenCalled();
+  });
+  expect(useOrderPaymentStore.getState().currentOrder?.status).toBe("open");
+  expect(useOrderPaymentStore.getState().payments).toEqual([]);
+  expect(useCatalogTableStore.getState().tables[0]).toMatchObject({ status: "occupied", currentOrderId: "order-1" });
+  expect(screen.queryByText(/thanh toán thành công/i)).toBeNull();
+});
+
+test("local release fail after durable commit leaves a rebound table untouched and suppresses receipt", async () => {
+  let resolvePay!: (value: { kind: "committed" }) => void;
+  persist.pay.mockImplementation(() => new Promise((resolve) => { resolvePay = resolve; }));
+  persist.loadPay.mockImplementation(async () => ({
+    kind: "ok" as const,
+    table: { ...occupiedHydrate.tables[0], status: "empty" as const, currentOrderId: undefined },
+    order: { ...payOpenOrder, status: "paid" as const, paidAt: 20 },
+    payments: [winnerPayment],
+    audits: [winnerAudit],
+  }));
+  await openPayModal();
+  act(() => {
+    useCatalogTableStore.setState({
+      tables: [{ ...occupiedHydrate.tables[0], status: "occupied", currentOrderId: "order-other" }],
+    });
+  });
+  await act(async () => { resolvePay({ kind: "committed" }); });
+  await waitFor(() => {
+    expect(screen.getByRole("alert")).toHaveTextContent("Không lưu được thanh toán. Kiểm tra lại đơn trước khi thu tiếp.");
+  });
+  expect(useCatalogTableStore.getState().tables[0]).toMatchObject({ status: "occupied", currentOrderId: "order-other" });
+  expect(screen.queryByText(/thanh toán thành công/i)).toBeNull();
+});
+
+test("logout then same-staff login while snapshot load awaits does not reconcile or show receipt", async () => {
+  persist.pay.mockImplementation(async () => ({ kind: "conflict" as const }));
+  persist.loadPay.mockImplementation(async () => {
+    useTenantAuthStore.getState().signOut();
+    await useTenantAuthStore.getState().signIn("7890", staffRecord, acceptAllVerifier);
+    return {
+      kind: "ok" as const,
+      table: { ...occupiedHydrate.tables[0], status: "empty" as const, currentOrderId: undefined },
+      order: { ...payOpenOrder, status: "paid" as const, paidAt: 20 },
+      payments: [winnerPayment],
+      audits: [winnerAudit],
+    };
+  });
+  await openPayModal();
+  await waitFor(() => {
+    expect(persist.loadPay).toHaveBeenCalled();
+  });
+  expect(screen.queryByText(/thanh toán thành công/i)).toBeNull();
+  expect(useCatalogTableStore.getState().tables[0]?.status).toBe("occupied");
 });

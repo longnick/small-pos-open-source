@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { bootstrapDemoPos } from "@/pos/demo-pos-bootstrap";
+import type { DemoPosBootstrap } from "@/pos/demo-pos-bootstrap";
 import { loadProductBootstrap } from "@/pos/product-bootstrap";
 import { completeFirstRun } from "@/pos/product-setup";
 import { hydrateFromDexie } from "@/pos/dexie-hydrate";
-import { isDexiePersistSession, persistAfterOccupy, persistAfterPay, setDexiePersistSession } from "@/pos/dexie-persist";
-import { loadOpenOrderForTable } from "@/pos/dexie-restore";
+import { isDexiePersistSession, loadDurablePaySnapshot, persistAfterOccupy, persistAfterPay, setDexiePersistSession } from "@/pos/dexie-persist";
+import { reconcileLocalPayFromDurable } from "@/pos/reconcile-pay";
+import { loadRestoredOrderForTable } from "@/pos/dexie-restore";
 import { exportDexieBackup, importDexieBackup, importDexieRecoveryBackup } from "@/pos/dexie-backup";
 import { listenDexieTabEvents } from "@/pos/dexie-tabs";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
@@ -57,7 +59,10 @@ type ViewId = (typeof VIEWS)[number]["id"];
 // --- Main Page (existing Lovable shell — do not modify) ---
 
 function PosShell() {
+  const { tenant, staff, sessionToken } = useTenantAuthStore();
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [selectionToken, setSelectionToken] = useState<number | null>(null);
+  const mountedSessionToken = useRef(sessionToken);
   const tables = useCatalogTableStore((state) => state.tables);
   const catalogGroups = useCatalogTableStore((state) => state.catalogGroups);
   const catalogItems = useCatalogTableStore((state) => state.catalogItems);
@@ -68,7 +73,22 @@ function PosShell() {
   const [view, setView] = useState<ViewId>("pos");
   const orderItemCount = useOrderPaymentStore((state) => state.currentOrder?.items.length ?? 0);
   const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
-  const { tenant, staff } = useTenantAuthStore();
+
+  useEffect(() => {
+    if (mountedSessionToken.current === null) {
+      mountedSessionToken.current = sessionToken;
+      return;
+    }
+    if (mountedSessionToken.current === sessionToken) return;
+    mountedSessionToken.current = sessionToken;
+    setSelectedTableId(null);
+    setSelectionToken(null);
+  }, [sessionToken]);
+
+  const selectedTable = selectionToken === sessionToken
+    ? (tables.find((t) => t.id === selectedTableId) ?? null)
+    : null;
+  const visibleSelectedTableId = selectedTable?.id ?? null;
 
   useEffect(() => {
     if (!tenant) return undefined;
@@ -92,7 +112,10 @@ function PosShell() {
     }
   }, [tables, selectedTableId]);
 
-  const selectedTable = tables.find((t) => t.id === selectedTableId) ?? null;
+  const selectTableForSession = (id: string | null): void => {
+    setSelectedTableId(id);
+    setSelectionToken(id === null ? null : useTenantAuthStore.getState().sessionToken);
+  };
 
   /**
    * Atomic table-selection handler.
@@ -106,7 +129,7 @@ function PosShell() {
   const handleTableSelect = (id: string): void => {
     // Never replace an existing order.
     if (currentOrder !== null) {
-      setSelectedTableId(id);
+      selectTableForSession(id);
       return;
     }
     const table = useCatalogTableStore.getState().tableById(id);
@@ -114,17 +137,39 @@ function PosShell() {
     if (table.status === "occupied" || table.status === "waiting_payment") {
       if (!isDexiePersistSession() || !tenant) return;
       const expectedOrderId = table.currentOrderId;
+      const staffId = staff?.id;
       if (typeof expectedOrderId !== "string" || expectedOrderId.trim().length === 0) return;
+      if (typeof staffId !== "string" || staffId.trim().length === 0) return;
+      if (table.staffId !== staffId) return;
       const tenantId = tenant.id;
       const tableId = table.id;
-      void loadOpenOrderForTable(
+      const startedToken = useTenantAuthStore.getState().sessionToken;
+      const persistOn = isDexiePersistSession();
+      const expectedTable = { ...table };
+      void loadRestoredOrderForTable(
         { authenticatedTenantId: tenantId },
-        { tableId, expectedOrderId },
-      ).then((order) => {
-        if (!order) return;
+        { tableId, expectedOrderId, expectedStaffId: staffId },
+      ).then((restored) => {
+        if (!restored) return;
+        if (useTenantAuthStore.getState().sessionToken !== startedToken) return;
+        if (!isDexiePersistSession() || persistOn !== true) return;
+        if (useTenantAuthStore.getState().tenant?.id !== tenantId) return;
+        if (useTenantAuthStore.getState().staff?.id !== staffId) return;
         if (useOrderPaymentStore.getState().currentOrder !== null) return;
-        if (useOrderPaymentStore.getState().selectOpenOrder(order)) {
-          setSelectedTableId(tableId);
+        const live = useCatalogTableStore.getState().tableById(tableId);
+        if (!live
+          || live.id !== expectedTable.id
+          || live.tenantId !== expectedTable.tenantId
+          || live.staffId !== expectedTable.staffId
+          || live.staffId !== staffId
+          || live.status !== expectedTable.status
+          || live.currentOrderId !== expectedOrderId
+          || live.number !== expectedTable.number
+          || live.openedAt !== expectedTable.openedAt) return;
+        if (restored.order.staffId !== staffId || restored.order.staffId !== live.staffId) return;
+        if (useTenantAuthStore.getState().sessionToken !== startedToken) return;
+        if (useOrderPaymentStore.getState().applyRestoredOpenOrder(restored.order, restored.audits)) {
+          selectTableForSession(tableId);
         }
       });
       return;
@@ -160,7 +205,7 @@ function PosShell() {
       return;
     }
 
-    setSelectedTableId(id);
+    selectTableForSession(id);
     if (isDexiePersistSession()) {
       const table = useCatalogTableStore.getState().tableById(id);
       const order = useOrderPaymentStore.getState().currentOrder;
@@ -183,22 +228,59 @@ function PosShell() {
     );
   };
 
-  const handlePaymentSuccess = (): boolean => {
+  const handlePaymentSuccess = async (): Promise<boolean> => {
+    const startedToken = useTenantAuthStore.getState().sessionToken;
     const order = useOrderPaymentStore.getState().currentOrder;
-    const released = Boolean(order && releaseTable(order.tableId, order.id));
-    if (isDexiePersistSession() && order) {
-      const table = useCatalogTableStore.getState().tableById(order.tableId);
-      const payment = useOrderPaymentStore.getState().payments.find((entry) => entry.orderId === order.id);
-      if (table && payment) {
-        void persistAfterPay({ authenticatedTenantId: order.tenantId }, { table, order, payment });
-      }
+    if (!order || order.status !== "paid") return false;
+    const table = useCatalogTableStore.getState().tableById(order.tableId);
+    const payment = [...useOrderPaymentStore.getState().payments].reverse().find((entry) => entry.orderId === order.id);
+    const audit = useOrderPaymentStore.getState().auditEntries.find((entry) => entry.id === `payment:${payment?.id}`);
+    const { paidAt: _paidAt, ...withoutPaidAt } = order;
+    const predecessor = order.sentAt !== undefined
+      ? { ...withoutPaidAt, status: "sent" as const }
+      : { ...withoutPaidAt, status: "open" as const };
+    if (!isDexiePersistSession()) {
+      return releaseTable(order.tableId, order.id);
     }
-    return released;
+    if (!table || !payment || !audit) return false;
+    const emptyTable = { ...table, status: "empty" as const, currentOrderId: undefined };
+    const persistInput = { authenticatedTenantId: order.tenantId };
+    const applyDurable = async (): Promise<boolean> => {
+      const durable = await loadDurablePaySnapshot(persistInput, { tableId: order.tableId, orderId: order.id });
+      if (useTenantAuthStore.getState().sessionToken !== startedToken) return false;
+      if (!durable || durable.kind !== "ok") return false;
+      reconcileLocalPayFromDurable(durable, { localPaymentId: payment.id, predecessor, sessionToken: startedToken });
+      return false;
+    };
+    try {
+      if (useTenantAuthStore.getState().sessionToken !== startedToken || !isDexiePersistSession()) {
+        return false;
+      }
+      const outcome = await persistAfterPay(
+        persistInput,
+        { table: emptyTable, order, payment, audit, expectedPredecessor: predecessor },
+      );
+      if (useTenantAuthStore.getState().sessionToken !== startedToken) {
+        return false;
+      }
+      if (outcome.kind === "committed" || outcome.kind === "idempotent") {
+        if (releaseTable(order.tableId, order.id)) return true;
+        const durable = await loadDurablePaySnapshot(persistInput, { tableId: order.tableId, orderId: order.id });
+        if (useTenantAuthStore.getState().sessionToken !== startedToken) return false;
+        if (!durable || durable.kind !== "ok") return false;
+        reconcileLocalPayFromDurable(durable, { localPaymentId: payment.id, predecessor, sessionToken: startedToken });
+        return false;
+      }
+      return applyDurable();
+    } catch {
+      if (useTenantAuthStore.getState().sessionToken !== startedToken) return false;
+      return applyDurable();
+    }
   };
 
   const handleReceiptClose = (): void => {
     clearCurrentOrder();
-    setSelectedTableId(null);
+    selectTableForSession(null);
   };
 
   // --- Panels ---
@@ -220,7 +302,7 @@ function PosShell() {
       </div>
       <TableMap
         tables={tables}
-        selectedTableId={selectedTableId}
+        selectedTableId={visibleSelectedTableId}
         onSelect={(id) => handleTableSelect(id)}
       />
     </div>
@@ -385,6 +467,7 @@ function App() {
   const [authenticatedStaff, setAuthenticatedStaff] = useState<Staff | null>(null);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const verifierRef = useRef<PinHashVerifier | null>(null);
+  const demoPosRef = useRef<DemoPosBootstrap | null>(null);
   const bootGenerationRef = useRef(0);
 
   const { tenant, staff: signedInStaff, setTenant, signIn } = useTenantAuthStore();
@@ -447,6 +530,7 @@ function App() {
         setTenant(product.tenant);
         setBootTenant(product.tenant);
         setStaffList(product.staff);
+        demoPosRef.current = pos;
         if (pos) {
           useCatalogTableStore.getState().replaceTenantData(product.tenant.id, pos);
           if (pos.currentOrder) useOrderPaymentStore.getState().selectOpenOrder(pos.currentOrder);
@@ -501,6 +585,11 @@ function App() {
     if (!candidate || candidate.tenantId !== tenant?.id) return false;
     const ok = await signIn(pin, candidate, verifier);
     if (ok) {
+      const demo = demoPosRef.current;
+      if (demo && !isDexiePersistSession() && demo.currentOrder?.staffId === candidate.id) {
+        useCatalogTableStore.getState().replaceTenantData(candidate.tenantId, demo);
+        useOrderPaymentStore.getState().selectOpenOrder(demo.currentOrder);
+      }
       setAuthenticatedStaff(candidate);
       // Snapshot the revocation counter at the moment of successful sign-in.
       // isAuthenticated checks this against revokedCountRef; any subsequent

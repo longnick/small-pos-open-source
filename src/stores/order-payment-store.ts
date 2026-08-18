@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { computeDiscount, computeSubtotal, computeTotal } from "../../packages/pos-core/src/order-calc";
 import type { AuditEntry, Order, OrderItem, Payment, PaymentReceipt } from "../../packages/pos-core/src/types";
+import { isAuditRecord } from "../../packages/pos-core/src/product-records";
+import { registerSessionClear } from "./session-hooks";
+import { useTenantAuthStore } from "./tenant-auth-store";
 
 type DiscountType = Order["discountType"];
 type OrderPaymentState = {
@@ -12,10 +15,17 @@ type OrderPaymentState = {
   createOpenOrder: (order: unknown) => boolean;
   selectOpenOrder: (order: unknown) => boolean;
   clearCurrentOrder: () => void;
+  clearSessionState: () => void;
   addItem: (item: unknown) => boolean;
   updateItemQuantity: (id: unknown, quantity: unknown) => boolean;
   removeItem: (id: unknown) => boolean;
   setDiscount: (type: unknown, value: unknown) => boolean;
+  sendToKitchen: (sentAt: unknown) => boolean;
+  revertSendToKitchen: (expectedSentAt: unknown) => boolean;
+  revertUnpersistedPayment: (input: unknown) => boolean;
+  applyDurablePaySnapshot: (input: unknown) => boolean;
+  applyRestoredOpenOrder: (order: unknown, audits: unknown) => boolean;
+  restoreOwnedPayState: (input: unknown) => boolean;
   recordPayment: (payment: unknown) => boolean;
 };
 
@@ -59,10 +69,12 @@ const freezeAuditEntries = (entries: AuditEntry[]): AuditEntry[] => Object.freez
 const materializeOpenOrder = (value: unknown): Order | null => {
   const order = materializeRecord(value);
   if (!order || !isNonemptyString(order.id) || !isNonemptyString(order.tenantId) || !isNonemptyString(order.tableId) || !isNonemptyString(order.staffId)
-    || order.status !== "open" || Object.hasOwn(order, "sentAt") || Object.hasOwn(order, "paidAt") || Object.hasOwn(order, "cancelledAt")
+    || (order.status !== "open" && order.status !== "sent") || Object.hasOwn(order, "paidAt") || Object.hasOwn(order, "cancelledAt")
     || !Array.isArray(order.items) || !isMoney(order.subtotal) || !isMoney(order.discount) || !isDiscountType(order.discountType) || !isMoney(order.total)
     || !isSafeInteger(order.createdAt) || (order.discountPercent !== undefined && !isMoney(order.discountPercent))
-    || (order.discountType === "amount" && order.discountPercent !== undefined)) return null;
+    || (order.discountType === "amount" && order.discountPercent !== undefined)
+    || (order.status === "open" && Object.hasOwn(order, "sentAt"))
+    || (order.status === "sent" && (!isSafeInteger(order.sentAt) || order.sentAt < order.createdAt))) return null;
   const items = order.items.map(materializeRecord);
   if (items.some((item) => !item || !isOrderItem(item))) return null;
   const validOrder = {
@@ -70,9 +82,7 @@ const materializeOpenOrder = (value: unknown): Order | null => {
     items: (items as (Record<string, unknown> & OrderItem)[]).map(canonicalItem), subtotal: order.subtotal, discount: order.discount,
     discountType: order.discountType, total: order.total, createdAt: order.createdAt,
     ...(order.discountPercent !== undefined ? { discountPercent: order.discountPercent } : {}),
-    ...(order.sentAt !== undefined ? { sentAt: order.sentAt } : {}),
-    ...(order.paidAt !== undefined ? { paidAt: order.paidAt } : {}),
-    ...(order.cancelledAt !== undefined ? { cancelledAt: order.cancelledAt } : {}),
+    ...(order.status === "sent" ? { sentAt: order.sentAt as number } : {}),
   } as Order;
   try {
     const subtotal = computeSubtotal(validOrder.items);
@@ -98,7 +108,10 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
   payments: freezePayments([]),
   auditEntries: freezeAuditEntries([]),
   lastReceipt: null,
-  createOpenOrder: (order) => !get().currentOrder && get().selectOpenOrder(order),
+  createOpenOrder: (order) => {
+    const validOrder = materializeOpenOrder(order);
+    return Boolean(validOrder && validOrder.status === "open" && !get().currentOrder && get().selectOpenOrder(validOrder));
+  },
   selectOpenOrder: (order) => {
     try {
       const validOrder = materializeOpenOrder(order);
@@ -108,6 +121,12 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
     } catch { return false; }
   },
   clearCurrentOrder: () => set({ currentOrder: null }),
+  clearSessionState: () => set({
+    currentOrder: null,
+    payments: Object.freeze([]) as unknown as Payment[],
+    auditEntries: Object.freeze([]) as unknown as AuditEntry[],
+    lastReceipt: null,
+  }),
   addItem: (item) => {
     try {
       const order = get().currentOrder;
@@ -141,13 +160,168 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
       return true;
     } catch { return false; }
   },
+  sendToKitchen: (sentAt) => {
+    try {
+      const order = get().currentOrder;
+      if (!order || order.status !== "open" || order.items.length === 0 || !isSafeInteger(sentAt) || sentAt < order.createdAt) return false;
+      const staff = useTenantAuthStore.getState().staff;
+      if (!staff || staff.tenantId !== order.tenantId || staff.id !== order.staffId || !useTenantAuthStore.getState().can("order.send")) return false;
+      const audit: AuditEntry = {
+        id: `send:${order.id}`,
+        tenantId: order.tenantId,
+        staffId: order.staffId,
+        action: "order.sent",
+        entityType: "order",
+        entityId: order.id,
+        details: { sentAt },
+        timestamp: sentAt,
+      };
+      set({
+        currentOrder: freezeOrder({ ...order, status: "sent", sentAt }),
+        auditEntries: freezeAuditEntries([...get().auditEntries, audit]),
+      });
+      return true;
+    } catch { return false; }
+  },
+  revertSendToKitchen: (expectedSentAt) => {
+    const order = get().currentOrder;
+    if (!order || order.status !== "sent" || !isSafeInteger(expectedSentAt) || order.sentAt !== expectedSentAt) return false;
+    const { sentAt: _, ...open } = order;
+    set({
+      currentOrder: freezeOrder({ ...open, status: "open" }),
+      auditEntries: freezeAuditEntries(get().auditEntries.filter((entry) => entry.id !== `send:${order.id}`)),
+    });
+    return true;
+  },
+  revertUnpersistedPayment: (input) => {
+    const raw = materializeRecord(input);
+    const order = get().currentOrder;
+    if (!raw || !order || order.status !== "paid" || !isNonemptyString(raw.paymentId)) return false;
+    const predecessor = materializeOpenOrder(raw.predecessor);
+    if (!predecessor || predecessor.id !== order.id || predecessor.tenantId !== order.tenantId) return false;
+    const staff = useTenantAuthStore.getState().staff;
+    if (!staff || staff.tenantId !== order.tenantId || !useTenantAuthStore.getState().can("payment.record")) return false;
+    if (!get().payments.some((payment) => payment.id === raw.paymentId && payment.orderId === order.id)) return false;
+    set({
+      currentOrder: freezeOrder(predecessor),
+      payments: freezePayments(get().payments.filter((payment) => payment.id !== raw.paymentId)),
+      auditEntries: freezeAuditEntries(get().auditEntries.filter((entry) => entry.id !== `payment:${raw.paymentId}`)),
+      lastReceipt: null,
+    });
+    return true;
+  },
+  applyDurablePaySnapshot: (input) => {
+    const raw = materializeRecord(input);
+    if (!raw) return false;
+    const orderRecord = materializeRecord(raw.order);
+    if (!orderRecord || !isNonemptyString(orderRecord.id) || !isNonemptyString(orderRecord.tenantId)) return false;
+    if (raw.payments !== undefined && !Array.isArray(raw.payments)) return false;
+    if (raw.audits !== undefined && !Array.isArray(raw.audits)) return false;
+    const payments = Array.isArray(raw.payments)
+      ? raw.payments.map((row) => materializeRecord(row)).filter((row): row is Record<string, unknown> => Boolean(row && isPayment(row))).map((row) => canonicalPayment(row as unknown as Payment))
+      : [];
+    if (Array.isArray(raw.payments) && payments.length !== raw.payments.length) return false;
+    const audits = Array.isArray(raw.audits)
+      ? raw.audits.map((row) => {
+        if (!isAuditRecord(row)) return null;
+        return {
+          id: row.id as string,
+          tenantId: row.tenantId as string,
+          staffId: row.staffId as string,
+          action: row.action as string,
+          entityType: row.entityType as string,
+          entityId: row.entityId as string,
+          details: { ...(row.details as Record<string, unknown>) },
+          timestamp: row.timestamp as number,
+        } as AuditEntry;
+      })
+      : [];
+    if (Array.isArray(raw.audits) && audits.some((row) => !row)) return false;
+    if (orderRecord.status === "paid") {
+      if (!isSafeInteger(orderRecord.paidAt) || payments.length !== 1 || payments[0].orderId !== orderRecord.id) return false;
+      set({
+        currentOrder: freezeOrder({
+          id: orderRecord.id as string,
+          tenantId: orderRecord.tenantId as string,
+          tableId: orderRecord.tableId as string,
+          staffId: orderRecord.staffId as string,
+          status: "paid",
+          items: Array.isArray(orderRecord.items) ? orderRecord.items as Order["items"] : [],
+          subtotal: orderRecord.subtotal as number,
+          discount: orderRecord.discount as number,
+          discountType: orderRecord.discountType as DiscountType,
+          total: orderRecord.total as number,
+          createdAt: orderRecord.createdAt as number,
+          paidAt: orderRecord.paidAt as number,
+          ...(orderRecord.sentAt !== undefined ? { sentAt: orderRecord.sentAt as number } : {}),
+        }),
+        payments: freezePayments(payments),
+        auditEntries: freezeAuditEntries(audits.filter((row): row is AuditEntry => Boolean(row))),
+        lastReceipt: null,
+      });
+      return true;
+    }
+    const open = materializeOpenOrder(orderRecord);
+    if (!open) return false;
+    set({
+      currentOrder: freezeOrder(open),
+      payments: freezePayments(payments),
+        auditEntries: freezeAuditEntries(audits.filter((row): row is AuditEntry => Boolean(row))),
+      lastReceipt: null,
+    });
+    return true;
+  },
+  applyRestoredOpenOrder: (order, audits) => {
+    const open = materializeOpenOrder(order);
+    if (!open) return false;
+    if (!Array.isArray(audits)) return false;
+    const entries = audits.map((row) => {
+      if (!isAuditRecord(row)) return null;
+      return {
+        id: row.id as string,
+        tenantId: row.tenantId as string,
+        staffId: row.staffId as string,
+        action: row.action as string,
+        entityType: row.entityType as string,
+        entityId: row.entityId as string,
+        details: { ...(row.details as Record<string, unknown>) },
+        timestamp: row.timestamp as number,
+      } as AuditEntry;
+    });
+    if (entries.some((row) => !row)) return false;
+    set({
+      currentOrder: freezeOrder(open),
+      payments: freezePayments([]),
+      auditEntries: freezeAuditEntries(entries.filter((row): row is AuditEntry => Boolean(row))),
+      lastReceipt: null,
+    });
+    return true;
+  },
+  restoreOwnedPayState: (input) => {
+    const raw = materializeRecord(input);
+    if (!raw || !Array.isArray(raw.payments) || !Array.isArray(raw.audits)) return false;
+    const order = raw.currentOrder === null || raw.currentOrder === undefined
+      ? null
+      : freezeOrder(structuredClone(raw.currentOrder) as Order);
+    set({
+      currentOrder: order,
+      payments: freezePayments(structuredClone(raw.payments) as Payment[]),
+      auditEntries: freezeAuditEntries(structuredClone(raw.audits) as AuditEntry[]),
+      lastReceipt: raw.lastReceipt === null || raw.lastReceipt === undefined ? null : structuredClone(raw.lastReceipt) as PaymentReceipt,
+    });
+    return true;
+  },
   recordPayment: (payment) => {
     try {
       const order = get().currentOrder;
       const validPayment = materializeRecord(payment);
-      if (!order || order.status !== "open" || !validPayment || !isPayment(validPayment)) return false;
+      if (!order || (order.status !== "open" && order.status !== "sent") || !validPayment || !isPayment(validPayment)) return false;
+      const staff = useTenantAuthStore.getState().staff;
+      if (!staff || staff.tenantId !== order.tenantId || staff.id !== validPayment.staffId || !useTenantAuthStore.getState().can("payment.record")) return false;
       // Identity checks
       if (validPayment.tenantId !== order.tenantId || validPayment.orderId !== order.id || validPayment.staffId !== order.staffId) return false;
+      if (validPayment.createdAt < order.createdAt) return false;
+      if (order.sentAt !== undefined && validPayment.createdAt < order.sentAt) return false;
       // Idempotency: reject duplicate payment id
       if (get().payments.some(({ id }) => id === validPayment.id)) return false;
       const tender = validPayment.tender;
@@ -174,3 +348,7 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
     } catch { return false; }
   },
 }));
+
+registerSessionClear(() => {
+  useOrderPaymentStore.getState().clearSessionState();
+});

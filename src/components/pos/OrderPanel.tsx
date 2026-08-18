@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { useOrderPaymentStore } from "@/stores/order-payment-store";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
-import { isDexiePersistSession, persistAfterOrderEdit } from "@/pos/dexie-persist";
+import { isDexiePersistSession, persistAfterOrderEdit, persistAfterSend } from "@/pos/dexie-persist";
 import { formatCurrency } from "@/lib/pos";
 import type { PosTable } from "../../../packages/pos-core/src/types";
 import { PaymentModal } from "./PaymentModal";
@@ -28,7 +28,7 @@ export interface OrderPanelProps {
    * lifecycle actions (release table, clear order selection, clear UI selection).
    * Optional: when absent no post-payment lifecycle is triggered.
    */
-  onPaymentSuccess?: () => boolean | void;
+  onPaymentSuccess?: () => boolean | void | Promise<boolean | void>;
   onReceiptClose?: () => void;
 }
 
@@ -40,6 +40,12 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
   const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
   const updateItemQuantity = useOrderPaymentStore((state) => state.updateItemQuantity);
   const removeItem = useOrderPaymentStore((state) => state.removeItem);
+  const sendToKitchen = useOrderPaymentStore((state) => state.sendToKitchen);
+  const revertSendToKitchen = useOrderPaymentStore((state) => state.revertSendToKitchen);
+  const canSend = useTenantAuthStore((state) => state.can("order.send"));
+  const canPay = useTenantAuthStore((state) => state.can("payment.record"));
+  const [persistError, setPersistError] = useState("");
+  const [sending, setSending] = useState(false);
 
   const persistEdit = () => {
     if (!isDexiePersistSession()) return;
@@ -93,9 +99,10 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
     return target.id;
   }
 
-  // Enabled only when there is an open order with at least one item
+  // Enabled when the current order can still be paid.
   const canOpenPayment =
-    currentOrder?.status === "open" && currentOrder.items.length > 0;
+    canPay && (currentOrder?.status === "open" || currentOrder?.status === "sent") && currentOrder.items.length > 0;
+  const canSendKitchen = canSend && !sending && currentOrder?.status === "open" && currentOrder.items.length > 0;
 
   // Heading is always "Đơn hàng". Only the subtitle adapts to selectedTable.
   const headingText = "Đơn hàng";
@@ -252,12 +259,45 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
         </div>
       </div>
 
-      {/* Action buttons – always disabled; no behavior */}
+      {/* Action buttons */}
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Button
           variant="secondary"
           className="h-12 text-sm font-semibold"
-          disabled
+          disabled={!canSendKitchen}
+          onClick={canSendKitchen ? () => {
+            const before = useOrderPaymentStore.getState().currentOrder;
+            if (!before || before.status !== "open") return;
+            const sentAt = Date.now();
+            const ok = sendToKitchen(sentAt);
+            if (!ok) return;
+            setSending(true);
+            setPersistError("");
+            const finish = (persisted: boolean) => {
+              setSending(false);
+              if (persisted) {
+                setAnnouncement("Đã gửi bếp");
+                return;
+              }
+              revertSendToKitchen(sentAt);
+              setPersistError("Không lưu được gửi bếp. Đơn vẫn mở.");
+            };
+            if (!isDexiePersistSession()) {
+              finish(true);
+              return;
+            }
+            const tenantId = useTenantAuthStore.getState().tenant?.id;
+            const order = useOrderPaymentStore.getState().currentOrder;
+            const audit = useOrderPaymentStore.getState().auditEntries.find((entry) => entry.id === `send:${before.id}`);
+            if (!tenantId || !order || !audit) {
+              finish(false);
+              return;
+            }
+            void persistAfterSend(
+              { authenticatedTenantId: tenantId },
+              { order, expectedOpen: before, audit },
+            ).then(finish).catch(() => finish(false));
+          } : undefined}
         >
           <ChefHat className="mr-2 h-4 w-4" aria-hidden="true" />
           Gửi bếp
@@ -286,7 +326,10 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
         />
       )}
 
-      {/* Always-mounted live region for screen-reader announcements */}
+      {persistError && (
+        <p role="alert" className="mt-2 text-sm text-destructive">{persistError}</p>
+      )}
+
       <div
         role="status"
         aria-live="polite"

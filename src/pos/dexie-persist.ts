@@ -1,5 +1,6 @@
 import { PosDatabase } from "../../packages/pos-storage/src/db";
-import type { Order, OrderItem, Payment, PosTable } from "../../packages/pos-core/src/types";
+import type { AuditEntry, Order, OrderItem, Payment, PosTable } from "../../packages/pos-core/src/types";
+import { isAuditRecord } from "../../packages/pos-core/src/product-records";
 import { notifyDexieTabWrite } from "./dexie-tabs";
 
 export type DexiePersistInput = {
@@ -8,6 +9,24 @@ export type DexiePersistInput = {
 };
 
 export type PersistResult = true | false;
+
+export type PayPersistOutcome =
+  | { kind: "committed" }
+  | { kind: "idempotent" }
+  | { kind: "conflict" }
+  | { kind: "io-error" }
+  | { kind: "invalid" };
+
+export type DurablePaySnapshot = {
+  table: PosTable;
+  order: Order | null;
+  payments: Payment[];
+  audits: AuditEntry[];
+};
+
+export type DurablePayLoad =
+  | { kind: "ok" } & DurablePaySnapshot
+  | { kind: "corrupt" };
 
 let persistSession = false;
 
@@ -157,6 +176,29 @@ const materializePayment = (value: unknown): Payment | null => {
   return payment && isPayment(payment) ? canonicalPayment(payment) : null;
 };
 
+const sameJson = (left: unknown, right: unknown): boolean => {
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return false;
+  }
+};
+
+const canonicalAudit = (value: unknown): AuditEntry | null => {
+  const record = materializeRecord(value);
+  if (!record || !isAuditRecord(record)) return null;
+  return {
+    id: record.id as string,
+    tenantId: record.tenantId as string,
+    staffId: record.staffId as string,
+    action: record.action as string,
+    entityType: record.entityType as string,
+    entityId: record.entityId as string,
+    details: { ...(record.details as Record<string, unknown>) },
+    timestamp: record.timestamp as number,
+  };
+};
+
 async function withWritableDb<T>(
   input: DexiePersistInput,
   stores: string[],
@@ -232,52 +274,242 @@ export async function persistAfterOrderEdit(
   return written === true;
 }
 
+export async function persistAfterSend(
+  input: DexiePersistInput,
+  snapshot: { order: Order; expectedOpen: Order; audit: AuditEntry },
+): Promise<PersistResult> {
+  let order: Order | null = null;
+  let expectedOpen: Order | null = null;
+  let audit: AuditEntry | null = null;
+  try {
+    order = materializeOrder(snapshot?.order);
+    expectedOpen = materializeOrder(snapshot?.expectedOpen);
+    audit = canonicalAudit(snapshot?.audit);
+  } catch {
+    return false;
+  }
+  if (
+    !order
+    || !expectedOpen
+    || !audit
+    || order.tenantId !== input.authenticatedTenantId
+    || expectedOpen.tenantId !== input.authenticatedTenantId
+    || audit.tenantId !== input.authenticatedTenantId
+    || order.status !== "sent"
+    || expectedOpen.status !== "open"
+    || expectedOpen.id !== order.id
+    || expectedOpen.tableId !== order.tableId
+    || expectedOpen.staffId !== order.staffId
+    || !Number.isSafeInteger(order.sentAt)
+    || (order.sentAt as number) < order.createdAt
+    || order.items.length === 0
+    || audit.id !== `send:${order.id}`
+    || audit.action !== "order.sent"
+    || audit.entityType !== "order"
+    || audit.entityId !== order.id
+    || audit.staffId !== order.staffId
+    || audit.timestamp !== order.sentAt
+    || !sameJson(audit.details, { sentAt: order.sentAt })
+  ) return false;
+
+  const written = await withWritableDb(input, ["orders", "auditLog"], async (database) => {
+    const existing = await database.orders.get(order.id);
+    if (!existing) return false;
+    const existingOrder = materializeOrder(existing);
+    if (!existingOrder || existingOrder.tenantId !== order.tenantId || existingOrder.tableId !== order.tableId) return false;
+    if (existingOrder.status === "open") {
+      if (!sameJson(existingOrder, expectedOpen)) return false;
+    } else if (existingOrder.status === "sent") {
+      if (!sameJson(existingOrder, order)) return false;
+    } else {
+      return false;
+    }
+    const existingAudit = await database.auditLog.get(audit.id);
+    if (existingAudit && !sameJson(canonicalAudit(existingAudit), audit)) return false;
+    await database.orders.put(order);
+    await database.auditLog.put(audit);
+    return true;
+  });
+  if (written === true) notifyDexieTabWrite({ tenantId: input.authenticatedTenantId, kind: "edit" });
+  return written === true;
+}
+
+async function withPayDb<T>(
+  input: DexiePersistInput,
+  write: (database: PosDatabase) => Promise<T>,
+): Promise<T | { kind: "io-error" } | { kind: "invalid" }> {
+  if (!persistSession || !input || !isPrimitiveNonemptyString(input.authenticatedTenantId)) return { kind: "invalid" };
+  try {
+    const database = new PosDatabase(input.databaseName ?? "small-pos");
+    try {
+      await database.open();
+      return await database.transaction("rw", ["tables", "orders", "payments", "auditLog"], async () => write(database));
+    } finally {
+      database.close();
+    }
+  } catch {
+    return { kind: "io-error" };
+  }
+}
+
+export async function loadDurablePaySnapshot(
+  input: DexiePersistInput,
+  ids: { tableId: string; orderId: string },
+): Promise<DurablePayLoad | null> {
+  if (!isPrimitiveNonemptyString(input.authenticatedTenantId) || !isPrimitiveNonemptyString(ids.tableId) || !isPrimitiveNonemptyString(ids.orderId)) {
+    return null;
+  }
+  try {
+    const database = new PosDatabase(input.databaseName ?? "small-pos");
+    try {
+      await database.open();
+      return await database.transaction("r", ["tables", "orders", "payments", "auditLog"], async () => {
+        const rawTable = await database.table<PosTable>("tables").get(ids.tableId);
+        if (rawTable === undefined) return null;
+        const table = materializeTable(rawTable);
+        if (!table || table.tenantId !== input.authenticatedTenantId) return { kind: "corrupt" as const };
+        const rawOrder = await database.orders.get(ids.orderId);
+        const order = rawOrder === undefined ? null : materializeOrder(rawOrder);
+        if (rawOrder !== undefined && (!order || order.tenantId !== input.authenticatedTenantId)) return { kind: "corrupt" as const };
+        const rawPayments = await database.payments.where("orderId").equals(ids.orderId).toArray();
+        const payments: Payment[] = [];
+        for (const raw of rawPayments) {
+          const payment = materializePayment(raw);
+          if (!payment || payment.tenantId !== input.authenticatedTenantId) return { kind: "corrupt" as const };
+          payments.push(payment);
+        }
+        const rawAudits = await database.auditLog.toArray();
+        const audits: AuditEntry[] = [];
+        for (const raw of rawAudits) {
+          const record = raw as { entityId?: unknown; action?: unknown; id?: unknown };
+          const relatedByEntity = record.entityId === ids.orderId;
+          const relatedById = typeof record.id === "string" && (
+            record.id === `send:${ids.orderId}`
+            || payments.some((payment) => record.id === `payment:${payment.id}`)
+          );
+          if (!relatedByEntity && !relatedById) continue;
+          const audit = canonicalAudit(raw);
+          if (!audit || audit.tenantId !== input.authenticatedTenantId || audit.entityId !== ids.orderId) {
+            return { kind: "corrupt" as const };
+          }
+          if (audit.action === "payment.recorded" || audit.action === "order.sent") audits.push(audit);
+        }
+        return { kind: "ok" as const, table, order, payments, audits };
+      });
+    } finally {
+      database.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
+const cashChange = (tender: number, amount: number): number | null => {
+  const change = tender - amount;
+  return Number.isSafeInteger(change) && change >= 0 ? change : null;
+};
+
 export async function persistAfterPay(
   input: DexiePersistInput,
-  snapshot: { table: PosTable; order: Order; payment: Payment },
-): Promise<PersistResult> {
+  snapshot: { table: PosTable; order: Order; payment: Payment; audit: AuditEntry; expectedPredecessor: Order },
+): Promise<PayPersistOutcome> {
   let table: PosTable | null = null;
   let order: Order | null = null;
   let payment: Payment | null = null;
+  let audit: AuditEntry | null = null;
+  let expectedPredecessor: Order | null = null;
   try {
     table = materializeTable(snapshot?.table);
     order = materializeOrder(snapshot?.order);
     payment = materializePayment(snapshot?.payment);
+    audit = canonicalAudit(snapshot?.audit);
+    expectedPredecessor = materializeOrder(snapshot?.expectedPredecessor);
   } catch {
-    return false;
+    return { kind: "invalid" };
   }
-  const tableOk = table
-    && table.tenantId === input.authenticatedTenantId
-    && (
-      table.status === "empty"
-      || (table.status === "occupied" && table.currentOrderId === order?.id)
-    );
+  const tenderOk = payment && Number.isSafeInteger(payment.tender) && (payment.tender as number) >= 0;
+  const change = payment && order && tenderOk
+    ? (payment.method === "cash" ? cashChange(payment.tender as number, order.total) : (payment.tender === order.total ? 0 : null))
+    : null;
   if (
     !table
     || !order
     || !payment
-    || !tableOk
+    || !audit
+    || !expectedPredecessor
+    || !tenderOk
+    || change === null
     || order.tenantId !== input.authenticatedTenantId
     || payment.tenantId !== input.authenticatedTenantId
+    || audit.tenantId !== input.authenticatedTenantId
+    || expectedPredecessor.tenantId !== input.authenticatedTenantId
     || order.status !== "paid"
+    || !Number.isSafeInteger(order.paidAt)
     || payment.orderId !== order.id
     || order.tableId !== table.id
-  ) return false;
+    || expectedPredecessor.id !== order.id
+    || expectedPredecessor.tableId !== order.tableId
+    || expectedPredecessor.staffId !== order.staffId
+    || (expectedPredecessor.status !== "open" && expectedPredecessor.status !== "sent")
+    || table.tenantId !== input.authenticatedTenantId
+    || (
+      table.status !== "empty"
+      && !(table.status === "occupied" && table.currentOrderId === order.id)
+    )
+    || audit.id !== `payment:${payment.id}`
+    || audit.action !== "payment.recorded"
+    || audit.entityType !== "order"
+    || audit.entityId !== order.id
+    || audit.staffId !== payment.staffId
+    || payment.staffId !== order.staffId
+    || audit.timestamp !== payment.createdAt
+    || order.paidAt !== payment.createdAt
+    || payment.amount !== order.total
+    || (payment.method === "cash" ? (payment.tender as number) < payment.amount : payment.tender !== payment.amount)
+    || !sameJson(audit.details, {
+      paymentId: payment.id,
+      method: payment.method,
+      paidTotal: order.total,
+      tender: payment.tender,
+      change,
+    })
+  ) return { kind: "invalid" };
 
-  const written = await withWritableDb(input, ["tables", "orders", "payments"], async (database) => {
-    const existingTable = await database.table<PosTable>("tables").get(table.id);
-    if (
-      existingTable
-      && existingTable.status !== "empty"
-      && existingTable.currentOrderId !== order.id
-    ) return false;
-    const existingPayment = await database.payments.get(payment.id);
-    if (existingPayment && existingPayment.orderId !== payment.orderId) return false;
-    await database.orders.put(order);
-    await database.payments.put(payment);
-    await database.posTables.put(table);
-    return true;
+  const written = await withPayDb(input, async (database) => {
+    const existingTable = materializeTable(await database.table<PosTable>("tables").get(table.id));
+    const existingOrder = materializeOrder(await database.orders.get(order.id));
+    const orderPayments = (await database.payments.where("orderId").equals(order.id).toArray())
+      .map(materializePayment);
+    if (orderPayments.some((row) => !row)) return { kind: "conflict" as const };
+    const existingAudit = canonicalAudit(await database.auditLog.get(audit.id));
+    if (!existingTable || !existingOrder) return { kind: "conflict" as const };
+    if (existingTable.tenantId !== order.tenantId || existingOrder.tenantId !== order.tenantId) return { kind: "conflict" as const };
+    if (existingOrder.tableId !== order.tableId) return { kind: "conflict" as const };
+    if (existingOrder.status === "cancelled") return { kind: "conflict" as const };
+    const sameIdElsewhere = await database.payments.get(payment.id);
+    if (sameIdElsewhere && sameIdElsewhere.orderId !== payment.orderId) return { kind: "conflict" as const };
+    if (sameIdElsewhere && !sameJson(materializePayment(sameIdElsewhere), payment)) return { kind: "conflict" as const };
+
+    if (existingOrder.status === "open" || existingOrder.status === "sent") {
+      if (!sameJson(existingOrder, expectedPredecessor)) return { kind: "conflict" as const };
+      if (existingTable.status !== "occupied" || existingTable.currentOrderId !== order.id) return { kind: "conflict" as const };
+      if (orderPayments.length > 0 || existingAudit) return { kind: "conflict" as const };
+      await database.orders.put(order);
+      await database.payments.put(payment);
+      await database.posTables.put(table);
+      await database.auditLog.put(audit);
+      return { kind: "committed" as const };
+    }
+
+    if (existingOrder.status === "paid") {
+      if (!sameJson(existingOrder, order)) return { kind: "conflict" as const };
+      if (orderPayments.length !== 1 || !sameJson(orderPayments[0], payment)) return { kind: "conflict" as const };
+      if (!existingAudit || !sameJson(existingAudit, audit)) return { kind: "conflict" as const };
+      if (!sameJson(existingTable, table)) return { kind: "conflict" as const };
+      return { kind: "idempotent" as const };
+    }
+    return { kind: "conflict" as const };
   });
-  if (written === true) notifyDexieTabWrite({ tenantId: input.authenticatedTenantId, kind: "pay" });
-  return written === true;
+  if (written.kind === "committed") notifyDexieTabWrite({ tenantId: input.authenticatedTenantId, kind: "pay" });
+  return written;
 }

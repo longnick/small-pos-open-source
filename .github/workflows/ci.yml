@@ -27,3 +27,4 @@ jobs:
       - run: npm run test:e2e:order
       - run: npm run test:e2e:visual
       - run: npm run test:e2e:first-run
+      - run: npm run test:e2e:sell

@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import type { CatalogGroup, CatalogItem, Order, PosTable } from "../../packages/pos-core/src/types";
 import { useCatalogTableStore } from "./catalog-table-store";
 import { useOrderPaymentStore } from "./order-payment-store";
+import { useTenantAuthStore } from "./tenant-auth-store";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -78,6 +79,10 @@ function seedOrder(overrides: Partial<Order> = {}) {
 beforeEach(() => {
   useCatalogTableStore.getState().clear();
   useOrderPaymentStore.getState().clearCurrentOrder();
+  useTenantAuthStore.setState({
+    tenant: null,
+    staff: { id: staffId, tenantId, name: "Cashier", role: "cashier", pinHash: "hash", createdAt: 1 },
+  });
 });
 
 // ---------------------------------------------------------------------------

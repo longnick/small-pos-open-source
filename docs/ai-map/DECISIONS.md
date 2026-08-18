@@ -1,5 +1,17 @@
 # Decisions
 
+## 2026-08-18 - Send kitchen is a real order status, pay still allowed
+
+Context: Sprint 2 first vertical slice after #38. Gửi bếp was a disabled no-op. Payment only accepted `open`. Restore rejected `sentAt`.
+
+Decision: `sendToKitchen` flips current open order to `sent` with integer `sentAt` and durable audit id `send:{orderId}`. Payment persist is typed CAS. Auth sessionToken generation clears POS order/payment/audit/receipt synchronously. Reconcile requires sessionToken. Restore requires expectedStaffId matching order, table, and authenticated staff. Kitchen panel stays hard-coded until Sprint 5.
+
+Reason: Sell flow needs send before pay without inventing a kitchen queue. Reload must not drop a sent ticket or invent success before durable write.
+
+Impact: `persistAfterSend`/`persistAfterPay` + OrderPanel/PaymentModal await + isolated `test:e2e:sell`. Menu/staff CRUD not in this slice.
+
+Revisit when: kitchen queue or cancel-with-reason.
+
 ## 2026-08-14 - Restore impl is occupied-table click only
 
 Context: Owner said `Làm tiếp đi` after #32 design merged `08d0a8f`.

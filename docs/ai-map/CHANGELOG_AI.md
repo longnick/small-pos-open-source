@@ -1,5 +1,109 @@
 # AI Changelog
 
+## 2026-08-18 13:00 - Fix canonical payment E2E fixture session regression
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Auth clears POS state correctly; non-persistent staged demo fixture is reapplied after valid fixture-staff sign-in. Initial selection effect no longer clears post-click fixture selection.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1300-payment-e2e-fixture-session.md`
+
+## 2026-08-18 12:40 - Sprint 2 fail-closed target audit tenant
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Restore reads all audit rows. Target-order row wrong/missing tenant fails closed; other-order cross-tenant row is ignored.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1240-sprint-2-target-audit-tenant.md`
+
+## 2026-08-18 12:25 - Sprint 2 restore audit relevance
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Restore ignores payment audits for other orders. Fail-closed stays for malformed target-order audits.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1225-sprint-2-restore-audit.md`
+
+## 2026-08-18 12:10 - Sprint 2 reset selected table on sessionToken
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Same-staff relogin without unmount clears selected table highlight. Catalog stays.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1210-sprint-2-table-selection.md`
+
+## 2026-08-18 11:55 - Sprint 2 session clear + required token
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Auth token transition clears POS order/payment/audit/receipt. Restore requires expectedStaffId. sessionToken required on reconcile API.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1155-sprint-2-session-clear.md`
+
+## 2026-08-18 11:35 - Sprint 2 sessionToken + no new-session restore
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: App passes startedToken. Commit never restores old snapshot after token change. Restore CAS includes staffId. Open/sent restore rejects payment.recorded.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1135-sprint-2-session-token.md`
+
+## 2026-08-18 11:15 - Sprint 2 freeze ownership + restore CAS
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Frozen cloned plan graph. Fingerprint TOCTOU reject. Occupied table metadata exact. Restore fail-closed + one Zustand set. Session abort rolls back old snapshot only.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1115-sprint-2-pay-freeze.md`
+
+## 2026-08-18 10:55 - Sprint 2 exact rollback + one-txn restore
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Plan captures exact local snapshots. Commit restores them if table apply fails or subscriber hijacks. Sent restore requires canonical send audit in one Dexie txn. App restore is session-token gated.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1055-sprint-2-pay-rollback.md`
+
+## 2026-08-18 10:35 - Sprint 2 atomic plan/commit reconcile
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: plan/commit prevalidate then apply order-then-table. Rebound waiting_payment/unbound rejected. Snapshot table corrupt typed. Session token checked after snapshot load. Winner lastReceipt null.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1035-sprint-2-pay-atomic.md`
+
+## 2026-08-18 10:05 - Sprint 2 fail-closed reconcile + session token
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Atomic reconcile only reports winner after local apply. Rebound table untouched. Session token blocks receipt after same-staff re-login. Corrupt snapshot fail-closed.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1005-sprint-2-pay-session.md`
+
+## 2026-08-18 09:35 - Sprint 2 pay typed outcome + durable reconcile
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: persistAfterPay returns committed/idempotent/conflict/io-error/invalid. Loser reads durable snapshot. Winner paid/empty adopted. Tender overflow rejected.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0935-sprint-2-pay-reconcile.md`
+
+## 2026-08-18 09:15 - Sprint 2 pay CAS + memory rollback
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: persistAfterPay requires predecessor + mandatory payment audit. Persist false rolls memory back. Modal locks Hủy while paying. E2E reload after pay.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0915-sprint-2-pay-cas.md`
+
+## 2026-08-18 08:35 - Sprint 2 send-to-kitchen sell slice
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Send/pay now wait Dexie result, persist order.sent + payment.recorded audits, CAS send, RBAC `order.send`/`payment.record`, E2E reload-after-send. Menu/staff CRUD still later.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0835-sprint-2-send-kitchen.md`
+
 ## 2026-08-18 08:03 - Sprint 1 sentAt ordering + untracked E2E screenshots
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`

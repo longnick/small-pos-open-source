@@ -26,6 +26,9 @@ type CatalogTableState = TenantData & {
    * Returns `false` with **no state change** on any mismatch.
    */
   occupyTable: (tableId: string, orderId: string, tenantId: string) => boolean;
+  restoreOccupiedTable: (tableId: string, orderId: string, tenantId: string) => boolean;
+  applyDurableTable: (table: PosTable, orderId: string) => boolean;
+  restoreOwnedTables: (tenantId: string | null, tables: PosTable[]) => boolean;
   /**
    * Release a table back to `empty` after a matching paid order.
    *
@@ -153,6 +156,46 @@ export const useCatalogTableStore = create<CatalogTableState>((set, get) => ({
           ? { ...t, status: "occupied" as const, currentOrderId: orderId }
           : { ...t },
       ),
+    });
+    return true;
+  },
+  restoreOccupiedTable: (tableId, orderId, tenantId) => {
+    if (!isPrimitiveNonemptyString(tableId) || !isPrimitiveNonemptyString(orderId) || !isPrimitiveNonemptyString(tenantId)) return false;
+    if (get().tenantId !== tenantId) return false;
+    const table = get().tables.find((t) => t.id === tableId);
+    if (!table || table.tenantId !== tenantId) return false;
+    if (table.status === "occupied" && table.currentOrderId === orderId) return true;
+    if (table.status !== "empty") return false;
+    set({
+      tables: get().tables.map((t) =>
+        t.id === tableId
+          ? { ...t, status: "occupied" as const, currentOrderId: orderId }
+          : { ...t },
+      ),
+    });
+    return true;
+  },
+  applyDurableTable: (table, orderId) => {
+    if (!isPrimitiveNonemptyString(orderId) || get().tenantId !== table.tenantId) return false;
+    const local = get().tables.find((row) => row.id === table.id);
+    if (!local || local.tenantId !== table.tenantId) return false;
+    if (table.status === "empty") {
+      if (local.status !== "empty" && local.currentOrderId !== orderId) return false;
+    } else if (table.status === "occupied" && table.currentOrderId === orderId) {
+      if (local.status !== "empty" && local.currentOrderId !== orderId) return false;
+    } else {
+      return false;
+    }
+    set({
+      tables: get().tables.map((row) => (row.id === table.id ? { ...table } : { ...row })),
+    });
+    return true;
+  },
+  restoreOwnedTables: (tenantId, tables) => {
+    if (!Array.isArray(tables)) return false;
+    set({
+      tenantId,
+      tables: tables.map((table) => ({ ...table })),
     });
     return true;
   },
