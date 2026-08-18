@@ -133,7 +133,14 @@ function PosShell() {
         if (useTenantAuthStore.getState().staff?.id !== staffId) return;
         if (useOrderPaymentStore.getState().currentOrder !== null) return;
         const live = useCatalogTableStore.getState().tableById(tableId);
-        if (!live || live.status !== expectedTable.status || live.currentOrderId !== expectedOrderId || live.number !== expectedTable.number || live.openedAt !== expectedTable.openedAt) return;
+        if (!live
+          || live.id !== expectedTable.id
+          || live.tenantId !== expectedTable.tenantId
+          || live.staffId !== expectedTable.staffId
+          || live.status !== expectedTable.status
+          || live.currentOrderId !== expectedOrderId
+          || live.number !== expectedTable.number
+          || live.openedAt !== expectedTable.openedAt) return;
         if (useOrderPaymentStore.getState().applyRestoredOpenOrder(restored.order, restored.audits)) {
           setSelectedTableId(tableId);
         }
@@ -215,7 +222,7 @@ function PosShell() {
       const durable = await loadDurablePaySnapshot(persistInput, { tableId: order.tableId, orderId: order.id });
       if (useTenantAuthStore.getState().sessionToken !== startedToken) return false;
       if (!durable || durable.kind !== "ok") return false;
-      reconcileLocalPayFromDurable(durable, { localPaymentId: payment.id, predecessor });
+      reconcileLocalPayFromDurable(durable, { localPaymentId: payment.id, predecessor, sessionToken: startedToken });
       return false;
     };
     try {
@@ -234,7 +241,7 @@ function PosShell() {
         const durable = await loadDurablePaySnapshot(persistInput, { tableId: order.tableId, orderId: order.id });
         if (useTenantAuthStore.getState().sessionToken !== startedToken) return false;
         if (!durable || durable.kind !== "ok") return false;
-        reconcileLocalPayFromDurable(durable, { localPaymentId: payment.id, predecessor });
+        reconcileLocalPayFromDurable(durable, { localPaymentId: payment.id, predecessor, sessionToken: startedToken });
         return false;
       }
       return applyDurable();

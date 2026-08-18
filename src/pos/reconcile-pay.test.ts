@@ -369,7 +369,7 @@ test("plan rejects occupied durable table with mismatched number or openedAt", (
   }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
 });
 
-test("commit aborts without touching a new session if subscriber signs out during first apply", () => {
+test("commit aborts without touching a new session if subscriber signs out during first apply", async () => {
   useOrderPaymentStore.getState().selectOpenOrder(openOrder());
   expect(useOrderPaymentStore.getState().recordPayment(payment("pay-loser"))).toBe(true);
   const token = useTenantAuthStore.getState().sessionToken;
@@ -386,8 +386,12 @@ test("commit aborts without touching a new session if subscriber signs out durin
   });
   expect(commitPayReconcile(plan)).toEqual({ kind: "rejected" });
   unsub();
-  expect(useOrderPaymentStore.getState().currentOrder?.status).toBe("paid");
-  expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).toEqual(["pay-loser"]);
-  expect(useOrderPaymentStore.getState().payments.some((row) => row.id === "pay-1")).toBe(false);
   expect(useTenantAuthStore.getState().staff).toBeNull();
+  expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).toEqual(["pay-1"]);
+  expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).not.toEqual(["pay-loser"]);
+  expect(useCatalogTableStore.getState().tables[0]?.status).toBe("occupied");
+  useTenantAuthStore.setState({ tenant: { id: tenantId, name: "Quán", address: "", phone: "", currency: "VND", defaultTax: 0, defaultSurcharge: 0, tableCount: 1, createdAt: 0 } });
+  await useTenantAuthStore.getState().signIn("1234", staff, async () => true);
+  expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).not.toEqual(["pay-loser"]);
+  expect(useCatalogTableStore.getState().tenantId).toBe(tenantId);
 });

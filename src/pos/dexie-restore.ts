@@ -247,6 +247,7 @@ export async function loadRestoredOrderForTable(
       } else if (sendAudits.length !== 0) {
         return null;
       }
+      if (audits.some((entry) => entry.action === "payment.recorded")) return null;
       audits.sort((left, right) => left.timestamp - right.timestamp || left.id.localeCompare(right.id));
       return { order, audits };
     } finally {

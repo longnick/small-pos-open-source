@@ -4,7 +4,7 @@
 
 Context: Sprint 2 first vertical slice after #38. Gửi bếp was a disabled no-op. Payment only accepted `open`. Restore rejected `sentAt`.
 
-Decision: `sendToKitchen` flips current open order to `sent` with integer `sentAt` and durable audit id `send:{orderId}`. Payment persist is typed CAS. Reconcile plan freezes cloned durable+local snapshots and commit rejects fingerprint or session-token drift. Restore is one Dexie readonly txn, fail-closed on malformed send audit, and one Zustand apply after exact table CAS. Kitchen panel stays hard-coded until Sprint 5.
+Decision: `sendToKitchen` flips current open order to `sent` with integer `sentAt` and durable audit id `send:{orderId}`. Payment persist is typed CAS. App always passes started sessionToken into reconcile. Commit restores old snapshot only if token still matches; token change mid-apply leaves leftover mutation and never writes old state into the new session. Restore is one Dexie readonly txn, fail-closed on payment.recorded for open/sent, and one Zustand apply after exact table CAS including staffId. Kitchen panel stays hard-coded until Sprint 5.
 
 Reason: Sell flow needs send before pay without inventing a kitchen queue. Reload must not drop a sent ticket or invent success before durable write.
 

@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 11:35 - Sprint 2 sessionToken + no new-session restore
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: App passes startedToken. Commit never restores old snapshot after token change. Restore CAS includes staffId. Open/sent restore rejects payment.recorded.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1135-sprint-2-session-token.md`
+
 ## 2026-08-18 11:15 - Sprint 2 freeze ownership + restore CAS
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`

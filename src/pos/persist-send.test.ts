@@ -188,6 +188,30 @@ test("restore rejects a sent order when a related audit is malformed or send det
   });
 });
 
+test("restore rejects open or sent orders that carry a payment.recorded audit", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(sentOrder());
+    await database.auditLog.add(sendAudit());
+    await database.auditLog.add({
+      id: "payment:pay-1",
+      tenantId,
+      staffId: "staff-1",
+      action: "payment.recorded",
+      entityType: "order",
+      entityId: "order-1",
+      details: { paymentId: "pay-1", method: "cash", paidTotal: 25_000, tender: 25_000, change: 0 },
+      timestamp: 20,
+    });
+  }, async (name) => {
+    await expect(loadRestoredOrderForTable(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", expectedOrderId: "order-1" },
+    )).resolves.toBeNull();
+  });
+});
+
 test("persistAfterSend is idempotent for the same sent snapshot and audit id", async () => {
   await withDb(async (database) => {
     await database.tenants.add(tenant());

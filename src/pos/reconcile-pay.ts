@@ -287,7 +287,7 @@ export function planPayReconcile(
       localPaymentId: local.localPaymentId,
       predecessor,
     };
-    return { ...planned, local: snapshot, fingerprint: planFingerprint(planned) };
+    return freezeDeep({ ...planned, local: snapshot, fingerprint: planFingerprint(planned) });
   }
 
   const winner = isWinnerGraph(durable, predecessor, snapshot.table);
@@ -301,7 +301,7 @@ export function planPayReconcile(
     localPaymentId: local.localPaymentId,
     predecessor,
   };
-  return { ...planned, local: snapshot, fingerprint: planFingerprint(planned) };
+  return freezeDeep({ ...planned, local: snapshot, fingerprint: planFingerprint(planned) });
 }
 
 export function commitPayReconcile(plan: PayReconcilePlan): ReconcilePayResult {
@@ -316,18 +316,20 @@ export function commitPayReconcile(plan: PayReconcilePlan): ReconcilePayResult {
     payments: plan.kind === "winner" ? [structuredClone(plan.payment)] : [],
     audits: structuredClone(plan.audits),
   });
-  if (!orderOk || !sessionMatches(local.sessionToken)) {
-    restoreLocal(local);
+  if (!orderOk) {
+    if (sessionMatches(local.sessionToken)) restoreLocal(local);
     return { kind: "rejected" };
   }
+  if (!sessionMatches(local.sessionToken)) return { kind: "rejected" };
   const tableOk = useCatalogTableStore.getState().applyDurableTable(structuredClone(plan.table), plan.order.id);
-  if (!tableOk || !sessionMatches(local.sessionToken)) {
-    restoreLocal(local);
+  if (!tableOk) {
+    if (sessionMatches(local.sessionToken)) restoreLocal(local);
     return { kind: "rejected" };
   }
+  if (!sessionMatches(local.sessionToken)) return { kind: "rejected" };
   const applied = useCatalogTableStore.getState().tables.find((row) => row.id === plan.table.id);
   if (!applied || !sameJson(applied, plan.table)) {
-    restoreLocal(local);
+    if (sessionMatches(local.sessionToken)) restoreLocal(local);
     return { kind: "rejected" };
   }
   return { kind: plan.kind };
