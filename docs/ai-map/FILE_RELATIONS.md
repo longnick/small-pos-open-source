@@ -64,7 +64,7 @@ Purpose: keep transient in-memory open order and payment list with full fail-clo
 Related files:
 
 - `src/stores/order-payment-store.ts`
-  - role: exports `useOrderPaymentStore` with createOpenOrder, selectOpenOrder, addItem, updateItemQuantity, removeItem, setDiscount, recordPayment, clearCurrentOrder.
+  - role: exports `useOrderPaymentStore` with createOpenOrder, selectOpenOrder, addItem, updateItemQuantity, removeItem, setDiscount, sendToKitchen, recordPayment, clearCurrentOrder.
   - depends on: `packages/pos-core/src/types.ts`, `packages/pos-core/src/order-calc.ts`.
   - used by: future order/payment UI adapters; no UI, Dexie, EventBus, or table/shift coupling in Task 2.3.
 
@@ -106,8 +106,9 @@ Purpose: owner-approved local payment choice preview for an existing open popula
 
 - `src/components/pos/PaymentModal.tsx` — accessible local dialog; reads passed total, stores selection only in component state, cancels/closes without domain write. All buttons set `type="button"`.
 - `src/components/pos/PaymentModal.test.tsx` — dialog, passed-total, method choice, cancel, no-confirm surface, and explicit `type="button"` lock.
-- `src/components/pos/OrderPanel.tsx` — local modal gate restricted to current store order status `open` with items; no `recordPayment` call.
-- `src/components/pos/OrderPanel.test.tsx` / `src/App.test.tsx` — eligibility, dialog and null-order denial boundaries.
+- `src/components/pos/OrderPanel.tsx` — local modal gate for `open|sent` with items; Gửi bếp calls `sendToKitchen` then `persistAfterSend`.
+- `src/components/pos/OrderPanel.test.tsx` / `src/App.test.tsx` — eligibility, send, dialog and null-order denial boundaries.
+- `e2e/sell-flow.spec.ts` — first-run open → add → reload → send → pay → receipt → release at 390/768/1440.
 - `e2e/smoke.spec.ts` — fixture-authenticated null-order denial evidence at 390×844, 768×1024, and 1440×900.
 - Scope: no payment write/receipt/change/staff/timestamp/table lifecycle. Paid-state executable setup needs separate approved full-payment scope.
 

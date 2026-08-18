@@ -170,10 +170,8 @@ describe("OrderPanel", () => {
   // -------------------------------------------------------------------------
 
   // -------------------------------------------------------------------------
-  // Controls: Gửi bếp always disabled; Thanh toán enabled for valid orders
-  // -------------------------------------------------------------------------
-
-  it("renders 'Gửi bếp' button as always disabled when currentOrder has items", () => {
+  // Controls: Gửi bếp enabled for open orders with items; Thanh toán enabled
+  it("renders 'Gửi bếp' and 'Thanh toán' enabled when currentOrder has items", () => {
     useOrderPaymentStore.getState().selectOpenOrder({
       id: "order-1",
       tenantId: "tenant-1",
@@ -199,9 +197,7 @@ describe("OrderPanel", () => {
 
     render(<OrderPanel selectedTable={table} />);
 
-    // "Gửi bếp" must remain disabled (feature not implemented yet)
-    expect(screen.getByRole("button", { name: /Gửi bếp/i })).toBeDisabled();
-    // "Thanh toán" is now enabled for a valid open order with items
+    expect(screen.getByRole("button", { name: /Gửi bếp/i })).not.toBeDisabled();
     expect(screen.getByRole("button", { name: /Thanh toán/i })).not.toBeDisabled();
   });
 
@@ -1159,6 +1155,46 @@ describe("OrderPanel", () => {
       await waitFor(() => {
         expect(document.activeElement).toBe(minusBtn);
       });
+    });
+  });
+
+  describe("send to kitchen", () => {
+    it("enables Gửi bếp for an open order with items and marks the order sent on click", () => {
+      useOrderPaymentStore.getState().selectOpenOrder({
+        id: "order-send-ui",
+        tenantId: "tenant-1",
+        tableId: "table-1",
+        staffId: "staff-1",
+        status: "open",
+        items: [
+          {
+            id: "line-1",
+            orderId: "order-send-ui",
+            catalogItemId: "c1",
+            name: "Cà phê đen",
+            price: 25_000,
+            quantity: 1,
+          },
+        ],
+        subtotal: 25_000,
+        discount: 0,
+        discountType: "amount",
+        total: 25_000,
+        createdAt: 1,
+      });
+
+      render(<OrderPanel selectedTable={table} />);
+
+      const send = screen.getByRole("button", { name: /Gửi bếp/i });
+      expect(send).not.toBeDisabled();
+      fireEvent.click(send);
+
+      expect(useOrderPaymentStore.getState().currentOrder).toMatchObject({
+        status: "sent",
+      });
+      expect(useOrderPaymentStore.getState().currentOrder?.sentAt).toEqual(expect.any(Number));
+      expect(send).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Thanh toán/i })).not.toBeDisabled();
     });
   });
 });

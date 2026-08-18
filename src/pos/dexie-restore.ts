@@ -71,8 +71,7 @@ const materializeOpenOrder = (value: unknown): Order | null => {
     || !isPrimitiveNonemptyString(order.tenantId)
     || !isPrimitiveNonemptyString(order.tableId)
     || !isPrimitiveNonemptyString(order.staffId)
-    || order.status !== "open"
-    || Object.hasOwn(order, "sentAt")
+    || (order.status !== "open" && order.status !== "sent")
     || Object.hasOwn(order, "paidAt")
     || Object.hasOwn(order, "cancelledAt")
     || !Array.isArray(order.items)
@@ -85,6 +84,8 @@ const materializeOpenOrder = (value: unknown): Order | null => {
     || (order.discountType === "amount" && order.discountPercent !== undefined)
   ) return null;
   const createdAt = order.createdAt as number;
+  if (order.status === "open" && Object.hasOwn(order, "sentAt")) return null;
+  if (order.status === "sent" && (!Number.isSafeInteger(order.sentAt) || (order.sentAt as number) < createdAt)) return null;
   const items = order.items.map(materializeRecord);
   if (items.some((item) => !item || !isOrderItem(item))) return null;
   const validOrder: Order = {
@@ -92,7 +93,7 @@ const materializeOpenOrder = (value: unknown): Order | null => {
     tenantId: order.tenantId,
     tableId: order.tableId,
     staffId: order.staffId,
-    status: "open",
+    status: order.status,
     items: (items as (Record<string, unknown> & OrderItem)[]).map(canonicalItem),
     subtotal: order.subtotal,
     discount: order.discount,
@@ -100,6 +101,7 @@ const materializeOpenOrder = (value: unknown): Order | null => {
     total: order.total,
     createdAt,
     ...(order.discountPercent !== undefined ? { discountPercent: order.discountPercent } : {}),
+    ...(order.status === "sent" ? { sentAt: order.sentAt as number } : {}),
   };
   try {
     const subtotal = computeSubtotal(validOrder.items);
@@ -126,7 +128,7 @@ export function classifyTableOrderBind(
   if (order.tableId !== table.id) return "table-mismatch";
   if (table.status !== "occupied" && table.status !== "waiting_payment") return "status-mismatch";
   if (order.status === "paid") return "paid-occupied";
-  if (order.status !== "open") return "status-mismatch";
+  if (order.status !== "open" && order.status !== "sent") return "status-mismatch";
   return "ok";
 }
 
@@ -165,7 +167,7 @@ export async function loadOpenOrderForTable(
           return null;
         }
         if (!record) return null;
-        if (record.status === "open") openCount += 1;
+        if (record.status === "open" || record.status === "sent") openCount += 1;
       }
       return openCount === 1 ? order : null;
     } finally {

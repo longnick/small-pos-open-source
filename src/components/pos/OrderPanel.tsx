@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { useOrderPaymentStore } from "@/stores/order-payment-store";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
-import { isDexiePersistSession, persistAfterOrderEdit } from "@/pos/dexie-persist";
+import { isDexiePersistSession, persistAfterOrderEdit, persistAfterSend } from "@/pos/dexie-persist";
 import { formatCurrency } from "@/lib/pos";
 import type { PosTable } from "../../../packages/pos-core/src/types";
 import { PaymentModal } from "./PaymentModal";
@@ -40,6 +40,7 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
   const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
   const updateItemQuantity = useOrderPaymentStore((state) => state.updateItemQuantity);
   const removeItem = useOrderPaymentStore((state) => state.removeItem);
+  const sendToKitchen = useOrderPaymentStore((state) => state.sendToKitchen);
 
   const persistEdit = () => {
     if (!isDexiePersistSession()) return;
@@ -93,9 +94,10 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
     return target.id;
   }
 
-  // Enabled only when there is an open order with at least one item
+  // Enabled when the current order can still be paid.
   const canOpenPayment =
-    currentOrder?.status === "open" && currentOrder.items.length > 0;
+    (currentOrder?.status === "open" || currentOrder?.status === "sent") && currentOrder.items.length > 0;
+  const canSendKitchen = currentOrder?.status === "open" && currentOrder.items.length > 0;
 
   // Heading is always "Đơn hàng". Only the subtitle adapts to selectedTable.
   const headingText = "Đơn hàng";
@@ -252,12 +254,22 @@ export function OrderPanel({ selectedTable, onBeforePaymentConfirm, onPaymentSuc
         </div>
       </div>
 
-      {/* Action buttons – always disabled; no behavior */}
+      {/* Action buttons */}
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Button
           variant="secondary"
           className="h-12 text-sm font-semibold"
-          disabled
+          disabled={!canSendKitchen}
+          onClick={canSendKitchen ? () => {
+            const ok = sendToKitchen(Date.now());
+            if (!ok) return;
+            setAnnouncement("Đã gửi bếp");
+            if (isDexiePersistSession()) {
+              const tenantId = useTenantAuthStore.getState().tenant?.id;
+              const order = useOrderPaymentStore.getState().currentOrder;
+              if (tenantId && order) void persistAfterSend({ authenticatedTenantId: tenantId }, { order });
+            }
+          } : undefined}
         >
           <ChefHat className="mr-2 h-4 w-4" aria-hidden="true" />
           Gửi bếp

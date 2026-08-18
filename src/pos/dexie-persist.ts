@@ -232,6 +232,35 @@ export async function persistAfterOrderEdit(
   return written === true;
 }
 
+export async function persistAfterSend(
+  input: DexiePersistInput,
+  snapshot: { order: Order },
+): Promise<PersistResult> {
+  let order: Order | null = null;
+  try {
+    order = materializeOrder(snapshot?.order);
+  } catch {
+    return false;
+  }
+  if (
+    !order
+    || order.tenantId !== input.authenticatedTenantId
+    || order.status !== "sent"
+    || !Number.isSafeInteger(order.sentAt)
+    || (order.sentAt as number) < order.createdAt
+    || order.items.length === 0
+  ) return false;
+
+  const written = await withWritableDb(input, ["orders"], async (database) => {
+    const existing = await database.orders.get(order.id);
+    if (existing && existing.status !== "open" && existing.status !== "sent") return false;
+    await database.orders.put(order);
+    return true;
+  });
+  if (written === true) notifyDexieTabWrite({ tenantId: input.authenticatedTenantId, kind: "edit" });
+  return written === true;
+}
+
 export async function persistAfterPay(
   input: DexiePersistInput,
   snapshot: { table: PosTable; order: Order; payment: Payment },

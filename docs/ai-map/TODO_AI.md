@@ -2,12 +2,12 @@
 
 ## Doing
 
-- Sprint 1 product bootstrap. Sol review next. Do not merge here.
+- Sprint 2 canonical sell flow. First slice: send kitchen + pay after send + reload. No merge here.
 
 ## Next
 
-- Sol review + owner `Duyệt` for this PR. Do not merge here.
-- Sprint 2 canonical sell flow after Sprint 1 review.
+- Remaining Sprint 2: persisted menu/table/staff CRUD + cancel-with-reason audit.
+- Kitchen queue from real `order.sent` stays Sprint 5.
 - Issue #1 / PR #31 stay for the contributor.
 
 ## Blocked

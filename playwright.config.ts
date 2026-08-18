@@ -12,6 +12,7 @@ export default defineConfig({
     "first-run.spec.ts",
     "recovery.spec.ts",
     "schema-upgrade.spec.ts",
+    "sell-flow.spec.ts",
   ],
   use: { baseURL: E2E_BASE_URL },
   projects: [
