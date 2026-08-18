@@ -191,3 +191,20 @@ test("ready state rejects manager pinHash that is not versioned", async () => {
   await database.staff.put({ ...manager, pinHash: "not-a-hash" });
   await expect(readProductSetupState(database)).resolves.toEqual({ kind: "corrupt" });
 });
+
+test("ready state rejects manager pinHash v1$ and wrong decoded lengths", async () => {
+  const database = await openDb();
+  const first = await completeFirstRun(database, {
+    shopName: "Quán Nhà",
+    tableCount: 1,
+    managerName: "Chủ quán",
+    pin: "5821",
+    seedSampleMenu: false,
+  });
+  expect(first.ok).toBe(true);
+  const manager = (await database.staff.toArray())[0];
+  await database.staff.put({ ...manager, pinHash: "v1$" });
+  await expect(readProductSetupState(database)).resolves.toEqual({ kind: "corrupt" });
+  await database.staff.put({ ...manager, pinHash: "v1$AA==$AA==" });
+  await expect(readProductSetupState(database)).resolves.toEqual({ kind: "corrupt" });
+});

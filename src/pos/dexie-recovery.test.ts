@@ -37,6 +37,8 @@ test("recovery import restores a first-run backup without persist session", asyn
   expect(boot.kind).toBe("ready");
   if (boot.kind !== "ready") return;
   expect(boot.tenant.name).toBe("Quán Nhà");
+  await expect(boot.verifier("5821", boot.staff[0].pinHash)).resolves.toBe(true);
+  await expect(boot.verifier("0000", boot.staff[0].pinHash)).resolves.toBe(false);
 });
 
 test("recovery import rejects a bad backup and leaves the existing database", async () => {

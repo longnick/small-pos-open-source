@@ -1,5 +1,6 @@
 import type { PosDatabase } from "../../packages/pos-storage/src/db";
 import type { CatalogGroup, CatalogItem, PosTable, Staff, Tenant } from "../../packages/pos-core/src/types";
+import { isProductViableShopData, isValidPinHash, decodeStrictBase64 } from "../../packages/pos-core/src/product-records";
 
 export type ProductSetupState =
   | { kind: "needs-setup" }
@@ -20,7 +21,6 @@ const PIN_VERSION = "v1";
 const PIN_ITERATIONS = 100_000;
 const PIN_KEY_BITS = 256;
 const PIN_SALT_BYTES = 16;
-const PIN_KEY_BYTES = PIN_KEY_BITS / 8;
 
 const isPrimitiveNonemptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
@@ -30,18 +30,6 @@ const isTableCount = (value: unknown): value is number =>
 
 function base64Encode(buf: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)));
-}
-
-function base64Decode(s: string): Uint8Array | null {
-  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(s)) return null;
-  try {
-    const bin = atob(s);
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    return base64Encode(arr.buffer) === s ? arr : null;
-  } catch {
-    return null;
-  }
 }
 
 function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -78,14 +66,11 @@ async function hashPin(pin: string): Promise<string> {
 
 export async function verifyStoredPin(pin: string, pinHash: string): Promise<boolean> {
   try {
-    if (typeof pin !== "string" || typeof pinHash !== "string") return false;
-    if (!/^\d{4}$/.test(pin)) return false;
+    if (typeof pin !== "string" || !/^\d{4}$/.test(pin) || !isValidPinHash(pinHash)) return false;
     const parts = pinHash.split("$");
-    if (parts.length !== 3 || parts[0] !== PIN_VERSION) return false;
-    const salt = base64Decode(parts[1]);
-    const storedKey = base64Decode(parts[2]);
+    const salt = decodeStrictBase64(parts[1]);
+    const storedKey = decodeStrictBase64(parts[2]);
     if (!salt || !storedKey) return false;
-    if (salt.length !== PIN_SALT_BYTES || storedKey.length !== PIN_KEY_BYTES) return false;
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(pin), "PBKDF2", false, ["deriveBits"]);
     const derived = await crypto.subtle.deriveBits(
@@ -108,22 +93,17 @@ export async function readProductSetupState(database: PosDatabase): Promise<Prod
       database.appConfig.get("product"),
     ]);
     if (tenants.length === 0 && staff.length === 0 && tables.length === 0 && !config) return { kind: "needs-setup" };
-    if (tenants.length !== 1) return { kind: "corrupt" };
-    const tenant = tenants[0];
-    if (!isPrimitiveNonemptyString(tenant.id) || !isPrimitiveNonemptyString(tenant.name)) return { kind: "corrupt" };
-    if (tenant.currency !== "VND" || !isPrimitiveNonemptyString(tenant.address) || !isPrimitiveNonemptyString(tenant.phone)) {
-      return { kind: "corrupt" };
-    }
-    if (!isTableCount(tenant.tableCount)) return { kind: "corrupt" };
-    if (!config || config.id !== "product" || config.tenantId !== tenant.id || !Number.isFinite(config.completedAt)) {
-      return { kind: "corrupt" };
-    }
-    const manager = staff.find((row) => row.tenantId === tenant.id && row.role === "manager");
-    if (!manager || !isPrimitiveNonemptyString(manager.pinHash) || !/^v1\$/.test(manager.pinHash)) return { kind: "corrupt" };
-    if (tables.length !== tenant.tableCount) return { kind: "corrupt" };
-    if (tables.some((row) => row.tenantId !== tenant.id || !isTableCount(row.number))) return { kind: "corrupt" };
-    if (new Set(tables.map((row) => row.number)).size !== tables.length) return { kind: "corrupt" };
-    return { kind: "ready", tenantId: tenant.id };
+    const groups = await database.catalogGroups.toArray();
+    const items = await database.catalogItems.toArray();
+    if (!isProductViableShopData({
+      tenants,
+      staff,
+      tables,
+      appConfig: config ? [config] : [],
+      catalogGroups: groups,
+      catalogItems: items,
+    })) return { kind: "corrupt" };
+    return { kind: "ready", tenantId: tenants[0].id };
   } catch {
     return { kind: "corrupt" };
   }

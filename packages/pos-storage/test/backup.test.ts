@@ -153,6 +153,67 @@ test.each([
   }
 });
 
+async function mutateExport(
+  database: PosDatabase,
+  mutate: (data: Record<string, unknown[]>) => void,
+): Promise<string> {
+  const parsed = JSON.parse(await exportBackup(database));
+  mutate(parsed.data);
+  return JSON.stringify(parsed);
+}
+
+test.each([
+  [
+    "catalog group missing sortOrder",
+    (data: Record<string, unknown[]>) => {
+      data.catalogGroups = [{ id: "g1", tenantId: data.tenants[0] && (data.tenants[0] as { id: string }).id, name: "Nước" }];
+    },
+  ],
+  [
+    "table missing status staffId openedAt",
+    (data: Record<string, unknown[]>) => {
+      const tenantId = (data.tenants[0] as { id: string }).id;
+      data.tables = [{ id: "table-bad", tenantId, number: 1 }];
+    },
+  ],
+  [
+    "catalog item missing available timestamps",
+    (data: Record<string, unknown[]>) => {
+      const tenantId = (data.tenants[0] as { id: string }).id;
+      data.catalogGroups = [{ id: "g1", tenantId, name: "Nước", sortOrder: 0 }];
+      data.catalogItems = [{ id: "i1", tenantId, groupId: "g1", name: "Cà phê", price: 25_000 }];
+    },
+  ],
+  [
+    "manager pinHash v1$ only",
+    (data: Record<string, unknown[]>) => {
+      const staff = { ...(data.staff[0] as Record<string, unknown>), pinHash: "v1$" };
+      data.staff = [staff];
+    },
+  ],
+  [
+    "manager pinHash wrong salt/key length",
+    (data: Record<string, unknown[]>) => {
+      const staff = { ...(data.staff[0] as Record<string, unknown>), pinHash: "v1$AA==$AA==" };
+      data.staff = [staff];
+    },
+  ],
+])("rejects near-valid %s and leaves all 10 stores unchanged", async (_name, mutate) => {
+  const database = createDatabase();
+  try {
+    await database.open();
+    await seedViableShop(database, "Quán Nhà", 1);
+    const before = await readAll(database);
+    expect(Object.keys(before)).toEqual(v2Stores);
+    const json = await mutateExport(database, mutate);
+    await expect(importBackup(database, json)).rejects.toThrow("backup-not-product-viable");
+    expect(await readAll(database)).toEqual(before);
+  } finally {
+    database.close();
+    await database.delete();
+  }
+});
+
 test("successful import replaces every store with a viable shop", async () => {
   const source = createDatabase();
   const database = createDatabase();
