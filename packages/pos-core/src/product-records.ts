@@ -151,17 +151,20 @@ export function isOrderItemRecord(value: unknown): value is Record<string, unkno
     && (value.cancelReason === undefined || typeof value.cancelReason === "string");
 }
 
-function notBeforeCreated(stamp: unknown, createdAt: number): boolean {
-  return stamp === undefined || (isSafeInteger(stamp) && stamp >= createdAt);
+function notBefore(stamp: unknown, earlier: number): boolean {
+  return stamp === undefined || (isSafeInteger(stamp) && stamp >= earlier);
 }
 
 function orderStatusTimestampsValid(value: Record<string, unknown>): boolean {
   const createdAt = value.createdAt;
   if (!isSafeInteger(createdAt)) return false;
-  if (!notBeforeCreated(value.sentAt, createdAt)
-    || !notBeforeCreated(value.paidAt, createdAt)
-    || !notBeforeCreated(value.cancelledAt, createdAt)
+  if (!notBefore(value.sentAt, createdAt)
+    || !notBefore(value.paidAt, createdAt)
+    || !notBefore(value.cancelledAt, createdAt)
   ) return false;
+  if (isSafeInteger(value.sentAt)) {
+    if (!notBefore(value.paidAt, value.sentAt) || !notBefore(value.cancelledAt, value.sentAt)) return false;
+  }
   if (value.status === "open") {
     return value.sentAt === undefined && value.paidAt === undefined && value.cancelledAt === undefined;
   }

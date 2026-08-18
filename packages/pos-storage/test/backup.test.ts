@@ -390,6 +390,39 @@ test.each([
       });
     },
   ],
+  [
+    "paid sentAt after paidAt",
+    (data: Record<string, unknown[]>) => {
+      data.orders = data.orders.map((row) => {
+        const order = { ...(row as Record<string, unknown>) };
+        if (order.status === "paid") return { ...order, sentAt: 100, paidAt: 8 };
+        return order;
+      });
+    },
+  ],
+  [
+    "cancelled sentAt after cancelledAt",
+    (data: Record<string, unknown[]>) => {
+      const paid = data.orders.find((row) => (row as { status?: string }).status === "paid") as Record<string, unknown>;
+      const { paidAt: _paidAt, ...rest } = paid;
+      const cancelledId = "order-cancelled-late-sent";
+      data.orders = [
+        ...data.orders,
+        {
+          ...rest,
+          id: cancelledId,
+          status: "cancelled",
+          sentAt: 20,
+          cancelledAt: 8,
+          items: (paid.items as Array<Record<string, unknown>>).map((item) => ({
+            ...item,
+            id: `${item.id}-cancelled`,
+            orderId: cancelledId,
+          })),
+        },
+      ];
+    },
+  ],
 ])("rejects operational %s and leaves all 10 stores unchanged", async (_name, mutate) => {
   const database = createDatabase();
   try {
