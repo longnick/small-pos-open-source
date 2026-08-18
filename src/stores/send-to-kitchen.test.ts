@@ -185,3 +185,24 @@ test("recordPayment rejects createdAt before order.createdAt or sentAt without m
   })).toBe(false);
   expect(snapshot()).toEqual(beforeSent);
 });
+
+test("revertUnpersistedPayment restores the exact pre-pay order and drops the payment audit", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(openWithItem());
+  expect(useOrderPaymentStore.getState().sendToKitchen(10)).toBe(true);
+  const beforePay = snapshot();
+  expect(useOrderPaymentStore.getState().recordPayment({
+    id: "pay-1",
+    tenantId: "tenant-1",
+    orderId: "order-1",
+    amount: 25_000,
+    tender: 25_000,
+    method: "cash",
+    staffId: "staff-1",
+    createdAt: 20,
+  })).toBe(true);
+  expect(useOrderPaymentStore.getState().revertUnpersistedPayment({
+    paymentId: "pay-1",
+    predecessor: beforePay.currentOrder,
+  })).toBe(true);
+  expect(snapshot()).toEqual(beforePay);
+});

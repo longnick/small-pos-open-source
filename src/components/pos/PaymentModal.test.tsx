@@ -492,17 +492,36 @@ describe("PaymentModal – payment lifecycle (Task 2.10)", () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
-  it("keeps modal open and suppresses success UI when post-payment lifecycle returns false", async () => {
+  it("disables Hủy while payment persist is in flight and shows a finally error if persist rejects", async () => {
+    const onOpenChange = vi.fn();
+    let resolvePay!: (value: boolean) => void;
+    const pending = new Promise<boolean>((resolve) => { resolvePay = resolve; });
+    loadOrder();
+    render(<PaymentModal {...baseProps()} onOpenChange={onOpenChange} onPaymentSuccess={() => pending} />);
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "50000" } });
+    fireEvent.click(screen.getByRole("button", { name: /xác nhận thanh toán/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Hủy/i })).toBeDisabled();
+    });
+    expect(screen.getByRole("button", { name: /xác nhận thanh toán/i })).toBeDisabled();
+    resolvePay(false);
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Không lưu được thanh toán. Kiểm tra lại đơn trước khi thu tiếp.");
+    });
+    expect(screen.getByRole("button", { name: /Hủy/i })).not.toBeDisabled();
+    expect(screen.queryByText(/thanh toán thành công/i)).not.toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("shows the same Vietnamese alert when persist throws", async () => {
     const onOpenChange = vi.fn();
     loadOrder();
-    render(<PaymentModal {...baseProps()} onOpenChange={onOpenChange} onPaymentSuccess={() => false} />);
+    render(<PaymentModal {...baseProps()} onOpenChange={onOpenChange} onPaymentSuccess={async () => { throw new Error("idb"); }} />);
     fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "50000" } });
     fireEvent.click(screen.getByRole("button", { name: /xác nhận thanh toán/i }));
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("Không lưu được thanh toán. Kiểm tra lại đơn trước khi thu tiếp.");
     });
-    expect(useOrderPaymentStore.getState().currentOrder?.status).toBe("paid");
-    expect(screen.getByRole("dialog", { name: "Thanh toán" })).toBeInTheDocument();
     expect(screen.queryByText(/thanh toán thành công/i)).not.toBeInTheDocument();
     expect(onOpenChange).not.toHaveBeenCalled();
   });

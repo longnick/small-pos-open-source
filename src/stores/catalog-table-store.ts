@@ -26,6 +26,7 @@ type CatalogTableState = TenantData & {
    * Returns `false` with **no state change** on any mismatch.
    */
   occupyTable: (tableId: string, orderId: string, tenantId: string) => boolean;
+  restoreOccupiedTable: (tableId: string, orderId: string, tenantId: string) => boolean;
   /**
    * Release a table back to `empty` after a matching paid order.
    *
@@ -146,6 +147,22 @@ export const useCatalogTableStore = create<CatalogTableState>((set, get) => ({
     const table = get().tables.find((t) => t.id === tableId);
     if (!table) return false;
     if (table.tenantId !== tenantId) return false;
+    if (table.status !== "empty") return false;
+    set({
+      tables: get().tables.map((t) =>
+        t.id === tableId
+          ? { ...t, status: "occupied" as const, currentOrderId: orderId }
+          : { ...t },
+      ),
+    });
+    return true;
+  },
+  restoreOccupiedTable: (tableId, orderId, tenantId) => {
+    if (!isPrimitiveNonemptyString(tableId) || !isPrimitiveNonemptyString(orderId) || !isPrimitiveNonemptyString(tenantId)) return false;
+    if (get().tenantId !== tenantId) return false;
+    const table = get().tables.find((t) => t.id === tableId);
+    if (!table || table.tenantId !== tenantId) return false;
+    if (table.status === "occupied" && table.currentOrderId === orderId) return true;
     if (table.status !== "empty") return false;
     set({
       tables: get().tables.map((t) =>

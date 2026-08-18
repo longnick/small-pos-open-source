@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 09:15 - Sprint 2 pay CAS + memory rollback
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: persistAfterPay requires predecessor + mandatory payment audit. Persist false rolls memory back. Modal locks Hủy while paying. E2E reload after pay.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0915-sprint-2-pay-cas.md`
+
 ## 2026-08-18 08:35 - Sprint 2 send-to-kitchen sell slice
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`

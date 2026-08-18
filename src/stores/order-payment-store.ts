@@ -19,6 +19,7 @@ type OrderPaymentState = {
   setDiscount: (type: unknown, value: unknown) => boolean;
   sendToKitchen: (sentAt: unknown) => boolean;
   revertSendToKitchen: (expectedSentAt: unknown) => boolean;
+  revertUnpersistedPayment: (input: unknown) => boolean;
   recordPayment: (payment: unknown) => boolean;
 };
 
@@ -177,6 +178,23 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
     set({
       currentOrder: freezeOrder({ ...open, status: "open" }),
       auditEntries: freezeAuditEntries(get().auditEntries.filter((entry) => entry.id !== `send:${order.id}`)),
+    });
+    return true;
+  },
+  revertUnpersistedPayment: (input) => {
+    const raw = materializeRecord(input);
+    const order = get().currentOrder;
+    if (!raw || !order || order.status !== "paid" || !isNonemptyString(raw.paymentId)) return false;
+    const predecessor = materializeOpenOrder(raw.predecessor);
+    if (!predecessor || predecessor.id !== order.id || predecessor.tenantId !== order.tenantId) return false;
+    const staff = useTenantAuthStore.getState().staff;
+    if (!staff || staff.tenantId !== order.tenantId || !useTenantAuthStore.getState().can("payment.record")) return false;
+    if (!get().payments.some((payment) => payment.id === raw.paymentId && payment.orderId === order.id)) return false;
+    set({
+      currentOrder: freezeOrder(predecessor),
+      payments: freezePayments(get().payments.filter((payment) => payment.id !== raw.paymentId)),
+      auditEntries: freezeAuditEntries(get().auditEntries.filter((entry) => entry.id !== `payment:${raw.paymentId}`)),
+      lastReceipt: null,
     });
     return true;
   },

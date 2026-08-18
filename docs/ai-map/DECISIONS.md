@@ -4,7 +4,7 @@
 
 Context: Sprint 2 first vertical slice after #38. Gửi bếp was a disabled no-op. Payment only accepted `open`. Restore rejected `sentAt`.
 
-Decision: `sendToKitchen` flips current open order to `sent` with integer `sentAt` and durable audit id `send:{orderId}`. Payment accepts `open|sent`, requires `createdAt >= createdAt/sentAt`, and writes `payment:{paymentId}` when persist is given an audit. Persist send is CAS against exact open snapshot or identical sent row. UI awaits Dexie before announce/receipt. Kitchen panel stays hard-coded until Sprint 5.
+Decision: `sendToKitchen` flips current open order to `sent` with integer `sentAt` and durable audit id `send:{orderId}`. Payment accepts `open|sent`, requires `createdAt >= createdAt/sentAt`, and always persists `payment:{paymentId}` with CAS against the exact open/sent predecessor. Persist false rolls memory back to that predecessor. UI awaits Dexie before receipt/release. Kitchen panel stays hard-coded until Sprint 5.
 
 Reason: Sell flow needs send before pay without inventing a kitchen queue. Reload must not drop a sent ticket or invent success before durable write.
 

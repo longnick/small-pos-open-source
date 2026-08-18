@@ -114,6 +114,16 @@ test("first-run sell: open table, add, reload, send kitchen, pay, receipt, relea
   await clickTabIfVisible(page, /^Bàn/);
   await expect(visibleButton(page, /Bàn 1/)).toContainText("Trống");
 
+  await page.reload();
+  await login(page, manager, pin);
+  await clickTabIfVisible(page, /^Bàn/);
+  await expect(visibleButton(page, /Bàn 1/)).toContainText("Trống");
+  await visibleButton(page, /Bàn 1/).click();
+  await clickTabIfVisible(page, /^Đơn/);
+  await expect(page.getByText("Chọn món để thêm vào đơn").filter({ visible: true }).first()).toBeVisible();
+  await expect(visibleButton(page, /Thanh toán/)).toBeDisabled();
+  await expect(page.getByRole("dialog", { name: "Thanh toán" })).toHaveCount(0);
+
   const overflow = await page.evaluate(() => ({
     html: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     body: document.body.scrollWidth - document.body.clientWidth,

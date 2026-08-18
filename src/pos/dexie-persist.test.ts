@@ -96,6 +96,27 @@ const payment = (): Payment => ({
   createdAt: 9,
 });
 
+const payAudit = () => ({
+  id: "payment:pay-1",
+  tenantId,
+  staffId: "staff-1",
+  action: "payment.recorded",
+  entityType: "order",
+  entityId: "order-1",
+  details: { paymentId: "pay-1", method: "cash", paidTotal: 25_000, tender: 25_000, change: 0 },
+  timestamp: 9,
+});
+
+const openWithItem = () => openOrder({ items: [line()], subtotal: 25_000, total: 25_000 });
+
+const paySnapshot = (table: PosTable) => ({
+  table,
+  order: paidOrder(),
+  payment: payment(),
+  audit: payAudit(),
+  expectedPredecessor: openWithItem(),
+});
+
 function snapshotStores() {
   const catalog = useCatalogTableStore.getState();
   const order = useOrderPaymentStore.getState();
@@ -209,7 +230,7 @@ test("pay writes paid order, payment, and empty table together", async () => {
   }, async (name) => {
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
-      { table: emptyTable(), order: paidOrder(), payment: payment() },
+      paySnapshot(emptyTable()),
     )).resolves.toBe(true);
     const written = await readWritten(name);
     expect(written.orders).toEqual([paidOrder()]);
@@ -226,7 +247,7 @@ test("pay persists occupied+paid split when release failed", async () => {
   }, async (name) => {
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
-      { table: occupiedTable(), order: paidOrder(), payment: payment() },
+      paySnapshot(occupiedTable()),
     )).resolves.toBe(true);
     const written = await readWritten(name);
     expect(written.orders).toEqual([paidOrder()]);
@@ -350,7 +371,7 @@ test("pay is idempotent on the same payment id", async () => {
     await database.orders.add(openOrder({ items: [line()], subtotal: 25_000, total: 25_000 }));
   }, async (name) => {
     const input = { authenticatedTenantId: tenantId, databaseName: name };
-    const snapshot = { table: emptyTable(), order: paidOrder(), payment: payment() };
+    const snapshot = paySnapshot(emptyTable());
     await expect(persistAfterPay(input, snapshot)).resolves.toBe(true);
     await expect(persistAfterPay(input, snapshot)).resolves.toBe(true);
     const written = await readWritten(name);
@@ -369,7 +390,7 @@ test("pay snapshot waiting_payment is rejected without write", async () => {
   }, async (name) => {
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
-      { table: waiting, order: paidOrder(), payment: payment() },
+      paySnapshot(waiting),
     )).resolves.toBe(false);
     const written = await readWritten(name);
     expect(written.tables).toEqual([occupiedTable()]);
@@ -385,7 +406,7 @@ test("pay refuses when Dexie table is occupied by another order", async () => {
   }, async (name) => {
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
-      { table: emptyTable(), order: paidOrder(), payment: payment() },
+      paySnapshot(emptyTable()),
     )).resolves.toBe(false);
     const written = await readWritten(name);
     expect(written.tables).toEqual([occupiedTable("order-other")]);
@@ -403,7 +424,7 @@ test("pay refuses when Dexie table is non-empty without currentOrderId", async (
   }, async (name) => {
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
-      { table: emptyTable(), order: paidOrder(), payment: payment() },
+      paySnapshot(emptyTable()),
     )).resolves.toBe(false);
     const written = await readWritten(name);
     expect(written.tables).toEqual([broken]);
@@ -421,7 +442,7 @@ test("pay refuses when payment id already belongs to another order", async () =>
   }, async (name) => {
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
-      { table: emptyTable(), order: paidOrder(), payment: payment() },
+      paySnapshot(emptyTable()),
     )).resolves.toBe(false);
     expect((await readWritten(name)).payments).toEqual([otherPay]);
   });
