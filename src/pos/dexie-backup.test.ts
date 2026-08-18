@@ -89,7 +89,8 @@ test("exportDexieBackup returns JSON only after hydrate-success session", async 
     const json = await exportDexieBackup({ authenticatedTenantId: tenantId, databaseName: name });
     expect(json).not.toBeNull();
     const parsed = JSON.parse(json as string);
-    expect(parsed.version).toBe(1);
+    expect(parsed.version).toBe(2);
+    expect(parsed.data.appConfig).toBeDefined();
     expect(parsed.data.tenants).toHaveLength(1);
     expect(parsed.data.staff[0].pinHash).toBe(pinHash);
   });

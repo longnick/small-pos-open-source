@@ -11,6 +11,12 @@ import type {
   Tenant,
 } from "../../pos-core/src/types";
 
+export type AppConfig = {
+  id: "product";
+  tenantId: string;
+  completedAt: number;
+};
+
 export class PosDatabase extends Dexie {
   tenants!: EntityTable<Tenant, "id">;
   staff!: EntityTable<Staff, "id">;
@@ -20,6 +26,7 @@ export class PosDatabase extends Dexie {
   payments!: EntityTable<Payment, "id">;
   shifts!: EntityTable<Shift, "id">;
   auditLog!: EntityTable<AuditEntry, "id">;
+  appConfig!: EntityTable<AppConfig, "id">;
 
   get posTables() {
     return this.table<PosTable, "id">("tables");
@@ -38,6 +45,10 @@ export class PosDatabase extends Dexie {
       payments: "id, orderId, tenantId, createdAt",
       shifts: "id, tenantId, staffId, openedAt",
       auditLog: "id, tenantId, timestamp, action",
+    });
+
+    this.version(2).stores({
+      appConfig: "id",
     });
   }
 }

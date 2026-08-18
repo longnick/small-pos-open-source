@@ -3,7 +3,7 @@ import { expect, test } from "vitest";
 import { PosDatabase } from "../src/db";
 import { exportBackup, importBackup } from "../src/backup";
 
-const stores = [
+const v1Stores = [
   "tenants",
   "staff",
   "catalogGroups",
@@ -15,25 +15,27 @@ const stores = [
   "auditLog",
 ] as const;
 
+const v2Stores = [...v1Stores, "appConfig"] as const;
+
 function createDatabase() {
   return new PosDatabase(`pos-storage-backup-test-${crypto.randomUUID()}`);
 }
 
 async function seed(database: PosDatabase, suffix: string) {
   await Promise.all(
-    stores.map((store, index) =>
+    v2Stores.map((store, index) =>
       database.table(store).bulkAdd([{ id: `${store}-${suffix}`, value: index }]),
     ),
   );
 }
 
-async function readAll(database: PosDatabase) {
+async function readAll(database: PosDatabase, stores: readonly string[] = v2Stores) {
   return Object.fromEntries(
     await Promise.all(stores.map(async (store) => [store, await database.table(store).toArray()])),
   );
 }
 
-test("exports and imports all v1 stores", async () => {
+test("exports version 2 including appConfig", async () => {
   const source = createDatabase();
   const target = createDatabase();
 
@@ -45,8 +47,8 @@ test("exports and imports all v1 stores", async () => {
     const json = await exportBackup(source);
     const backup = JSON.parse(json);
 
-    expect(Object.keys(backup.data)).toEqual(stores);
-    expect(backup.version).toBe(1);
+    expect(Object.keys(backup.data)).toEqual(v2Stores);
+    expect(backup.version).toBe(2);
     expect(Number.isFinite(backup.exportedAt)).toBe(true);
 
     await importBackup(target, json);
@@ -59,12 +61,32 @@ test("exports and imports all v1 stores", async () => {
   }
 });
 
+test("imports a v1 backup without appConfig", async () => {
+  const database = createDatabase();
+  const json = JSON.stringify({
+    version: 1,
+    exportedAt: 0,
+    data: Object.fromEntries(v1Stores.map((store, index) => [store, [{ id: `${store}-v1`, value: index }]])),
+  });
+
+  try {
+    await database.open();
+    await database.appConfig.add({ id: "product", tenantId: "old", completedAt: 1 });
+    await importBackup(database, json);
+    expect(await database.tenants.toArray()).toEqual([{ id: "tenants-v1", value: 0 }]);
+    expect(await database.appConfig.toArray()).toEqual([]);
+  } finally {
+    database.close();
+    await database.delete();
+  }
+});
+
 test.each([
   ["malformed JSON", "{"],
-  ["wrong version", JSON.stringify({ version: 2, exportedAt: 0, data: Object.fromEntries(stores.map((store) => [store, []])) })],
-  ["missing store", JSON.stringify({ version: 1, exportedAt: 0, data: Object.fromEntries(stores.slice(1).map((store) => [store, []])) })],
-  ["unknown store", JSON.stringify({ version: 1, exportedAt: 0, data: { ...Object.fromEntries(stores.map((store) => [store, []])), extra: [] } })],
-  ["non-array store", JSON.stringify({ version: 1, exportedAt: 0, data: { ...Object.fromEntries(stores.map((store) => [store, []])), tenants: {} } })],
+  ["wrong version", JSON.stringify({ version: 3, exportedAt: 0, data: Object.fromEntries(v2Stores.map((store) => [store, []])) })],
+  ["missing store", JSON.stringify({ version: 2, exportedAt: 0, data: Object.fromEntries(v2Stores.slice(1).map((store) => [store, []])) })],
+  ["unknown store", JSON.stringify({ version: 2, exportedAt: 0, data: { ...Object.fromEntries(v2Stores.map((store) => [store, []])), extra: [] } })],
+  ["non-array store", JSON.stringify({ version: 2, exportedAt: 0, data: { ...Object.fromEntries(v2Stores.map((store) => [store, []])), tenants: {} } })],
 ])("rejects %s without changing database", async (_name, json) => {
   const database = createDatabase();
 
@@ -84,9 +106,9 @@ test.each([
 test("successful import replaces every store", async () => {
   const database = createDatabase();
   const replacement = JSON.stringify({
-    version: 1,
+    version: 2,
     exportedAt: 0,
-    data: Object.fromEntries(stores.map((store, index) => [store, [{ id: `${store}-replacement`, value: index }]])),
+    data: Object.fromEntries(v2Stores.map((store, index) => [store, [{ id: `${store}-replacement`, value: index }]])),
   });
 
   try {
@@ -95,7 +117,7 @@ test("successful import replaces every store", async () => {
 
     await importBackup(database, replacement);
     expect(await readAll(database)).toEqual(
-      Object.fromEntries(stores.map((store, index) => [store, [{ id: `${store}-replacement`, value: index }] ])),
+      Object.fromEntries(v2Stores.map((store, index) => [store, [{ id: `${store}-replacement`, value: index }] ])),
     );
   } finally {
     database.close();
