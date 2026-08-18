@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 12:10 - Sprint 2 reset selected table on sessionToken
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Same-staff relogin without unmount clears selected table highlight. Catalog stays.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1210-sprint-2-table-selection.md`
+
 ## 2026-08-18 11:55 - Sprint 2 session clear + required token
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`

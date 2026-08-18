@@ -998,6 +998,34 @@ test("hydrate success + occupied table click restores the bound open order", asy
   expect(screen.getAllByRole("button", { name: /Bàn 1/i })[0].getAttribute("aria-pressed")).toBe("true");
 });
 
+test("same-staff relogin without unmount clears POS state and selected table", async () => {
+  restore.load.mockImplementation(async () => ({ order: restoredOrder, audits: [] }));
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
+  );
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  await waitFor(() => expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-1"));
+  expect(screen.getAllByRole("button", { name: /Bàn 1/i })[0].getAttribute("aria-pressed")).toBe("true");
+  useOrderPaymentStore.setState({
+    payments: [{ id: "pay-1", tenantId: tenant.id, orderId: "order-1", amount: 0, tender: 0, method: "cash", staffId: staffRecord.id, createdAt: 2 }] as never,
+    auditEntries: [{ id: "payment:pay-1", tenantId: tenant.id, staffId: staffRecord.id, action: "payment.recorded", entityType: "order", entityId: "order-1", details: {}, timestamp: 2 }] as never,
+    lastReceipt: { paymentId: "pay-1", orderId: "order-1", tenantId: tenant.id, staffId: staffRecord.id, method: "cash", paidTotal: 0, change: 0, timestamp: 2 },
+  });
+  await act(async () => {
+    await useTenantAuthStore.getState().signIn("7890", staffRecord, acceptAllVerifier);
+  });
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+  expect(useOrderPaymentStore.getState().payments).toEqual([]);
+  expect(useOrderPaymentStore.getState().auditEntries).toEqual([]);
+  expect(useOrderPaymentStore.getState().lastReceipt).toBeNull();
+  expect(screen.getAllByRole("button", { name: /Bàn 1/i })[0].getAttribute("aria-pressed")).toBe("false");
+  expect(useCatalogTableStore.getState().tables).toHaveLength(occupiedHydrate.tables.length);
+});
+
 test("occupied restore after logout/relogin does not mutate the new session", async () => {
   let resolveRestore!: (value: { order: typeof restoredOrder; audits: [] }) => void;
   restore.load.mockImplementation(() => new Promise((resolve) => { resolveRestore = resolve; }));

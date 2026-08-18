@@ -59,6 +59,7 @@ type ViewId = (typeof VIEWS)[number]["id"];
 
 function PosShell() {
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [selectionToken, setSelectionToken] = useState<number | null>(null);
   const tables = useCatalogTableStore((state) => state.tables);
   const catalogGroups = useCatalogTableStore((state) => state.catalogGroups);
   const catalogItems = useCatalogTableStore((state) => state.catalogItems);
@@ -69,7 +70,17 @@ function PosShell() {
   const [view, setView] = useState<ViewId>("pos");
   const orderItemCount = useOrderPaymentStore((state) => state.currentOrder?.items.length ?? 0);
   const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
-  const { tenant, staff } = useTenantAuthStore();
+  const { tenant, staff, sessionToken } = useTenantAuthStore();
+
+  useEffect(() => {
+    setSelectedTableId(null);
+    setSelectionToken(null);
+  }, [sessionToken]);
+
+  const selectedTable = selectionToken === sessionToken
+    ? (tables.find((t) => t.id === selectedTableId) ?? null)
+    : null;
+  const visibleSelectedTableId = selectedTable?.id ?? null;
 
   useEffect(() => {
     if (!tenant) return undefined;
@@ -93,7 +104,10 @@ function PosShell() {
     }
   }, [tables, selectedTableId]);
 
-  const selectedTable = tables.find((t) => t.id === selectedTableId) ?? null;
+  const selectTableForSession = (id: string | null): void => {
+    setSelectedTableId(id);
+    setSelectionToken(id === null ? null : useTenantAuthStore.getState().sessionToken);
+  };
 
   /**
    * Atomic table-selection handler.
@@ -107,7 +121,7 @@ function PosShell() {
   const handleTableSelect = (id: string): void => {
     // Never replace an existing order.
     if (currentOrder !== null) {
-      setSelectedTableId(id);
+      selectTableForSession(id);
       return;
     }
     const table = useCatalogTableStore.getState().tableById(id);
@@ -145,8 +159,9 @@ function PosShell() {
           || live.number !== expectedTable.number
           || live.openedAt !== expectedTable.openedAt) return;
         if (restored.order.staffId !== staffId || restored.order.staffId !== live.staffId) return;
+        if (useTenantAuthStore.getState().sessionToken !== startedToken) return;
         if (useOrderPaymentStore.getState().applyRestoredOpenOrder(restored.order, restored.audits)) {
-          setSelectedTableId(tableId);
+          selectTableForSession(tableId);
         }
       });
       return;
@@ -182,7 +197,7 @@ function PosShell() {
       return;
     }
 
-    setSelectedTableId(id);
+    selectTableForSession(id);
     if (isDexiePersistSession()) {
       const table = useCatalogTableStore.getState().tableById(id);
       const order = useOrderPaymentStore.getState().currentOrder;
@@ -257,7 +272,7 @@ function PosShell() {
 
   const handleReceiptClose = (): void => {
     clearCurrentOrder();
-    setSelectedTableId(null);
+    selectTableForSession(null);
   };
 
   // --- Panels ---
@@ -279,7 +294,7 @@ function PosShell() {
       </div>
       <TableMap
         tables={tables}
-        selectedTableId={selectedTableId}
+        selectedTableId={visibleSelectedTableId}
         onSelect={(id) => handleTableSelect(id)}
       />
     </div>
