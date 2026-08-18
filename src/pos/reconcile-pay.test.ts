@@ -3,7 +3,7 @@ import type { AuditEntry, Order, Payment, PosTable } from "../../packages/pos-co
 import { useCatalogTableStore } from "../stores/catalog-table-store";
 import { useOrderPaymentStore } from "../stores/order-payment-store";
 import { useTenantAuthStore } from "../stores/tenant-auth-store";
-import { reconcileLocalPayFromDurable } from "./reconcile-pay";
+import { planPayReconcile, commitPayReconcile, reconcileLocalPayFromDurable } from "./reconcile-pay";
 
 const tenantId = "tenant-1";
 const staff = { id: "staff-1", tenantId, name: "Cashier", role: "cashier" as const, pinHash: "v1$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", createdAt: 0 };
@@ -68,8 +68,77 @@ test("reconcile adopts durable winner paid + empty table and blocks a second loc
 
   expect(useOrderPaymentStore.getState().currentOrder).toMatchObject({ status: "paid", paidAt: 20 });
   expect(useOrderPaymentStore.getState().payments).toEqual([payment("pay-1")]);
+  expect(useOrderPaymentStore.getState().lastReceipt).toBeNull();
   expect(useCatalogTableStore.getState().tableById("table-1")).toMatchObject({ status: "empty" });
   expect(useOrderPaymentStore.getState().recordPayment(payment("pay-3"))).toBe(false);
+});
+
+test("applyDurableTable rejects waiting_payment and occupied missing binding without mutation", () => {
+  const waiting = { ...occupied(), status: "waiting_payment" as const, currentOrderId: "order-other" };
+  useCatalogTableStore.setState({ tenantId, catalogGroups: [], catalogItems: [], tables: [waiting] });
+  expect(useCatalogTableStore.getState().applyDurableTable(empty(), "order-1")).toBe(false);
+  expect(useCatalogTableStore.getState().tableById("table-1")).toEqual(waiting);
+
+  const unbound = { ...occupied(), currentOrderId: undefined };
+  useCatalogTableStore.setState({ tenantId, catalogGroups: [], catalogItems: [], tables: [unbound] });
+  expect(useCatalogTableStore.getState().applyDurableTable(empty(), "order-1")).toBe(false);
+  expect(useCatalogTableStore.getState().tableById("table-1")).toMatchObject({ status: "occupied" });
+});
+
+test("plan rejects and commit does not mutate when durable order totals or line links are invalid", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(openOrder());
+  expect(useOrderPaymentStore.getState().recordPayment(payment("pay-loser"))).toBe(true);
+  const beforeTable = useCatalogTableStore.getState().tableById("table-1");
+  const beforeOrder = useOrderPaymentStore.getState().currentOrder;
+  const badTotal = { ...paidOrder(), total: 99_000 };
+  const plan = planPayReconcile({
+    table: empty(),
+    order: badTotal,
+    payments: [payment("pay-1")],
+    audits: [payAudit("pay-1")],
+  }, { localPaymentId: "pay-loser", predecessor: openOrder() });
+  expect(plan).toEqual({ kind: "rejected" });
+  expect(commitPayReconcile(plan)).toEqual({ kind: "rejected" });
+  expect(useCatalogTableStore.getState().tableById("table-1")).toEqual(beforeTable);
+  expect(useOrderPaymentStore.getState().currentOrder).toEqual(beforeOrder);
+});
+
+test("plan rejects duplicate line IDs, foreign line orderId, and paidAt before createdAt", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(openOrder());
+  expect(useOrderPaymentStore.getState().recordPayment(payment("pay-loser"))).toBe(true);
+  const dup = { ...paidOrder(), items: [line(), { ...line(), catalogItemId: "item-2" }] };
+  expect(planPayReconcile({
+    table: empty(), order: dup, payments: [payment("pay-1")], audits: [payAudit("pay-1")],
+  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+
+  const foreign = { ...paidOrder(), items: [{ ...line(), orderId: "order-other" }] };
+  expect(planPayReconcile({
+    table: empty(), order: foreign, payments: [payment("pay-1")], audits: [payAudit("pay-1")],
+  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+
+  const early = { ...paidOrder(), paidAt: 0 };
+  expect(planPayReconcile({
+    table: empty(), order: early, payments: [{ ...payment("pay-1"), createdAt: 0 }],
+    audits: [{ ...payAudit("pay-1"), timestamp: 0 }],
+  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+});
+
+test("commit rejects when local payment or current order changed after plan", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(openOrder());
+  expect(useOrderPaymentStore.getState().recordPayment(payment("pay-loser"))).toBe(true);
+  const plan = planPayReconcile({
+    table: empty(),
+    order: paidOrder(),
+    payments: [payment("pay-1")],
+    audits: [payAudit("pay-1")],
+  }, { localPaymentId: "pay-loser", predecessor: openOrder() });
+  expect(plan.kind).toBe("winner");
+  useOrderPaymentStore.getState().clearCurrentOrder();
+  useOrderPaymentStore.getState().selectOpenOrder({ ...openOrder(), id: "order-newer" });
+  const before = useCatalogTableStore.getState().tableById("table-1");
+  expect(commitPayReconcile(plan)).toEqual({ kind: "rejected" });
+  expect(useCatalogTableStore.getState().tableById("table-1")).toEqual(before);
+  expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-newer");
 });
 
 test("reconcile does not report winner when local table is rebound to another order", () => {

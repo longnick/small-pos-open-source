@@ -216,12 +216,6 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
     if (Array.isArray(raw.audits) && audits.length !== raw.audits.length) return false;
     if (orderRecord.status === "paid") {
       if (!isSafeInteger(orderRecord.paidAt) || payments.length !== 1 || payments[0].orderId !== orderRecord.id) return false;
-      const payment = payments[0];
-      const change = payment.method === "cash" && isMoney(payment.tender) ? payment.tender - payment.amount : 0;
-      const receipt: PaymentReceipt = Object.freeze({
-        paymentId: payment.id, orderId: payment.orderId, tenantId: payment.tenantId,
-        staffId: payment.staffId, method: payment.method, paidTotal: payment.amount, change, timestamp: payment.createdAt,
-      });
       set({
         currentOrder: freezeOrder({
           id: orderRecord.id as string,
@@ -240,7 +234,7 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
         }),
         payments: freezePayments(payments),
         auditEntries: freezeAuditEntries(audits as unknown as AuditEntry[]),
-        lastReceipt: receipt,
+        lastReceipt: null,
       });
       return true;
     }

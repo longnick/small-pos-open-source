@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 10:35 - Sprint 2 atomic plan/commit reconcile
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: plan/commit prevalidate then apply order-then-table. Rebound waiting_payment/unbound rejected. Snapshot table corrupt typed. Session token checked after snapshot load. Winner lastReceipt null.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1035-sprint-2-pay-atomic.md`
+
 ## 2026-08-18 10:05 - Sprint 2 fail-closed reconcile + session token
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`

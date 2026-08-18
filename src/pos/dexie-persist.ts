@@ -364,8 +364,10 @@ export async function loadDurablePaySnapshot(
     try {
       await database.open();
       return await database.transaction("r", ["tables", "orders", "payments", "auditLog"], async () => {
-        const table = materializeTable(await database.table<PosTable>("tables").get(ids.tableId));
-        if (!table || table.tenantId !== input.authenticatedTenantId) return null;
+        const rawTable = await database.table<PosTable>("tables").get(ids.tableId);
+        if (rawTable === undefined) return null;
+        const table = materializeTable(rawTable);
+        if (!table || table.tenantId !== input.authenticatedTenantId) return { kind: "corrupt" as const };
         const rawOrder = await database.orders.get(ids.orderId);
         const order = rawOrder === undefined ? null : materializeOrder(rawOrder);
         if (rawOrder !== undefined && (!order || order.tenantId !== input.authenticatedTenantId)) return { kind: "corrupt" as const };

@@ -387,6 +387,21 @@ test("two connections: loser reconciles local memory to durable paid/empty", asy
   });
 });
 
+test("loadDurablePaySnapshot returns corrupt when table is malformed or cross-tenant", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add({ ...emptyTable(), tenantId: "other-tenant" });
+    await database.orders.add(paidOrder());
+    await database.payments.add(payment());
+    await database.auditLog.add(payAudit());
+  }, async (name) => {
+    await expect(loadDurablePaySnapshot(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", orderId: "order-1" },
+    )).resolves.toEqual({ kind: "corrupt" });
+  });
+});
+
 test("loadDurablePaySnapshot returns corrupt when a related payment or audit row is malformed or cross-tenant", async () => {
   await withDb(async (database) => {
     await database.tenants.add(tenant());

@@ -208,6 +208,7 @@ function PosShell() {
     const persistInput = { authenticatedTenantId: order.tenantId };
     const applyDurable = async (): Promise<boolean> => {
       const durable = await loadDurablePaySnapshot(persistInput, { tableId: order.tableId, orderId: order.id });
+      if (useTenantAuthStore.getState().sessionToken !== startedToken) return false;
       if (!durable || durable.kind !== "ok") return false;
       reconcileLocalPayFromDurable(durable, { localPaymentId: payment.id, predecessor });
       return false;
@@ -226,9 +227,10 @@ function PosShell() {
       if (outcome.kind === "committed" || outcome.kind === "idempotent") {
         if (releaseTable(order.tableId, order.id)) return true;
         const durable = await loadDurablePaySnapshot(persistInput, { tableId: order.tableId, orderId: order.id });
+        if (useTenantAuthStore.getState().sessionToken !== startedToken) return false;
         if (!durable || durable.kind !== "ok") return false;
-        const decision = reconcileLocalPayFromDurable(durable, { localPaymentId: payment.id, predecessor });
-        return decision.kind === "winner";
+        reconcileLocalPayFromDurable(durable, { localPaymentId: payment.id, predecessor });
+        return false;
       }
       return applyDurable();
     } catch {

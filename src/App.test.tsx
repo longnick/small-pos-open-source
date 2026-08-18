@@ -1263,23 +1263,23 @@ test("local release fail after durable commit leaves a rebound table untouched a
   expect(screen.queryByText(/thanh toán thành công/i)).toBeNull();
 });
 
-test("logout then same-staff login while persist awaits does not show receipt or mutate the new session", async () => {
-  persist.pay.mockImplementation(async () => {
+test("logout then same-staff login while snapshot load awaits does not reconcile or show receipt", async () => {
+  persist.pay.mockImplementation(async () => ({ kind: "conflict" as const }));
+  persist.loadPay.mockImplementation(async () => {
     useTenantAuthStore.getState().signOut();
     await useTenantAuthStore.getState().signIn("7890", staffRecord, acceptAllVerifier);
-    return { kind: "committed" as const };
+    return {
+      kind: "ok" as const,
+      table: { ...occupiedHydrate.tables[0], status: "empty" as const, currentOrderId: undefined },
+      order: { ...payOpenOrder, status: "paid" as const, paidAt: 20 },
+      payments: [winnerPayment],
+      audits: [winnerAudit],
+    };
   });
-  persist.loadPay.mockImplementation(async () => ({
-    kind: "ok" as const,
-    table: { ...occupiedHydrate.tables[0], status: "empty" as const, currentOrderId: undefined },
-    order: { ...payOpenOrder, status: "paid" as const, paidAt: 20 },
-    payments: [winnerPayment],
-    audits: [winnerAudit],
-  }));
   await openPayModal();
   await waitFor(() => {
-    expect(persist.pay).toHaveBeenCalled();
+    expect(persist.loadPay).toHaveBeenCalled();
   });
   expect(screen.queryByText(/thanh toán thành công/i)).toBeNull();
-  expect(persist.loadPay).not.toHaveBeenCalled();
+  expect(useCatalogTableStore.getState().tables[0]?.status).toBe("occupied");
 });

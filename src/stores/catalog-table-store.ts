@@ -179,7 +179,7 @@ export const useCatalogTableStore = create<CatalogTableState>((set, get) => ({
     const local = get().tables.find((row) => row.id === table.id);
     if (!local || local.tenantId !== table.tenantId) return false;
     if (table.status === "empty") {
-      if (local.status === "occupied" && local.currentOrderId !== undefined && local.currentOrderId !== orderId) return false;
+      if (local.status !== "empty" && local.currentOrderId !== orderId) return false;
     } else if (table.status === "occupied" && table.currentOrderId === orderId) {
       if (local.status !== "empty" && local.currentOrderId !== orderId) return false;
     } else {
