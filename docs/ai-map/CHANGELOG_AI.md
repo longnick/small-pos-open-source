@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 08:03 - Sprint 1 sentAt ordering + untracked E2E screenshots
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
+Branch: `feat/sprint-1-product-bootstrap`
+Agent: Hermes / gcli/grok-4.6
+Summary: paidAt/cancelledAt must be >= sentAt when sentAt exists. Smoke/visual screenshots go to gitignored test-results.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0803-sprint-1-sentat-order.md`
+
 ## 2026-08-18 07:53 - Sprint 1 compatibility and order timestamp invariants
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
