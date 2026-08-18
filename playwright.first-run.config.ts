@@ -5,7 +5,7 @@ const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "e2e",
-  testMatch: "first-run.spec.ts",
+  testMatch: ["first-run.spec.ts", "recovery.spec.ts", "schema-upgrade.spec.ts"],
   use: { baseURL },
   projects: [
     { name: "mobile", use: { viewport: { width: 390, height: 844 } } },
