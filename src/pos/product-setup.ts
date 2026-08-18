@@ -111,13 +111,18 @@ export async function readProductSetupState(database: PosDatabase): Promise<Prod
     if (tenants.length !== 1) return { kind: "corrupt" };
     const tenant = tenants[0];
     if (!isPrimitiveNonemptyString(tenant.id) || !isPrimitiveNonemptyString(tenant.name)) return { kind: "corrupt" };
+    if (tenant.currency !== "VND" || !isPrimitiveNonemptyString(tenant.address) || !isPrimitiveNonemptyString(tenant.phone)) {
+      return { kind: "corrupt" };
+    }
+    if (!isTableCount(tenant.tableCount)) return { kind: "corrupt" };
     if (!config || config.id !== "product" || config.tenantId !== tenant.id || !Number.isFinite(config.completedAt)) {
       return { kind: "corrupt" };
     }
     const manager = staff.find((row) => row.tenantId === tenant.id && row.role === "manager");
-    if (!manager || !isPrimitiveNonemptyString(manager.pinHash)) return { kind: "corrupt" };
+    if (!manager || !isPrimitiveNonemptyString(manager.pinHash) || !/^v1\$/.test(manager.pinHash)) return { kind: "corrupt" };
     if (tables.length !== tenant.tableCount) return { kind: "corrupt" };
-    if (tables.some((row) => row.tenantId !== tenant.id)) return { kind: "corrupt" };
+    if (tables.some((row) => row.tenantId !== tenant.id || !isTableCount(row.number))) return { kind: "corrupt" };
+    if (new Set(tables.map((row) => row.number)).size !== tables.length) return { kind: "corrupt" };
     return { kind: "ready", tenantId: tenant.id };
   } catch {
     return { kind: "corrupt" };

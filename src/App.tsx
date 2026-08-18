@@ -10,6 +10,7 @@ import { listenDexieTabEvents } from "@/pos/dexie-tabs";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
 import { FirstRunWizard } from "@/components/setup/FirstRunWizard";
 import { SetupRecovery } from "@/components/setup/SetupRecovery";
+import { allowPinAttempt } from "@/auth/login-throttle";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
 import { useCatalogTableStore } from "@/stores/catalog-table-store";
 import { useOrderPaymentStore } from "@/stores/order-payment-store";
@@ -495,6 +496,7 @@ function App() {
   async function handleSignIn(staffId: string, pin: string): Promise<boolean> {
     const verifier = verifierRef.current;
     if (!verifier) return false;
+    if (!allowPinAttempt(staffId)) return false;
     const candidate = staffList.find((s) => s.id === staffId);
     if (!candidate || candidate.tenantId !== tenant?.id) return false;
     const ok = await signIn(pin, candidate, verifier);

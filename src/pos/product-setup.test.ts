@@ -161,3 +161,33 @@ test("tenant rows without matching appConfig are corrupt", async () => {
   await database.appConfig.clear();
   await expect(readProductSetupState(database)).resolves.toEqual({ kind: "corrupt" });
 });
+
+test("ready state rejects tenant currency or table-number mismatch", async () => {
+  const database = await openDb();
+  const first = await completeFirstRun(database, {
+    shopName: "Quán Nhà",
+    tableCount: 2,
+    managerName: "Chủ quán",
+    pin: "5821",
+    seedSampleMenu: false,
+  });
+  expect(first.ok).toBe(true);
+  const tenant = (await database.tenants.toArray())[0];
+  await database.tenants.put({ ...tenant, currency: "USD" as never });
+  await expect(readProductSetupState(database)).resolves.toEqual({ kind: "corrupt" });
+});
+
+test("ready state rejects manager pinHash that is not versioned", async () => {
+  const database = await openDb();
+  const first = await completeFirstRun(database, {
+    shopName: "Quán Nhà",
+    tableCount: 1,
+    managerName: "Chủ quán",
+    pin: "5821",
+    seedSampleMenu: false,
+  });
+  expect(first.ok).toBe(true);
+  const manager = (await database.staff.toArray())[0];
+  await database.staff.put({ ...manager, pinHash: "not-a-hash" });
+  await expect(readProductSetupState(database)).resolves.toEqual({ kind: "corrupt" });
+});
