@@ -11,6 +11,7 @@ const entries: Array<{ find: string | RegExp; replacement: string }> = Array.isA
   : Object.entries(aliases as Record<string, string>).map(([find, replacement]) => ({ find, replacement }));
 
 const alias: AliasOptions = [
+  { find: "@/pos/product-bootstrap", replacement: path.resolve(dirname, "e2e/fixtures/test-product-bootstrap.ts") },
   { find: "@/auth/demo-auth-adapter", replacement: path.resolve(dirname, "e2e/fixtures/test-auth-adapter.ts") },
   { find: "@/pos/demo-pos-bootstrap", replacement: path.resolve(dirname, "e2e/fixtures/test-pos-bootstrap.ts") },
   ...entries,

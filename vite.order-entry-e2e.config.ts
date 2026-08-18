@@ -36,6 +36,13 @@ const baseAliasEntries: Array<{ find: string | RegExp; replacement: string }> =
 const aliasWithOverridesFirst: AliasOptions = [
   // Exact-module substitutions — MUST come before the broad "@" entry.
   {
+    find: "@/pos/product-bootstrap",
+    replacement: path.resolve(
+      __dirname,
+      "e2e/fixtures/test-product-bootstrap.ts",
+    ),
+  },
+  {
     find: "@/auth/demo-auth-adapter",
     replacement: path.resolve(
       __dirname,

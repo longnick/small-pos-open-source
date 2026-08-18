@@ -9,6 +9,7 @@ export default defineConfig({
     "payment-positive.spec.ts",
     "order-entry.spec.ts",
     "visual-tablet-desktop.spec.ts",
+    "first-run.spec.ts",
   ],
   use: { baseURL: E2E_BASE_URL },
   projects: [
