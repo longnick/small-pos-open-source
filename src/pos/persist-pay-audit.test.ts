@@ -380,7 +380,7 @@ test("two connections: loser reconciles local memory to durable paid/empty", asy
     useOrderPaymentStore.setState({ payments: Object.freeze([]) as never, auditEntries: [], lastReceipt: null });
     useOrderPaymentStore.getState().selectOpenOrder(openOrder());
     expect(useOrderPaymentStore.getState().recordPayment(secondPay)).toBe(true);
-    expect(reconcileLocalPayFromDurable(durable!, { localPaymentId: "pay-2", predecessor: openOrder() })).toEqual({ kind: "winner" });
+    expect(reconcileLocalPayFromDurable(durable!, { localPaymentId: "pay-2", predecessor: openOrder(), sessionToken: useTenantAuthStore.getState().sessionToken })).toEqual({ kind: "winner" });
     expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).toEqual(["pay-1"]);
     expect(useCatalogTableStore.getState().tableById("table-1")?.status).toBe("empty");
     expect(useOrderPaymentStore.getState().recordPayment({ ...secondPay, id: "pay-3", createdAt: 22 })).toBe(false);

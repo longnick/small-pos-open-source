@@ -991,7 +991,7 @@ test("hydrate success + occupied table click restores the bound open order", asy
   await waitFor(() => expect(restore.load).toHaveBeenCalledTimes(1));
   expect(restore.load).toHaveBeenCalledWith(
     { authenticatedTenantId: tenant.id },
-    { tableId: "t1", expectedOrderId: "order-1" },
+    { tableId: "t1", expectedOrderId: "order-1", expectedStaffId: staffRecord.id },
   );
   await waitFor(() => expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-1"));
   expect(persist.occupy).not.toHaveBeenCalled();

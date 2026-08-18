@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 11:55 - Sprint 2 session clear + required token
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Auth token transition clears POS order/payment/audit/receipt. Restore requires expectedStaffId. sessionToken required on reconcile API.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1155-sprint-2-session-clear.md`
+
 ## 2026-08-18 11:35 - Sprint 2 sessionToken + no new-session restore
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`

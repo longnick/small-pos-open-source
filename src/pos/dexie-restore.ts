@@ -181,7 +181,7 @@ export async function loadOpenOrderForTable(
 
 export async function loadRestoredOrderForTable(
   input: DexieRestoreInput,
-  ref: { tableId: string; expectedOrderId: string },
+  ref: { tableId: string; expectedOrderId: string; expectedStaffId: string },
 ): Promise<{ order: Order; audits: AuditEntry[] } | null> {
   try {
     if (
@@ -190,6 +190,7 @@ export async function loadRestoredOrderForTable(
       || !isPrimitiveNonemptyString(input.authenticatedTenantId)
       || !isPrimitiveNonemptyString(ref.tableId)
       || !isPrimitiveNonemptyString(ref.expectedOrderId)
+      || !isPrimitiveNonemptyString(ref.expectedStaffId)
     ) return null;
     const database = new PosDatabase(input.databaseName ?? "small-pos");
     try {
@@ -205,6 +206,7 @@ export async function loadRestoredOrderForTable(
         || order.tenantId !== input.authenticatedTenantId
         || order.id !== ref.expectedOrderId
         || order.tableId !== ref.tableId
+        || order.staffId !== ref.expectedStaffId
       ) return null;
       let openCount = 0;
       for (const raw of snapshot.sameTable) {

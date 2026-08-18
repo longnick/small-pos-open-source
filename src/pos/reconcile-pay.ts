@@ -19,7 +19,7 @@ type LocalPaySnapshot = {
   tenantId: string | null;
   tables: PosTable[];
   table: PosTable | null;
-  sessionToken?: number;
+  sessionToken: number;
 };
 
 export type PayReconcilePlan =
@@ -74,7 +74,7 @@ const cashChange = (tender: number, amount: number): number | null => {
 
 const uniqueIds = (ids: string[]): boolean => new Set(ids).size === ids.length;
 
-const captureLocal = (sessionToken?: number): LocalPaySnapshot => {
+const captureLocal = (sessionToken: number): LocalPaySnapshot => {
   const orders = useOrderPaymentStore.getState();
   const catalog = useCatalogTableStore.getState();
   return freezeDeep({
@@ -99,8 +99,8 @@ const restoreLocal = (local: LocalPaySnapshot): void => {
   useCatalogTableStore.getState().restoreOwnedTables(local.tenantId, structuredClone(local.tables));
 };
 
-const sessionMatches = (expected?: number): boolean =>
-  expected === undefined || useTenantAuthStore.getState().sessionToken === expected;
+const sessionMatches = (expected: number): boolean =>
+  Number.isSafeInteger(expected) && useTenantAuthStore.getState().sessionToken === expected;
 
 const validateDurableOrder = (order: Order, predecessor: Order): boolean => {
   if (order.id !== predecessor.id || order.tenantId !== predecessor.tenantId || order.tableId !== predecessor.tableId || order.staffId !== predecessor.staffId) {
@@ -258,8 +258,9 @@ const isWinnerGraph = (durable: DurablePaySnapshot, predecessor: Order, localTab
 
 export function planPayReconcile(
   durable: DurablePaySnapshot,
-  local: { localPaymentId: string; predecessor: Order; sessionToken?: number },
+  local: { localPaymentId: string; predecessor: Order; sessionToken: number },
 ): PayReconcilePlan {
+  if (!Number.isSafeInteger(local.sessionToken)) return { kind: "rejected" };
   const predecessor = freezeDeep(local.predecessor);
   const snapshot = captureLocal(local.sessionToken);
   const durableOrder = durable.order;
@@ -337,7 +338,7 @@ export function commitPayReconcile(plan: PayReconcilePlan): ReconcilePayResult {
 
 export function reconcileLocalPayFromDurable(
   durable: DurablePaySnapshot,
-  local: { localPaymentId: string; predecessor: Order; sessionToken?: number },
+  local: { localPaymentId: string; predecessor: Order; sessionToken: number },
 ): ReconcilePayResult {
   return commitPayReconcile(planPayReconcile(durable, local));
 }

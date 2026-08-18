@@ -143,7 +143,7 @@ test("restore loads the durable order.sent audit with the sent order", async () 
   }, async (name) => {
     const restored = await loadRestoredOrderForTable(
       { authenticatedTenantId: tenantId, databaseName: name },
-      { tableId: "table-1", expectedOrderId: "order-1" },
+      { tableId: "table-1", expectedOrderId: "order-1", expectedStaffId: "staff-1" },
     );
     expect(restored).toEqual({ order: sentOrder(), audits: [sendAudit()] });
   });
@@ -157,7 +157,21 @@ test("restore loads order and send audit in one transaction and rejects a sent o
   }, async (name) => {
     await expect(loadRestoredOrderForTable(
       { authenticatedTenantId: tenantId, databaseName: name },
-      { tableId: "table-1", expectedOrderId: "order-1" },
+      { tableId: "table-1", expectedOrderId: "order-1", expectedStaffId: "staff-1" },
+    )).resolves.toBeNull();
+  });
+});
+
+test("restore rejects when expectedStaffId does not match the durable order staff", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(sentOrder());
+    await database.auditLog.add(sendAudit());
+  }, async (name) => {
+    await expect(loadRestoredOrderForTable(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", expectedOrderId: "order-1", expectedStaffId: "staff-other" },
     )).resolves.toBeNull();
   });
 });
@@ -171,7 +185,7 @@ test("restore rejects a sent order when a related audit is malformed or send det
   }, async (name) => {
     await expect(loadRestoredOrderForTable(
       { authenticatedTenantId: tenantId, databaseName: name },
-      { tableId: "table-1", expectedOrderId: "order-1" },
+      { tableId: "table-1", expectedOrderId: "order-1", expectedStaffId: "staff-1" },
     )).resolves.toBeNull();
   });
 
@@ -183,7 +197,7 @@ test("restore rejects a sent order when a related audit is malformed or send det
   }, async (name) => {
     await expect(loadRestoredOrderForTable(
       { authenticatedTenantId: tenantId, databaseName: name },
-      { tableId: "table-1", expectedOrderId: "order-1" },
+      { tableId: "table-1", expectedOrderId: "order-1", expectedStaffId: "staff-1" },
     )).resolves.toBeNull();
   });
 });
@@ -207,7 +221,7 @@ test("restore rejects open or sent orders that carry a payment.recorded audit", 
   }, async (name) => {
     await expect(loadRestoredOrderForTable(
       { authenticatedTenantId: tenantId, databaseName: name },
-      { tableId: "table-1", expectedOrderId: "order-1" },
+      { tableId: "table-1", expectedOrderId: "order-1", expectedStaffId: "staff-1" },
     )).resolves.toBeNull();
   });
 });

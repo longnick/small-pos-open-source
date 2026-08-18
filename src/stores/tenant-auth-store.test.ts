@@ -1,6 +1,7 @@
 import { beforeEach, expect, test, vi } from "vitest";
 import type { Staff, Tenant } from "../../packages/pos-core/src/types";
 import { useTenantAuthStore } from "./tenant-auth-store";
+import { useOrderPaymentStore } from "./order-payment-store";
 
 const tenant: Tenant = {
   id: "tenant-1",
@@ -137,6 +138,22 @@ test("session token changes on sign-in, sign-out, and same-staff re-login", asyn
   await expect(useTenantAuthStore.getState().signIn("1234", cashier, async () => true)).resolves.toBe(true);
   expect(useTenantAuthStore.getState().sessionToken).not.toBe(afterSignOut);
   expect(useTenantAuthStore.getState().staff).toEqual(cashier);
+});
+
+test("session token transition clears leftover POS order payment audit and receipt", async () => {
+  useTenantAuthStore.getState().setTenant(tenant);
+  await useTenantAuthStore.getState().signIn("1234", cashier, async () => true);
+  useOrderPaymentStore.setState({
+    currentOrder: { id: "order-old", tenantId: tenant.id, tableId: "t1", staffId: cashier.id, status: "paid", items: [], subtotal: 0, discount: 0, discountType: "amount", total: 0, createdAt: 1, paidAt: 2 } as never,
+    payments: [{ id: "pay-1", tenantId: tenant.id, orderId: "order-old", amount: 0, tender: 0, method: "cash", staffId: cashier.id, createdAt: 2 }] as never,
+    auditEntries: [{ id: "payment:pay-1", tenantId: tenant.id, staffId: cashier.id, action: "payment.recorded", entityType: "order", entityId: "order-old", details: {}, timestamp: 2 }] as never,
+    lastReceipt: { paymentId: "pay-1", orderId: "order-old", tenantId: tenant.id, staffId: cashier.id, method: "cash", paidTotal: 0, change: 0, timestamp: 2 },
+  });
+  useTenantAuthStore.getState().signOut();
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+  expect(useOrderPaymentStore.getState().payments).toEqual([]);
+  expect(useOrderPaymentStore.getState().auditEntries).toEqual([]);
+  expect(useOrderPaymentStore.getState().lastReceipt).toBeNull();
 });
 
 test("can delegates core policy and fails closed without staff", () => {

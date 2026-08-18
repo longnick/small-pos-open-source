@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { computeDiscount, computeSubtotal, computeTotal } from "../../packages/pos-core/src/order-calc";
 import type { AuditEntry, Order, OrderItem, Payment, PaymentReceipt } from "../../packages/pos-core/src/types";
 import { isAuditRecord } from "../../packages/pos-core/src/product-records";
+import { registerSessionClear } from "./session-hooks";
 import { useTenantAuthStore } from "./tenant-auth-store";
 
 type DiscountType = Order["discountType"];
@@ -14,6 +15,7 @@ type OrderPaymentState = {
   createOpenOrder: (order: unknown) => boolean;
   selectOpenOrder: (order: unknown) => boolean;
   clearCurrentOrder: () => void;
+  clearSessionState: () => void;
   addItem: (item: unknown) => boolean;
   updateItemQuantity: (id: unknown, quantity: unknown) => boolean;
   removeItem: (id: unknown) => boolean;
@@ -119,6 +121,12 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
     } catch { return false; }
   },
   clearCurrentOrder: () => set({ currentOrder: null }),
+  clearSessionState: () => set({
+    currentOrder: null,
+    payments: Object.freeze([]) as unknown as Payment[],
+    auditEntries: Object.freeze([]) as unknown as AuditEntry[],
+    lastReceipt: null,
+  }),
   addItem: (item) => {
     try {
       const order = get().currentOrder;
@@ -340,3 +348,7 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
     } catch { return false; }
   },
 }));
+
+registerSessionClear(() => {
+  useOrderPaymentStore.getState().clearSessionState();
+});

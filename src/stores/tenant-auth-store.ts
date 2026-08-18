@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { canAccess, verifyPin } from "../../packages/pos-core/src/auth";
 import type { PinHashVerifier } from "../../packages/pos-core/src/auth";
 import type { Staff, Tenant } from "../../packages/pos-core/src/types";
+import { runSessionClear } from "./session-hooks";
 
 export type { PinHashVerifier } from "../../packages/pos-core/src/auth";
 
@@ -27,6 +28,7 @@ export const useTenantAuthStore = create<TenantAuthState>((set, get) => ({
     if (changed) {
       latestSignIn += 1;
       sessionGeneration += 1;
+      runSessionClear();
     }
     set(changed ? { tenant, staff: null, sessionToken: sessionGeneration } : { tenant });
   },
@@ -38,12 +40,14 @@ export const useTenantAuthStore = create<TenantAuthState>((set, get) => ({
     if (!(await verifyPin(inputPin, candidate.pinHash, verifier))) return false;
     if (attempt !== latestSignIn || generation !== sessionGeneration || get().tenant?.id !== tenantId) return false;
     sessionGeneration += 1;
+    runSessionClear();
     set({ staff: candidate, sessionToken: sessionGeneration });
     return true;
   },
   signOut: () => {
     latestSignIn += 1;
     sessionGeneration += 1;
+    runSessionClear();
     set({ staff: null, sessionToken: sessionGeneration });
   },
   can: (action) => {

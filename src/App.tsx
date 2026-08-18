@@ -115,16 +115,18 @@ function PosShell() {
     if (table.status === "occupied" || table.status === "waiting_payment") {
       if (!isDexiePersistSession() || !tenant) return;
       const expectedOrderId = table.currentOrderId;
+      const staffId = staff?.id;
       if (typeof expectedOrderId !== "string" || expectedOrderId.trim().length === 0) return;
+      if (typeof staffId !== "string" || staffId.trim().length === 0) return;
+      if (table.staffId !== staffId) return;
       const tenantId = tenant.id;
       const tableId = table.id;
       const startedToken = useTenantAuthStore.getState().sessionToken;
       const persistOn = isDexiePersistSession();
-      const staffId = staff?.id;
       const expectedTable = { ...table };
       void loadRestoredOrderForTable(
         { authenticatedTenantId: tenantId },
-        { tableId, expectedOrderId },
+        { tableId, expectedOrderId, expectedStaffId: staffId },
       ).then((restored) => {
         if (!restored) return;
         if (useTenantAuthStore.getState().sessionToken !== startedToken) return;
@@ -137,10 +139,12 @@ function PosShell() {
           || live.id !== expectedTable.id
           || live.tenantId !== expectedTable.tenantId
           || live.staffId !== expectedTable.staffId
+          || live.staffId !== staffId
           || live.status !== expectedTable.status
           || live.currentOrderId !== expectedOrderId
           || live.number !== expectedTable.number
           || live.openedAt !== expectedTable.openedAt) return;
+        if (restored.order.staffId !== staffId || restored.order.staffId !== live.staffId) return;
         if (useOrderPaymentStore.getState().applyRestoredOpenOrder(restored.order, restored.audits)) {
           setSelectedTableId(tableId);
         }

@@ -6,6 +6,7 @@ import { useTenantAuthStore } from "../stores/tenant-auth-store";
 import { planPayReconcile, commitPayReconcile, reconcileLocalPayFromDurable } from "./reconcile-pay";
 
 const tenantId = "tenant-1";
+const token = () => useTenantAuthStore.getState().sessionToken;
 const staff = { id: "staff-1", tenantId, name: "Cashier", role: "cashier" as const, pinHash: "v1$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", createdAt: 0 };
 
 const occupied = (): PosTable => ({
@@ -48,7 +49,7 @@ test("reconcile restores predecessor only when durable is occupied, exact predec
     order: openOrder(),
     payments: [],
     audits: [],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "predecessor" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "predecessor" });
 
   expect(useOrderPaymentStore.getState().currentOrder).toMatchObject({ status: "open", id: "order-1" });
   expect(useOrderPaymentStore.getState().payments).toEqual([]);
@@ -64,7 +65,7 @@ test("reconcile adopts durable winner paid + empty table and blocks a second loc
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "winner" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "winner" });
 
   expect(useOrderPaymentStore.getState().currentOrder).toMatchObject({ status: "paid", paidAt: 20 });
   expect(useOrderPaymentStore.getState().payments).toEqual([payment("pay-1")]);
@@ -96,7 +97,7 @@ test("plan rejects and commit does not mutate when durable order totals or line 
     order: badTotal,
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() });
   expect(plan).toEqual({ kind: "rejected" });
   expect(commitPayReconcile(plan)).toEqual({ kind: "rejected" });
   expect(useCatalogTableStore.getState().tableById("table-1")).toEqual(beforeTable);
@@ -109,18 +110,18 @@ test("plan rejects duplicate line IDs, foreign line orderId, and paidAt before c
   const dup = { ...paidOrder(), items: [line(), { ...line(), catalogItemId: "item-2" }] };
   expect(planPayReconcile({
     table: empty(), order: dup, payments: [payment("pay-1")], audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
 
   const foreign = { ...paidOrder(), items: [{ ...line(), orderId: "order-other" }] };
   expect(planPayReconcile({
     table: empty(), order: foreign, payments: [payment("pay-1")], audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
 
   const early = { ...paidOrder(), paidAt: 0 };
   expect(planPayReconcile({
     table: empty(), order: early, payments: [{ ...payment("pay-1"), createdAt: 0 }],
     audits: [{ ...payAudit("pay-1"), timestamp: 0 }],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
 });
 
 test("commit rejects when local payment or current order changed after plan", () => {
@@ -131,7 +132,7 @@ test("commit rejects when local payment or current order changed after plan", ()
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() });
   expect(plan.kind).toBe("winner");
   useOrderPaymentStore.getState().clearCurrentOrder();
   useOrderPaymentStore.getState().selectOpenOrder({ ...openOrder(), id: "order-newer" });
@@ -157,7 +158,7 @@ test("reconcile does not report winner when local table is rebound to another or
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
 
   expect(useCatalogTableStore.getState().tableById("table-1")).toEqual(before);
 });
@@ -172,14 +173,14 @@ test("reconcile does not report winner when winner graph is incomplete or extra 
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
 
   expect(reconcileLocalPayFromDurable({
     table: empty(),
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1"), { ...payAudit("pay-extra"), id: "payment:pay-extra", details: { ...payAudit("pay-extra").details, paymentId: "pay-extra" } }],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
 
   expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).toEqual(beforePay);
 });
@@ -216,7 +217,7 @@ test("commit restores exact precommit snapshots when table apply fails after ord
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() });
   expect(plan.kind).toBe("winner");
   const original = useCatalogTableStore.getState().applyDurableTable;
   useCatalogTableStore.setState({ applyDurableTable: () => false });
@@ -234,7 +235,7 @@ test("commit restores exact snapshots if a subscriber mutates the table after or
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() });
   const unsub = useOrderPaymentStore.subscribe((state, prev) => {
     if (state.payments.some((row) => row.id === "pay-1") && !prev.payments.some((row) => row.id === "pay-1")) {
       useCatalogTableStore.setState({
@@ -255,13 +256,13 @@ test("plan rejects forged or missing send/payment audit graphs", () => {
     order: openOrder(),
     payments: [],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
   expect(planPayReconcile({
     table: occupied(),
     order: openOrder(),
     payments: [],
     audits: [sendAudit()],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
 
   useOrderPaymentStore.getState().clearCurrentOrder();
   useOrderPaymentStore.setState({ payments: Object.freeze([]) as never, auditEntries: [], lastReceipt: null });
@@ -272,19 +273,19 @@ test("plan rejects forged or missing send/payment audit graphs", () => {
     order: sentOrder(),
     payments: [],
     audits: [],
-  }, { localPaymentId: "pay-loser", predecessor: sentOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: sentOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
   expect(planPayReconcile({
     table: empty(),
     order: paidAfterSend(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: sentOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: sentOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
   expect(planPayReconcile({
     table: empty(),
     order: paidAfterSend(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1"), sendAudit()],
-  }, { localPaymentId: "pay-loser", predecessor: sentOrder() }).kind).toBe("winner");
+  }, { localPaymentId: "pay-loser", predecessor: sentOrder(), sessionToken: token() }).kind).toBe("winner");
 });
 
 test("plan rejects malformed durable table graphs", () => {
@@ -295,19 +296,19 @@ test("plan rejects malformed durable table graphs", () => {
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
   expect(planPayReconcile({
     table: { ...empty(), currentOrderId: "order-1" },
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
   expect(planPayReconcile({
     table: { ...empty(), staffId: "staff-other" },
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
 });
 
 test("plan durable graph is frozen and mutating it cannot change store after commit", () => {
@@ -318,7 +319,7 @@ test("plan durable graph is frozen and mutating it cannot change store after com
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() });
   expect(plan.kind).toBe("winner");
   if (plan.kind !== "winner") return;
   expect(Object.isFrozen(plan.table)).toBe(true);
@@ -343,7 +344,7 @@ test("commit rejects when caller mutates plan order between plan and commit", ()
     order: paidOrder(),
     payments: [payment("pay-1")],
     audits: [payAudit("pay-1")],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() });
   expect(plan.kind).toBe("winner");
   if (plan.kind !== "winner") return;
   const mutated = { ...plan, order: { ...plan.order, total: 99_000 } };
@@ -360,13 +361,13 @@ test("plan rejects occupied durable table with mismatched number or openedAt", (
     order: openOrder(),
     payments: [],
     audits: [],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
   expect(planPayReconcile({
     table: { ...occupied(), openedAt: 99 },
     order: openOrder(),
     payments: [],
     audits: [],
-  }, { localPaymentId: "pay-loser", predecessor: openOrder() })).toEqual({ kind: "rejected" });
+  }, { localPaymentId: "pay-loser", predecessor: openOrder(), sessionToken: token() })).toEqual({ kind: "rejected" });
 });
 
 test("commit aborts without touching a new session if subscriber signs out during first apply", async () => {
@@ -387,11 +388,25 @@ test("commit aborts without touching a new session if subscriber signs out durin
   expect(commitPayReconcile(plan)).toEqual({ kind: "rejected" });
   unsub();
   expect(useTenantAuthStore.getState().staff).toBeNull();
-  expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).toEqual(["pay-1"]);
-  expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).not.toEqual(["pay-loser"]);
-  expect(useCatalogTableStore.getState().tables[0]?.status).toBe("occupied");
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+  expect(useOrderPaymentStore.getState().payments).toEqual([]);
+  expect(useOrderPaymentStore.getState().auditEntries).toEqual([]);
+  expect(useOrderPaymentStore.getState().lastReceipt).toBeNull();
   useTenantAuthStore.setState({ tenant: { id: tenantId, name: "Quán", address: "", phone: "", currency: "VND", defaultTax: 0, defaultSurcharge: 0, tableCount: 1, createdAt: 0 } });
   await useTenantAuthStore.getState().signIn("1234", staff, async () => true);
-  expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).not.toEqual(["pay-loser"]);
-  expect(useCatalogTableStore.getState().tenantId).toBe(tenantId);
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+  expect(useOrderPaymentStore.getState().payments).toEqual([]);
+  expect(useOrderPaymentStore.getState().auditEntries).toEqual([]);
+  expect(useOrderPaymentStore.getState().lastReceipt).toBeNull();
+});
+
+test("plan rejects when sessionToken is omitted", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(openOrder());
+  expect(useOrderPaymentStore.getState().recordPayment(payment("pay-loser"))).toBe(true);
+  expect(planPayReconcile({
+    table: empty(),
+    order: paidOrder(),
+    payments: [payment("pay-1")],
+    audits: [payAudit("pay-1")],
+  }, { localPaymentId: "pay-loser", predecessor: openOrder() } as never)).toEqual({ kind: "rejected" });
 });
