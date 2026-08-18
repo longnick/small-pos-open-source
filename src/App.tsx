@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { bootstrapDemoPos } from "@/pos/demo-pos-bootstrap";
+import type { DemoPosBootstrap } from "@/pos/demo-pos-bootstrap";
 import { loadProductBootstrap } from "@/pos/product-bootstrap";
 import { completeFirstRun } from "@/pos/product-setup";
 import { hydrateFromDexie } from "@/pos/dexie-hydrate";
@@ -58,8 +59,10 @@ type ViewId = (typeof VIEWS)[number]["id"];
 // --- Main Page (existing Lovable shell — do not modify) ---
 
 function PosShell() {
+  const { tenant, staff, sessionToken } = useTenantAuthStore();
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [selectionToken, setSelectionToken] = useState<number | null>(null);
+  const mountedSessionToken = useRef(sessionToken);
   const tables = useCatalogTableStore((state) => state.tables);
   const catalogGroups = useCatalogTableStore((state) => state.catalogGroups);
   const catalogItems = useCatalogTableStore((state) => state.catalogItems);
@@ -70,9 +73,14 @@ function PosShell() {
   const [view, setView] = useState<ViewId>("pos");
   const orderItemCount = useOrderPaymentStore((state) => state.currentOrder?.items.length ?? 0);
   const currentOrder = useOrderPaymentStore((state) => state.currentOrder);
-  const { tenant, staff, sessionToken } = useTenantAuthStore();
 
   useEffect(() => {
+    if (mountedSessionToken.current === null) {
+      mountedSessionToken.current = sessionToken;
+      return;
+    }
+    if (mountedSessionToken.current === sessionToken) return;
+    mountedSessionToken.current = sessionToken;
     setSelectedTableId(null);
     setSelectionToken(null);
   }, [sessionToken]);
@@ -459,6 +467,7 @@ function App() {
   const [authenticatedStaff, setAuthenticatedStaff] = useState<Staff | null>(null);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const verifierRef = useRef<PinHashVerifier | null>(null);
+  const demoPosRef = useRef<DemoPosBootstrap | null>(null);
   const bootGenerationRef = useRef(0);
 
   const { tenant, staff: signedInStaff, setTenant, signIn } = useTenantAuthStore();
@@ -521,6 +530,7 @@ function App() {
         setTenant(product.tenant);
         setBootTenant(product.tenant);
         setStaffList(product.staff);
+        demoPosRef.current = pos;
         if (pos) {
           useCatalogTableStore.getState().replaceTenantData(product.tenant.id, pos);
           if (pos.currentOrder) useOrderPaymentStore.getState().selectOpenOrder(pos.currentOrder);
@@ -575,6 +585,11 @@ function App() {
     if (!candidate || candidate.tenantId !== tenant?.id) return false;
     const ok = await signIn(pin, candidate, verifier);
     if (ok) {
+      const demo = demoPosRef.current;
+      if (demo && !isDexiePersistSession() && demo.currentOrder?.staffId === candidate.id) {
+        useCatalogTableStore.getState().replaceTenantData(candidate.tenantId, demo);
+        useOrderPaymentStore.getState().selectOpenOrder(demo.currentOrder);
+      }
       setAuthenticatedStaff(candidate);
       // Snapshot the revocation counter at the moment of successful sign-in.
       // isAuthenticated checks this against revokedCountRef; any subsequent

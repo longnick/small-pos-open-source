@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 13:00 - Fix canonical payment E2E fixture session regression
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Auth clears POS state correctly; non-persistent staged demo fixture is reapplied after valid fixture-staff sign-in. Initial selection effect no longer clears post-click fixture selection.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1300-payment-e2e-fixture-session.md`
+
 ## 2026-08-18 12:40 - Sprint 2 fail-closed target audit tenant
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
