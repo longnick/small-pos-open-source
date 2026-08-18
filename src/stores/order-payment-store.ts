@@ -22,6 +22,8 @@ type OrderPaymentState = {
   revertSendToKitchen: (expectedSentAt: unknown) => boolean;
   revertUnpersistedPayment: (input: unknown) => boolean;
   applyDurablePaySnapshot: (input: unknown) => boolean;
+  applyRestoredOpenOrder: (order: unknown, audits: unknown) => boolean;
+  restoreOwnedPayState: (input: unknown) => boolean;
   recordPayment: (payment: unknown) => boolean;
 };
 
@@ -258,6 +260,46 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
       payments: freezePayments(payments),
         auditEntries: freezeAuditEntries(audits.filter((row): row is AuditEntry => Boolean(row))),
       lastReceipt: null,
+    });
+    return true;
+  },
+  applyRestoredOpenOrder: (order, audits) => {
+    const open = materializeOpenOrder(order);
+    if (!open) return false;
+    if (!Array.isArray(audits)) return false;
+    const entries = audits.map((row) => {
+      if (!isAuditRecord(row)) return null;
+      return {
+        id: row.id as string,
+        tenantId: row.tenantId as string,
+        staffId: row.staffId as string,
+        action: row.action as string,
+        entityType: row.entityType as string,
+        entityId: row.entityId as string,
+        details: { ...(row.details as Record<string, unknown>) },
+        timestamp: row.timestamp as number,
+      } as AuditEntry;
+    });
+    if (entries.some((row) => !row)) return false;
+    set({
+      currentOrder: freezeOrder(open),
+      payments: freezePayments([]),
+      auditEntries: freezeAuditEntries(entries.filter((row): row is AuditEntry => Boolean(row))),
+      lastReceipt: null,
+    });
+    return true;
+  },
+  restoreOwnedPayState: (input) => {
+    const raw = materializeRecord(input);
+    if (!raw || !Array.isArray(raw.payments) || !Array.isArray(raw.audits)) return false;
+    const order = raw.currentOrder === null || raw.currentOrder === undefined
+      ? null
+      : freezeOrder(structuredClone(raw.currentOrder) as Order);
+    set({
+      currentOrder: order,
+      payments: freezePayments(structuredClone(raw.payments) as Payment[]),
+      auditEntries: freezeAuditEntries(structuredClone(raw.audits) as AuditEntry[]),
+      lastReceipt: raw.lastReceipt === null || raw.lastReceipt === undefined ? null : structuredClone(raw.lastReceipt) as PaymentReceipt,
     });
     return true;
   },

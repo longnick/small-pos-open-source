@@ -216,8 +216,12 @@ export async function loadRestoredOrderForTable(
       const audits: AuditEntry[] = [];
       for (const raw of snapshot.audits) {
         const record = materializeRecord(raw);
-        if (!record || !isAuditRecord(record)) continue;
-        if (record.entityType !== "order" || record.entityId !== order.id) continue;
+        const related = record && (
+          record.entityId === order.id
+          || (typeof record.id === "string" && (record.id === `send:${order.id}` || String(record.id).startsWith("payment:")))
+        );
+        if (!related) continue;
+        if (!record || !isAuditRecord(record) || record.entityType !== "order" || record.entityId !== order.id) return null;
         audits.push({
           id: record.id as string,
           tenantId: record.tenantId as string,
@@ -233,7 +237,13 @@ export async function loadRestoredOrderForTable(
       if (order.status === "sent") {
         if (sendAudits.length !== 1) return null;
         const send = sendAudits[0];
-        if (send.id !== `send:${order.id}` || send.timestamp !== order.sentAt || send.staffId !== order.staffId) return null;
+        if (
+          send.id !== `send:${order.id}`
+          || send.timestamp !== order.sentAt
+          || send.staffId !== order.staffId
+          || send.tenantId !== order.tenantId
+          || JSON.stringify(send.details) !== JSON.stringify({ sentAt: order.sentAt })
+        ) return null;
       } else if (sendAudits.length !== 0) {
         return null;
       }

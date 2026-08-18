@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 11:15 - Sprint 2 freeze ownership + restore CAS
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Frozen cloned plan graph. Fingerprint TOCTOU reject. Occupied table metadata exact. Restore fail-closed + one Zustand set. Session abort rolls back old snapshot only.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1115-sprint-2-pay-freeze.md`
+
 ## 2026-08-18 10:55 - Sprint 2 exact rollback + one-txn restore
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`

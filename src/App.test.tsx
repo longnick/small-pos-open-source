@@ -1016,6 +1016,27 @@ test("occupied restore after logout/relogin does not mutate the new session", as
   expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
 });
 
+test("occupied restore after table rebind during await does not apply the old order", async () => {
+  let resolveRestore!: (value: { order: typeof restoredOrder; audits: [] }) => void;
+  restore.load.mockImplementation(() => new Promise((resolve) => { resolveRestore = resolve; }));
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
+  );
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  await waitFor(() => expect(restore.load).toHaveBeenCalledTimes(1));
+  act(() => {
+    useCatalogTableStore.setState({
+      tables: [{ ...occupiedHydrate.tables[0], currentOrderId: "order-other" }],
+    });
+  });
+  await act(async () => { resolveRestore({ order: restoredOrder, audits: [] }); });
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+});
+
 test("occupied click with missing currentOrderId does not call restore", async () => {
   bootstrap.create.mockImplementation(() =>
     makeReadyBootstrap({

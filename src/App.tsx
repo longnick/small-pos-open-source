@@ -121,6 +121,7 @@ function PosShell() {
       const startedToken = useTenantAuthStore.getState().sessionToken;
       const persistOn = isDexiePersistSession();
       const staffId = staff?.id;
+      const expectedTable = { ...table };
       void loadRestoredOrderForTable(
         { authenticatedTenantId: tenantId },
         { tableId, expectedOrderId },
@@ -131,12 +132,9 @@ function PosShell() {
         if (useTenantAuthStore.getState().tenant?.id !== tenantId) return;
         if (useTenantAuthStore.getState().staff?.id !== staffId) return;
         if (useOrderPaymentStore.getState().currentOrder !== null) return;
-        if (useOrderPaymentStore.getState().selectOpenOrder(restored.order)) {
-          if (restored.audits.length > 0) {
-            useOrderPaymentStore.setState({
-              auditEntries: Object.freeze(restored.audits.map((entry) => Object.freeze({ ...entry, details: Object.freeze({ ...entry.details }) }))) as typeof restored.audits,
-            });
-          }
+        const live = useCatalogTableStore.getState().tableById(tableId);
+        if (!live || live.status !== expectedTable.status || live.currentOrderId !== expectedOrderId || live.number !== expectedTable.number || live.openedAt !== expectedTable.openedAt) return;
+        if (useOrderPaymentStore.getState().applyRestoredOpenOrder(restored.order, restored.audits)) {
           setSelectedTableId(tableId);
         }
       });

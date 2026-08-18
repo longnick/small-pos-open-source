@@ -162,6 +162,32 @@ test("restore loads order and send audit in one transaction and rejects a sent o
   });
 });
 
+test("restore rejects a sent order when a related audit is malformed or send details are forged", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(sentOrder());
+    await database.auditLog.add({ id: "send:order-1", tenantId, staffId: "staff-1" } as never);
+  }, async (name) => {
+    await expect(loadRestoredOrderForTable(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", expectedOrderId: "order-1" },
+    )).resolves.toBeNull();
+  });
+
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(sentOrder());
+    await database.auditLog.add({ ...sendAudit(), details: { sentAt: 99 } });
+  }, async (name) => {
+    await expect(loadRestoredOrderForTable(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", expectedOrderId: "order-1" },
+    )).resolves.toBeNull();
+  });
+});
+
 test("persistAfterSend is idempotent for the same sent snapshot and audit id", async () => {
   await withDb(async (database) => {
     await database.tenants.add(tenant());
