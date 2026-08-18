@@ -998,6 +998,24 @@ test("hydrate success + occupied table click restores the bound open order", asy
   expect(screen.getAllByRole("button", { name: /Bàn 1/i })[0].getAttribute("aria-pressed")).toBe("true");
 });
 
+test("occupied restore after logout/relogin does not mutate the new session", async () => {
+  let resolveRestore!: (value: { order: typeof restoredOrder; audits: [] }) => void;
+  restore.load.mockImplementation(() => new Promise((resolve) => { resolveRestore = resolve; }));
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
+  );
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  await waitFor(() => expect(restore.load).toHaveBeenCalledTimes(1));
+  useTenantAuthStore.getState().signOut();
+  await useTenantAuthStore.getState().signIn("7890", staffRecord, acceptAllVerifier);
+  await act(async () => { resolveRestore({ order: restoredOrder, audits: [] }); });
+  expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
+});
+
 test("occupied click with missing currentOrderId does not call restore", async () => {
   bootstrap.create.mockImplementation(() =>
     makeReadyBootstrap({

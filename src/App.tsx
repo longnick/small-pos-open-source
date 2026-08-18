@@ -118,11 +118,18 @@ function PosShell() {
       if (typeof expectedOrderId !== "string" || expectedOrderId.trim().length === 0) return;
       const tenantId = tenant.id;
       const tableId = table.id;
+      const startedToken = useTenantAuthStore.getState().sessionToken;
+      const persistOn = isDexiePersistSession();
+      const staffId = staff?.id;
       void loadRestoredOrderForTable(
         { authenticatedTenantId: tenantId },
         { tableId, expectedOrderId },
       ).then((restored) => {
         if (!restored) return;
+        if (useTenantAuthStore.getState().sessionToken !== startedToken) return;
+        if (!isDexiePersistSession() || persistOn !== true) return;
+        if (useTenantAuthStore.getState().tenant?.id !== tenantId) return;
+        if (useTenantAuthStore.getState().staff?.id !== staffId) return;
         if (useOrderPaymentStore.getState().currentOrder !== null) return;
         if (useOrderPaymentStore.getState().selectOpenOrder(restored.order)) {
           if (restored.audits.length > 0) {

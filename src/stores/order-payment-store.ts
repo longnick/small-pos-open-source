@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { computeDiscount, computeSubtotal, computeTotal } from "../../packages/pos-core/src/order-calc";
 import type { AuditEntry, Order, OrderItem, Payment, PaymentReceipt } from "../../packages/pos-core/src/types";
+import { isAuditRecord } from "../../packages/pos-core/src/product-records";
 import { useTenantAuthStore } from "./tenant-auth-store";
 
 type DiscountType = Order["discountType"];
@@ -211,9 +212,21 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
       : [];
     if (Array.isArray(raw.payments) && payments.length !== raw.payments.length) return false;
     const audits = Array.isArray(raw.audits)
-      ? (raw.audits as unknown[]).map((row) => materializeRecord(row)).filter((row): row is Record<string, unknown> => Boolean(row))
+      ? raw.audits.map((row) => {
+        if (!isAuditRecord(row)) return null;
+        return {
+          id: row.id as string,
+          tenantId: row.tenantId as string,
+          staffId: row.staffId as string,
+          action: row.action as string,
+          entityType: row.entityType as string,
+          entityId: row.entityId as string,
+          details: { ...(row.details as Record<string, unknown>) },
+          timestamp: row.timestamp as number,
+        } as AuditEntry;
+      })
       : [];
-    if (Array.isArray(raw.audits) && audits.length !== raw.audits.length) return false;
+    if (Array.isArray(raw.audits) && audits.some((row) => !row)) return false;
     if (orderRecord.status === "paid") {
       if (!isSafeInteger(orderRecord.paidAt) || payments.length !== 1 || payments[0].orderId !== orderRecord.id) return false;
       set({
@@ -233,7 +246,7 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
           ...(orderRecord.sentAt !== undefined ? { sentAt: orderRecord.sentAt as number } : {}),
         }),
         payments: freezePayments(payments),
-        auditEntries: freezeAuditEntries(audits as unknown as AuditEntry[]),
+        auditEntries: freezeAuditEntries(audits.filter((row): row is AuditEntry => Boolean(row))),
         lastReceipt: null,
       });
       return true;
@@ -243,7 +256,7 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
     set({
       currentOrder: freezeOrder(open),
       payments: freezePayments(payments),
-      auditEntries: freezeAuditEntries(audits as unknown as AuditEntry[]),
+        auditEntries: freezeAuditEntries(audits.filter((row): row is AuditEntry => Boolean(row))),
       lastReceipt: null,
     });
     return true;

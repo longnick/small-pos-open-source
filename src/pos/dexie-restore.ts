@@ -183,15 +183,38 @@ export async function loadRestoredOrderForTable(
   input: DexieRestoreInput,
   ref: { tableId: string; expectedOrderId: string },
 ): Promise<{ order: Order; audits: AuditEntry[] } | null> {
-  const order = await loadOpenOrderForTable(input, ref);
-  if (!order) return null;
   try {
+    if (
+      !input
+      || !ref
+      || !isPrimitiveNonemptyString(input.authenticatedTenantId)
+      || !isPrimitiveNonemptyString(ref.tableId)
+      || !isPrimitiveNonemptyString(ref.expectedOrderId)
+    ) return null;
     const database = new PosDatabase(input.databaseName ?? "small-pos");
     try {
       await database.open();
-      const rows = await database.auditLog.where("tenantId").equals(input.authenticatedTenantId).toArray();
+      const snapshot = await database.transaction("r", ["orders", "auditLog"], async () => ({
+        order: await database.orders.get(ref.expectedOrderId),
+        sameTable: await database.orders.where("tableId").equals(ref.tableId).toArray(),
+        audits: await database.auditLog.where("tenantId").equals(input.authenticatedTenantId).toArray(),
+      }));
+      const order = materializeOpenOrder(snapshot.order);
+      if (
+        !order
+        || order.tenantId !== input.authenticatedTenantId
+        || order.id !== ref.expectedOrderId
+        || order.tableId !== ref.tableId
+      ) return null;
+      let openCount = 0;
+      for (const raw of snapshot.sameTable) {
+        const record = materializeRecord(raw);
+        if (!record) return null;
+        if (record.status === "open" || record.status === "sent") openCount += 1;
+      }
+      if (openCount !== 1) return null;
       const audits: AuditEntry[] = [];
-      for (const raw of rows) {
+      for (const raw of snapshot.audits) {
         const record = materializeRecord(raw);
         if (!record || !isAuditRecord(record)) continue;
         if (record.entityType !== "order" || record.entityId !== order.id) continue;
@@ -206,12 +229,20 @@ export async function loadRestoredOrderForTable(
           timestamp: record.timestamp as number,
         });
       }
+      const sendAudits = audits.filter((entry) => entry.action === "order.sent");
+      if (order.status === "sent") {
+        if (sendAudits.length !== 1) return null;
+        const send = sendAudits[0];
+        if (send.id !== `send:${order.id}` || send.timestamp !== order.sentAt || send.staffId !== order.staffId) return null;
+      } else if (sendAudits.length !== 0) {
+        return null;
+      }
       audits.sort((left, right) => left.timestamp - right.timestamp || left.id.localeCompare(right.id));
       return { order, audits };
     } finally {
       database.close();
     }
   } catch {
-    return { order, audits: [] };
+    return null;
   }
 }

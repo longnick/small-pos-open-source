@@ -149,6 +149,19 @@ test("restore loads the durable order.sent audit with the sent order", async () 
   });
 });
 
+test("restore loads order and send audit in one transaction and rejects a sent order without canonical send audit", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(sentOrder());
+  }, async (name) => {
+    await expect(loadRestoredOrderForTable(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", expectedOrderId: "order-1" },
+    )).resolves.toBeNull();
+  });
+});
+
 test("persistAfterSend is idempotent for the same sent snapshot and audit id", async () => {
   await withDb(async (database) => {
     await database.tenants.add(tenant());

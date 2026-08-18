@@ -1,4 +1,5 @@
 import { computeDiscount, computeSubtotal, computeTotal } from "../../packages/pos-core/src/order-calc";
+import { isAuditRecord } from "../../packages/pos-core/src/product-records";
 import type { AuditEntry, Order, Payment, PosTable } from "../../packages/pos-core/src/types";
 import { useCatalogTableStore } from "../stores/catalog-table-store";
 import { useOrderPaymentStore } from "../stores/order-payment-store";
@@ -9,6 +10,17 @@ export type ReconcilePayResult =
   | { kind: "winner" }
   | { kind: "rejected" };
 
+type LocalPaySnapshot = {
+  currentOrder: Order | null;
+  payments: Payment[];
+  audits: AuditEntry[];
+  lastReceipt: unknown;
+  tenantId: string | null;
+  tables: PosTable[];
+  table: PosTable | null;
+  sessionToken?: number;
+};
+
 export type PayReconcilePlan =
   | { kind: "rejected" }
   | {
@@ -18,6 +30,7 @@ export type PayReconcilePlan =
     audits: AuditEntry[];
     localPaymentId: string;
     predecessor: Order;
+    local: LocalPaySnapshot;
   }
   | {
     kind: "winner";
@@ -27,6 +40,7 @@ export type PayReconcilePlan =
     audits: AuditEntry[];
     localPaymentId: string;
     predecessor: Order;
+    local: LocalPaySnapshot;
   };
 
 const sameJson = (left: unknown, right: unknown): boolean => {
@@ -43,6 +57,34 @@ const cashChange = (tender: number, amount: number): number | null => {
 };
 
 const uniqueIds = (ids: string[]): boolean => new Set(ids).size === ids.length;
+
+const captureLocal = (sessionToken?: number): LocalPaySnapshot => {
+  const orders = useOrderPaymentStore.getState();
+  const catalog = useCatalogTableStore.getState();
+  return {
+    currentOrder: orders.currentOrder ? structuredClone(orders.currentOrder) : null,
+    payments: structuredClone(orders.payments),
+    audits: structuredClone(orders.auditEntries),
+    lastReceipt: structuredClone(orders.lastReceipt),
+    tenantId: catalog.tenantId,
+    tables: structuredClone(catalog.tables),
+    table: catalog.tables.find((row) => row.id === orders.currentOrder?.tableId) ?? null,
+    sessionToken,
+  };
+};
+
+const restoreLocal = (local: LocalPaySnapshot): void => {
+  useOrderPaymentStore.setState({
+    currentOrder: local.currentOrder,
+    payments: local.payments,
+    auditEntries: local.audits,
+    lastReceipt: local.lastReceipt as never,
+  });
+  useCatalogTableStore.setState({
+    tenantId: local.tenantId,
+    tables: local.tables,
+  });
+};
 
 const validateDurableOrder = (order: Order, predecessor: Order): boolean => {
   if (order.id !== predecessor.id || order.tenantId !== predecessor.tenantId || order.tableId !== predecessor.tableId || order.staffId !== predecessor.staffId) {
@@ -71,6 +113,69 @@ const validateDurableOrder = (order: Order, predecessor: Order): boolean => {
   return sameJson(order, predecessor);
 };
 
+const validateDurableTable = (table: PosTable, order: Order, localTable: PosTable | null): boolean => {
+  if (!Number.isSafeInteger(table.number) || table.number < 1 || table.number > 10) return false;
+  if (!Number.isSafeInteger(table.openedAt)) return false;
+  if (table.tenantId !== order.tenantId || table.id !== order.tableId) return false;
+  if (table.status === "empty") {
+    if (table.currentOrderId !== undefined) return false;
+    if (localTable && (table.number !== localTable.number || table.openedAt !== localTable.openedAt)) return false;
+    return table.staffId === order.staffId;
+  }
+  if (table.status === "occupied") {
+    return table.currentOrderId === order.id && table.staffId === order.staffId;
+  }
+  return false;
+};
+
+const isCanonicalSendAudit = (audit: AuditEntry, order: Order): boolean =>
+  audit.id === `send:${order.id}`
+  && audit.action === "order.sent"
+  && audit.entityType === "order"
+  && audit.entityId === order.id
+  && audit.tenantId === order.tenantId
+  && audit.staffId === order.staffId
+  && audit.timestamp === order.sentAt
+  && sameJson(audit.details, { sentAt: order.sentAt });
+
+const isCanonicalPaymentAudit = (audit: AuditEntry, order: Order, payment: Payment, change: number): boolean =>
+  audit.id === `payment:${payment.id}`
+  && audit.action === "payment.recorded"
+  && audit.entityType === "order"
+  && audit.entityId === order.id
+  && audit.tenantId === order.tenantId
+  && audit.staffId === payment.staffId
+  && audit.timestamp === payment.createdAt
+  && sameJson(audit.details, {
+    paymentId: payment.id,
+    method: payment.method,
+    paidTotal: order.total,
+    tender: payment.tender,
+    change,
+  });
+
+const validateAuditGraph = (durable: DurablePaySnapshot, predecessor: Order, payment: Payment | null): boolean => {
+  if (!durable.audits.every((entry) => isAuditRecord(entry))) return false;
+  const paymentAudits = durable.audits.filter((entry) => entry.action === "payment.recorded");
+  const sendAudits = durable.audits.filter((entry) => entry.action === "order.sent");
+  if (payment === null) {
+    if (paymentAudits.length !== 0) return false;
+    if (predecessor.status === "open") return sendAudits.length === 0;
+    if (predecessor.status === "sent") {
+      return sendAudits.length === 1 && isCanonicalSendAudit(sendAudits[0], predecessor);
+    }
+    return false;
+  }
+  if (paymentAudits.length !== 1) return false;
+  const change = payment.method === "cash" ? cashChange(payment.tender as number, payment.amount) : (payment.tender === payment.amount ? 0 : null);
+  if (change === null || !isCanonicalPaymentAudit(paymentAudits[0], durable.order as Order, payment, change)) return false;
+  if (predecessor.status === "open") return sendAudits.length === 0;
+  if (predecessor.status === "sent") {
+    return sendAudits.length === 1 && durable.order !== null && isCanonicalSendAudit(sendAudits[0], durable.order);
+  }
+  return false;
+};
+
 const canApplyEmptyOrOccupied = (table: PosTable, orderId: string): boolean => {
   const catalog = useCatalogTableStore.getState();
   if (catalog.tenantId !== table.tenantId) return false;
@@ -86,25 +191,27 @@ const canApplyEmptyOrOccupied = (table: PosTable, orderId: string): boolean => {
   return false;
 };
 
-const localCasHolds = (localPaymentId: string, predecessor: Order): boolean => {
-  const order = useOrderPaymentStore.getState().currentOrder;
-  if (!order || order.id !== predecessor.id || order.tenantId !== predecessor.tenantId) return false;
-  if (order.status === "paid") {
-    return useOrderPaymentStore.getState().payments.some((payment) => payment.id === localPaymentId && payment.orderId === order.id);
-  }
-  return order.status === predecessor.status;
+const localCasExact = (local: LocalPaySnapshot): boolean => {
+  const orders = useOrderPaymentStore.getState();
+  const catalog = useCatalogTableStore.getState();
+  return sameJson(orders.currentOrder, local.currentOrder)
+    && sameJson(orders.payments, local.payments)
+    && sameJson(orders.auditEntries, local.audits)
+    && sameJson(orders.lastReceipt, local.lastReceipt)
+    && catalog.tenantId === local.tenantId
+    && sameJson(catalog.tables, local.tables);
 };
 
-const isWinnerGraph = (durable: DurablePaySnapshot, predecessor: Order): {
+const isWinnerGraph = (durable: DurablePaySnapshot, predecessor: Order, localTable: PosTable | null): {
   table: PosTable;
   order: Order;
   payment: Payment;
-  audit: AuditEntry;
 } | null => {
   const order = durable.order;
   const table = durable.table;
   if (!order || order.status !== "paid" || !validateDurableOrder(order, predecessor)) return null;
-  if (table.status !== "empty" || table.tenantId !== order.tenantId || table.id !== order.tableId) return null;
+  if (!validateDurableTable(table, order, localTable)) return null;
+  if (table.status !== "empty") return null;
   if (durable.payments.length !== 1) return null;
   const payment = durable.payments[0];
   if (
@@ -115,44 +222,30 @@ const isWinnerGraph = (durable: DurablePaySnapshot, predecessor: Order): {
     || payment.createdAt !== order.paidAt
     || !Number.isSafeInteger(payment.tender)
   ) return null;
-  const change = payment.method === "cash" ? cashChange(payment.tender as number, payment.amount) : (payment.tender === payment.amount ? 0 : null);
-  if (change === null) return null;
-  const paymentAudits = durable.audits.filter((entry) => entry.action === "payment.recorded");
-  if (paymentAudits.length !== 1) return null;
-  const audit = paymentAudits[0];
-  if (
-    audit.id !== `payment:${payment.id}`
-    || audit.tenantId !== order.tenantId
-    || audit.staffId !== payment.staffId
-    || audit.entityType !== "order"
-    || audit.entityId !== order.id
-    || audit.timestamp !== payment.createdAt
-    || !sameJson(audit.details, {
-      paymentId: payment.id,
-      method: payment.method,
-      paidTotal: order.total,
-      tender: payment.tender,
-      change,
-    })
-  ) return null;
-  return { table, order, payment, audit };
+  if (!validateAuditGraph(durable, predecessor, payment)) return null;
+  return { table, order, payment };
 };
 
 export function planPayReconcile(
   durable: DurablePaySnapshot,
-  local: { localPaymentId: string; predecessor: Order },
+  local: { localPaymentId: string; predecessor: Order; sessionToken?: number },
 ): PayReconcilePlan {
   const predecessor = local.predecessor;
+  const snapshot = captureLocal(local.sessionToken);
   const durableOrder = durable.order;
-  if (!localCasHolds(local.localPaymentId, predecessor)) return { kind: "rejected" };
+  if (!snapshot.currentOrder || snapshot.currentOrder.id !== predecessor.id) return { kind: "rejected" };
+  if (!snapshot.payments.some((payment) => payment.id === local.localPaymentId && payment.orderId === predecessor.id)) {
+    return { kind: "rejected" };
+  }
 
   if (
     durable.table.status === "occupied"
-    && durable.table.currentOrderId === predecessor.id
     && durableOrder
     && (durableOrder.status === "open" || durableOrder.status === "sent")
     && validateDurableOrder(durableOrder, predecessor)
+    && validateDurableTable(durable.table, durableOrder, snapshot.table)
     && durable.payments.length === 0
+    && validateAuditGraph(durable, predecessor, null)
     && canApplyEmptyOrOccupied(durable.table, predecessor.id)
   ) {
     return {
@@ -162,10 +255,11 @@ export function planPayReconcile(
       audits: durable.audits,
       localPaymentId: local.localPaymentId,
       predecessor,
+      local: snapshot,
     };
   }
 
-  const winner = isWinnerGraph(durable, predecessor);
+  const winner = isWinnerGraph(durable, predecessor, snapshot.table);
   if (!winner || !canApplyEmptyOrOccupied(winner.table, winner.order.id)) return { kind: "rejected" };
   return {
     kind: "winner",
@@ -175,26 +269,31 @@ export function planPayReconcile(
     audits: durable.audits.filter((entry) => entry.action === "payment.recorded" || entry.action === "order.sent"),
     localPaymentId: local.localPaymentId,
     predecessor,
+    local: snapshot,
   };
 }
 
 export function commitPayReconcile(plan: PayReconcilePlan): ReconcilePayResult {
   if (plan.kind === "rejected") return { kind: "rejected" };
-  if (!localCasHolds(plan.localPaymentId, plan.predecessor)) return { kind: "rejected" };
+  if (!localCasExact(plan.local)) return { kind: "rejected" };
   if (!canApplyEmptyOrOccupied(plan.table, plan.order.id)) return { kind: "rejected" };
   const orderOk = useOrderPaymentStore.getState().applyDurablePaySnapshot({
     order: plan.order,
     payments: plan.kind === "winner" ? [plan.payment] : [],
     audits: plan.audits,
   });
-  if (!orderOk) return { kind: "rejected" };
+  if (!orderOk) {
+    restoreLocal(plan.local);
+    return { kind: "rejected" };
+  }
   const tableOk = useCatalogTableStore.getState().applyDurableTable(plan.table, plan.order.id);
   if (!tableOk) {
-    useOrderPaymentStore.getState().applyDurablePaySnapshot({
-      order: plan.predecessor,
-      payments: [],
-      audits: [],
-    });
+    restoreLocal(plan.local);
+    return { kind: "rejected" };
+  }
+  const applied = useCatalogTableStore.getState().tables.find((row) => row.id === plan.table.id);
+  if (!applied || !sameJson(applied, plan.table)) {
+    restoreLocal(plan.local);
     return { kind: "rejected" };
   }
   return { kind: plan.kind };
@@ -202,7 +301,7 @@ export function commitPayReconcile(plan: PayReconcilePlan): ReconcilePayResult {
 
 export function reconcileLocalPayFromDurable(
   durable: DurablePaySnapshot,
-  local: { localPaymentId: string; predecessor: Order },
+  local: { localPaymentId: string; predecessor: Order; sessionToken?: number },
 ): ReconcilePayResult {
   return commitPayReconcile(planPayReconcile(durable, local));
 }
