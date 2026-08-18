@@ -1,6 +1,7 @@
 import { PosDatabase } from "../../packages/pos-storage/src/db";
 import { computeDiscount, computeSubtotal, computeTotal } from "../../packages/pos-core/src/order-calc";
-import type { Order, OrderItem, PosTable } from "../../packages/pos-core/src/types";
+import type { AuditEntry, Order, OrderItem, PosTable } from "../../packages/pos-core/src/types";
+import { isAuditRecord } from "../../packages/pos-core/src/product-records";
 
 export type DexieRestoreInput = {
   authenticatedTenantId: string;
@@ -175,5 +176,42 @@ export async function loadOpenOrderForTable(
     }
   } catch {
     return null;
+  }
+}
+
+export async function loadRestoredOrderForTable(
+  input: DexieRestoreInput,
+  ref: { tableId: string; expectedOrderId: string },
+): Promise<{ order: Order; audits: AuditEntry[] } | null> {
+  const order = await loadOpenOrderForTable(input, ref);
+  if (!order) return null;
+  try {
+    const database = new PosDatabase(input.databaseName ?? "small-pos");
+    try {
+      await database.open();
+      const rows = await database.auditLog.where("tenantId").equals(input.authenticatedTenantId).toArray();
+      const audits: AuditEntry[] = [];
+      for (const raw of rows) {
+        const record = materializeRecord(raw);
+        if (!record || !isAuditRecord(record)) continue;
+        if (record.entityType !== "order" || record.entityId !== order.id) continue;
+        audits.push({
+          id: record.id as string,
+          tenantId: record.tenantId as string,
+          staffId: record.staffId as string,
+          action: record.action as string,
+          entityType: record.entityType as string,
+          entityId: record.entityId as string,
+          details: { ...(record.details as Record<string, unknown>) },
+          timestamp: record.timestamp as number,
+        });
+      }
+      audits.sort((left, right) => left.timestamp - right.timestamp || left.id.localeCompare(right.id));
+      return { order, audits };
+    } finally {
+      database.close();
+    }
+  } catch {
+    return { order, audits: [] };
   }
 }

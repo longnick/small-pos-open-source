@@ -4,7 +4,7 @@ import { loadProductBootstrap } from "@/pos/product-bootstrap";
 import { completeFirstRun } from "@/pos/product-setup";
 import { hydrateFromDexie } from "@/pos/dexie-hydrate";
 import { isDexiePersistSession, persistAfterOccupy, persistAfterPay, setDexiePersistSession } from "@/pos/dexie-persist";
-import { loadOpenOrderForTable } from "@/pos/dexie-restore";
+import { loadRestoredOrderForTable } from "@/pos/dexie-restore";
 import { exportDexieBackup, importDexieBackup, importDexieRecoveryBackup } from "@/pos/dexie-backup";
 import { listenDexieTabEvents } from "@/pos/dexie-tabs";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
@@ -117,13 +117,18 @@ function PosShell() {
       if (typeof expectedOrderId !== "string" || expectedOrderId.trim().length === 0) return;
       const tenantId = tenant.id;
       const tableId = table.id;
-      void loadOpenOrderForTable(
+      void loadRestoredOrderForTable(
         { authenticatedTenantId: tenantId },
         { tableId, expectedOrderId },
-      ).then((order) => {
-        if (!order) return;
+      ).then((restored) => {
+        if (!restored) return;
         if (useOrderPaymentStore.getState().currentOrder !== null) return;
-        if (useOrderPaymentStore.getState().selectOpenOrder(order)) {
+        if (useOrderPaymentStore.getState().selectOpenOrder(restored.order)) {
+          if (restored.audits.length > 0) {
+            useOrderPaymentStore.setState({
+              auditEntries: Object.freeze(restored.audits.map((entry) => Object.freeze({ ...entry, details: Object.freeze({ ...entry.details }) }))) as typeof restored.audits,
+            });
+          }
           setSelectedTableId(tableId);
         }
       });
@@ -183,14 +188,19 @@ function PosShell() {
     );
   };
 
-  const handlePaymentSuccess = (): boolean => {
+  const handlePaymentSuccess = async (): Promise<boolean> => {
     const order = useOrderPaymentStore.getState().currentOrder;
     const released = Boolean(order && releaseTable(order.tableId, order.id));
     if (isDexiePersistSession() && order) {
       const table = useCatalogTableStore.getState().tableById(order.tableId);
       const payment = useOrderPaymentStore.getState().payments.find((entry) => entry.orderId === order.id);
+      const audit = useOrderPaymentStore.getState().auditEntries.find((entry) => entry.id === `payment:${payment?.id}`);
       if (table && payment) {
-        void persistAfterPay({ authenticatedTenantId: order.tenantId }, { table, order, payment });
+        const persisted = await persistAfterPay(
+          { authenticatedTenantId: order.tenantId },
+          { table, order, payment, ...(audit ? { audit } : {}) },
+        );
+        if (!persisted) return false;
       }
     }
     return released;

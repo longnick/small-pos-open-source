@@ -1,6 +1,16 @@
 import { beforeEach, expect, test } from "vitest";
 import type { Order, Payment } from "../../packages/pos-core/src/types";
 import { useOrderPaymentStore } from "./order-payment-store";
+import { useTenantAuthStore } from "./tenant-auth-store";
+
+const cashierStaff = {
+  id: "staff-1",
+  tenantId: "tenant-1",
+  name: "Cashier",
+  role: "cashier" as const,
+  pinHash: "hash",
+  createdAt: 1,
+};
 
 const order = (): Order => ({
   id: "order-1",
@@ -23,6 +33,7 @@ beforeEach(() => {
     auditEntries: [],
     lastReceipt: null,
   });
+  useTenantAuthStore.setState({ tenant: null, staff: cashierStaff });
 });
 
 test("selects valid open order without retaining caller record", () => {

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { computeDiscount, computeSubtotal, computeTotal } from "../../packages/pos-core/src/order-calc";
 import type { AuditEntry, Order, OrderItem, Payment, PaymentReceipt } from "../../packages/pos-core/src/types";
+import { useTenantAuthStore } from "./tenant-auth-store";
 
 type DiscountType = Order["discountType"];
 type OrderPaymentState = {
@@ -17,6 +18,7 @@ type OrderPaymentState = {
   removeItem: (id: unknown) => boolean;
   setDiscount: (type: unknown, value: unknown) => boolean;
   sendToKitchen: (sentAt: unknown) => boolean;
+  revertSendToKitchen: (expectedSentAt: unknown) => boolean;
   recordPayment: (payment: unknown) => boolean;
 };
 
@@ -149,6 +151,8 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
     try {
       const order = get().currentOrder;
       if (!order || order.status !== "open" || order.items.length === 0 || !isSafeInteger(sentAt) || sentAt < order.createdAt) return false;
+      const staff = useTenantAuthStore.getState().staff;
+      if (!staff || staff.tenantId !== order.tenantId || staff.id !== order.staffId || !useTenantAuthStore.getState().can("order.send")) return false;
       const audit: AuditEntry = {
         id: `send:${order.id}`,
         tenantId: order.tenantId,
@@ -166,11 +170,23 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
       return true;
     } catch { return false; }
   },
+  revertSendToKitchen: (expectedSentAt) => {
+    const order = get().currentOrder;
+    if (!order || order.status !== "sent" || !isSafeInteger(expectedSentAt) || order.sentAt !== expectedSentAt) return false;
+    const { sentAt: _, ...open } = order;
+    set({
+      currentOrder: freezeOrder({ ...open, status: "open" }),
+      auditEntries: freezeAuditEntries(get().auditEntries.filter((entry) => entry.id !== `send:${order.id}`)),
+    });
+    return true;
+  },
   recordPayment: (payment) => {
     try {
       const order = get().currentOrder;
       const validPayment = materializeRecord(payment);
       if (!order || (order.status !== "open" && order.status !== "sent") || !validPayment || !isPayment(validPayment)) return false;
+      const staff = useTenantAuthStore.getState().staff;
+      if (!staff || staff.tenantId !== order.tenantId || staff.id !== validPayment.staffId || !useTenantAuthStore.getState().can("payment.record")) return false;
       // Identity checks
       if (validPayment.tenantId !== order.tenantId || validPayment.orderId !== order.id || validPayment.staffId !== order.staffId) return false;
       if (validPayment.createdAt < order.createdAt) return false;

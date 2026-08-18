@@ -75,13 +75,35 @@ test("first-run sell: open table, add, reload, send kitchen, pay, receipt, relea
   await expect(send).toBeEnabled();
   await send.click();
   await expect(send).toBeDisabled();
+  await expect(visibleButton(page, /Thanh toán/)).toBeEnabled();
 
+  await page.reload();
+  await login(page, manager, pin);
+  await clickTabIfVisible(page, /^Bàn/);
+  await expect(visibleButton(page, /Bàn 1/)).toContainText("Có khách");
+  await visibleButton(page, /Bàn 1/).click();
+  await clickTabIfVisible(page, /^Đơn/);
+  await expect(page.locator('[class*="rounded-xl"]', { hasText: "Cà phê đen" }).filter({ visible: true })).toBeVisible();
+  await expect(visibleButton(page, /Gửi bếp/)).toBeDisabled();
   const checkout = visibleButton(page, /Thanh toán/);
   await expect(checkout).toBeEnabled();
   await checkout.click();
+  const modalOverflow = await page.evaluate(() => ({
+    html: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    body: document.body.scrollWidth - document.body.clientWidth,
+  }));
+  expect(modalOverflow.html).toBeLessThanOrEqual(0);
+  expect(modalOverflow.body).toBeLessThanOrEqual(0);
   await page.getByLabel("Số tiền khách đưa").fill("25000");
   await page.getByRole("button", { name: "Xác nhận thanh toán" }).click();
   await expect(page.getByRole("region", { name: "Hóa đơn thanh toán" })).toBeVisible();
+  const receiptOverflow = await page.evaluate(() => ({
+    html: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    body: document.body.scrollWidth - document.body.clientWidth,
+  }));
+  expect(receiptOverflow.html).toBeLessThanOrEqual(0);
+  expect(receiptOverflow.body).toBeLessThanOrEqual(0);
+
   await expect(page.getByText(/Thanh toán thành công/)).toBeVisible();
 
   const shot = path.join(SCREENSHOT_DIR, `sell-flow-${testInfo.project.name}.png`);

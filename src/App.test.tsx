@@ -36,7 +36,7 @@ const persist = vi.hoisted(() => ({
 }));
 
 const restore = vi.hoisted(() => ({
-  load: vi.fn(async () => null as import("../packages/pos-core/src/types").Order | null),
+  load: vi.fn(async () => null as { order: import("../packages/pos-core/src/types").Order; audits: import("../packages/pos-core/src/types").AuditEntry[] } | null),
 }));
 
 const backup = vi.hoisted(() => ({
@@ -76,7 +76,11 @@ vi.mock("@/pos/dexie-persist", async (importOriginal) => {
 });
 
 vi.mock("@/pos/dexie-restore", () => ({
-  loadOpenOrderForTable: restore.load,
+  loadRestoredOrderForTable: restore.load,
+  loadOpenOrderForTable: async (...args: unknown[]) => {
+    const restored = await restore.load(...args as []);
+    return restored?.order ?? null;
+  },
 }));
 
 vi.mock("@/pos/dexie-backup", () => ({
@@ -962,7 +966,7 @@ const restoredOrder = {
 };
 
 test("hydrate success + occupied table click restores the bound open order", async () => {
-  restore.load.mockImplementation(async () => restoredOrder);
+  restore.load.mockImplementation(async () => ({ order: restoredOrder, audits: [] }));
   bootstrap.create.mockImplementation(() =>
     makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
   );
@@ -1021,7 +1025,7 @@ test("empty IDB never calls restore on occupied click", async () => {
 });
 
 test("existing currentOrder + other occupied table only changes highlight", async () => {
-  restore.load.mockImplementation(async () => restoredOrder);
+  restore.load.mockImplementation(async () => ({ order: restoredOrder, audits: [] }));
   bootstrap.create.mockImplementation(() =>
     makeReadyBootstrap({
       ...occupiedHydrate,

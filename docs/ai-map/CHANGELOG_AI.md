@@ -5,7 +5,7 @@
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
 Branch: `feat/sprint-2-canonical-sell-flow`
 Agent: Hermes / gcli/grok-4.6
-Summary: Open order can send to kitchen, persist, reload, then pay. Isolated E2E 390/768/1440. Menu/staff CRUD still later.
+Summary: Send/pay now wait Dexie result, persist order.sent + payment.recorded audits, CAS send, RBAC `order.send`/`payment.record`, E2E reload-after-send. Menu/staff CRUD still later.
 Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0835-sprint-2-send-kitchen.md`
 
 ## 2026-08-18 08:03 - Sprint 1 sentAt ordering + untracked E2E screenshots

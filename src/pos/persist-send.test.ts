@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import type { Order, PosTable, Tenant } from "../../packages/pos-core/src/types";
 import { PosDatabase } from "../../packages/pos-storage/src/db";
 import { persistAfterSend, setDexiePersistSession } from "./dexie-persist";
-import { loadOpenOrderForTable } from "./dexie-restore";
+import { loadOpenOrderForTable, loadRestoredOrderForTable } from "./dexie-restore";
 import { useOrderPaymentStore } from "../stores/order-payment-store";
 
 const tenantId = "tenant-demo";
@@ -130,6 +130,22 @@ test("persistAfterSend writes the sent order and restore can select it", async (
       sentAt: 10,
       total: 25_000,
     });
+    expect(useOrderPaymentStore.getState().auditEntries).toEqual([]);
+  });
+});
+
+test("restore loads the durable order.sent audit with the sent order", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(sentOrder());
+    await database.auditLog.add(sendAudit());
+  }, async (name) => {
+    const restored = await loadRestoredOrderForTable(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", expectedOrderId: "order-1" },
+    );
+    expect(restored).toEqual({ order: sentOrder(), audits: [sendAudit()] });
   });
 });
 

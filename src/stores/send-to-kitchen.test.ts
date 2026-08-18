@@ -11,6 +11,26 @@
 import { beforeEach, expect, test } from "vitest";
 import type { Order, Payment } from "../../packages/pos-core/src/types";
 import { useOrderPaymentStore } from "./order-payment-store";
+import { useTenantAuthStore } from "./tenant-auth-store";
+
+const cashierStaff = {
+  id: "staff-1",
+  tenantId: "tenant-1",
+  name: "Cashier",
+  role: "cashier" as const,
+  pinHash: "hash",
+  createdAt: 1,
+};
+
+beforeEach(() => {
+  useOrderPaymentStore.getState().clearCurrentOrder();
+  useOrderPaymentStore.setState({
+    payments: Object.freeze([]) as unknown as Payment[],
+    auditEntries: [],
+    lastReceipt: null,
+  });
+  useTenantAuthStore.setState({ tenant: null, staff: cashierStaff });
+});
 
 const order = (): Order => ({
   id: "order-1",
@@ -40,15 +60,6 @@ const openWithItem = (): Order => ({
   items: [line()],
   subtotal: 25_000,
   total: 25_000,
-});
-
-beforeEach(() => {
-  useOrderPaymentStore.getState().clearCurrentOrder();
-  useOrderPaymentStore.setState({
-    payments: Object.freeze([]) as unknown as Payment[],
-    auditEntries: [],
-    lastReceipt: null,
-  });
 });
 
 test("sendToKitchen marks open order sent, stores sentAt, and writes order.sent audit", () => {

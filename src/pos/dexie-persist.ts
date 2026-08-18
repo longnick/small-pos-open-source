@@ -318,15 +318,17 @@ export async function persistAfterSend(
 
 export async function persistAfterPay(
   input: DexiePersistInput,
-  snapshot: { table: PosTable; order: Order; payment: Payment },
+  snapshot: { table: PosTable; order: Order; payment: Payment; audit?: AuditEntry },
 ): Promise<PersistResult> {
   let table: PosTable | null = null;
   let order: Order | null = null;
   let payment: Payment | null = null;
+  let audit: AuditEntry | null = null;
   try {
     table = materializeTable(snapshot?.table);
     order = materializeOrder(snapshot?.order);
     payment = materializePayment(snapshot?.payment);
+    audit = snapshot?.audit === undefined ? null : canonicalAudit(snapshot.audit);
   } catch {
     return false;
   }
@@ -346,9 +348,19 @@ export async function persistAfterPay(
     || order.status !== "paid"
     || payment.orderId !== order.id
     || order.tableId !== table.id
+    || (snapshot?.audit !== undefined && (
+      !audit
+      || audit.tenantId !== input.authenticatedTenantId
+      || audit.id !== `payment:${payment.id}`
+      || audit.action !== "payment.recorded"
+      || audit.entityType !== "order"
+      || audit.entityId !== order.id
+      || audit.staffId !== payment.staffId
+      || audit.timestamp !== payment.createdAt
+    ))
   ) return false;
 
-  const written = await withWritableDb(input, ["tables", "orders", "payments"], async (database) => {
+  const written = await withWritableDb(input, audit ? ["tables", "orders", "payments", "auditLog"] : ["tables", "orders", "payments"], async (database) => {
     const existingTable = await database.table<PosTable>("tables").get(table.id);
     if (
       existingTable
@@ -357,9 +369,14 @@ export async function persistAfterPay(
     ) return false;
     const existingPayment = await database.payments.get(payment.id);
     if (existingPayment && existingPayment.orderId !== payment.orderId) return false;
+    if (audit) {
+      const existingAudit = await database.auditLog.get(audit.id);
+      if (existingAudit && !sameJson(canonicalAudit(existingAudit), audit)) return false;
+    }
     await database.orders.put(order);
     await database.payments.put(payment);
     await database.posTables.put(table);
+    if (audit) await database.auditLog.put(audit);
     return true;
   });
   if (written === true) notifyDexieTabWrite({ tenantId: input.authenticatedTenantId, kind: "pay" });
