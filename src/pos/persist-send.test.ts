@@ -265,6 +265,79 @@ test("restore rejects a malformed audit whose entityId is the target order", asy
   });
 });
 
+test("restore rejects target send or payment audits with wrong or missing tenant", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(sentOrder());
+    await database.auditLog.add({ ...sendAudit(), tenantId: "other-tenant" });
+  }, async (name) => {
+    await expect(loadRestoredOrderForTable(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", expectedOrderId: "order-1", expectedStaffId: "staff-1" },
+    )).resolves.toBeNull();
+  });
+
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(sentOrder());
+    const { tenantId: _omit, ...sendWithoutTenant } = sendAudit();
+    await database.auditLog.add(sendWithoutTenant as never);
+  }, async (name) => {
+    await expect(loadRestoredOrderForTable(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", expectedOrderId: "order-1", expectedStaffId: "staff-1" },
+    )).resolves.toBeNull();
+  });
+
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(sentOrder());
+    await database.auditLog.add(sendAudit());
+    await database.auditLog.add({
+      id: "payment:pay-1",
+      tenantId: "other-tenant",
+      staffId: "staff-1",
+      action: "payment.recorded",
+      entityType: "order",
+      entityId: "order-1",
+      details: { paymentId: "pay-1", method: "cash", paidTotal: 25_000, tender: 25_000, change: 0 },
+      timestamp: 20,
+    });
+  }, async (name) => {
+    await expect(loadRestoredOrderForTable(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", expectedOrderId: "order-1", expectedStaffId: "staff-1" },
+    )).resolves.toBeNull();
+  });
+});
+
+test("restore ignores a cross-tenant payment audit for another order", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(sentOrder());
+    await database.auditLog.add(sendAudit());
+    await database.auditLog.add({
+      id: "payment:pay-other",
+      tenantId: "other-tenant",
+      staffId: "staff-1",
+      action: "payment.recorded",
+      entityType: "order",
+      entityId: "order-other",
+      details: { paymentId: "pay-other", method: "cash", paidTotal: 25_000, tender: 25_000, change: 0 },
+      timestamp: 20,
+    });
+  }, async (name) => {
+    await expect(loadRestoredOrderForTable(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { tableId: "table-1", expectedOrderId: "order-1", expectedStaffId: "staff-1" },
+    )).resolves.toEqual({ order: sentOrder(), audits: [sendAudit()] });
+  });
+});
+
 test("persistAfterSend is idempotent for the same sent snapshot and audit id", async () => {
   await withDb(async (database) => {
     await database.tenants.add(tenant());

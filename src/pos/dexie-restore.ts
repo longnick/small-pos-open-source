@@ -198,7 +198,7 @@ export async function loadRestoredOrderForTable(
       const snapshot = await database.transaction("r", ["orders", "auditLog"], async () => ({
         order: await database.orders.get(ref.expectedOrderId),
         sameTable: await database.orders.where("tableId").equals(ref.tableId).toArray(),
-        audits: await database.auditLog.where("tenantId").equals(input.authenticatedTenantId).toArray(),
+        audits: await database.auditLog.toArray(),
       }));
       const order = materializeOpenOrder(snapshot.order);
       if (
@@ -223,7 +223,13 @@ export async function loadRestoredOrderForTable(
           || (typeof record.id === "string" && record.id === `send:${order.id}`)
         );
         if (!related) continue;
-        if (!record || !isAuditRecord(record) || record.entityType !== "order" || record.entityId !== order.id) return null;
+        if (
+          !record
+          || !isAuditRecord(record)
+          || record.tenantId !== input.authenticatedTenantId
+          || record.entityType !== "order"
+          || record.entityId !== order.id
+        ) return null;
         audits.push({
           id: record.id as string,
           tenantId: record.tenantId as string,

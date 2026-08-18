@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 12:40 - Sprint 2 fail-closed target audit tenant
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Restore reads all audit rows. Target-order row wrong/missing tenant fails closed; other-order cross-tenant row is ignored.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1240-sprint-2-target-audit-tenant.md`
+
 ## 2026-08-18 12:25 - Sprint 2 restore audit relevance
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
