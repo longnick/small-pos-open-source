@@ -1,5 +1,5 @@
 import type { PosDatabase } from "./db";
-import { isPlainObject, isProductViableShopData } from "../../pos-core/src/product-records";
+import { isPlainObject, isProductViableBackupData } from "../../pos-core/src/product-records";
 
 const V2_STORES = [
   "tenants",
@@ -43,13 +43,17 @@ export function assertProductViableBackupJson(json: string): Record<V2StoreName,
   for (const store of V2_STORES) {
     if (!Array.isArray(data[store])) throw new Error(`Backup store ${store} must be an array`);
   }
-  if (!isProductViableShopData({
+  if (!isProductViableBackupData({
     tenants: data.tenants as unknown[],
     staff: data.staff as unknown[],
     tables: data.tables as unknown[],
     appConfig: data.appConfig as unknown[],
     catalogGroups: data.catalogGroups as unknown[],
     catalogItems: data.catalogItems as unknown[],
+    orders: data.orders as unknown[],
+    payments: data.payments as unknown[],
+    shifts: data.shifts as unknown[],
+    auditLog: data.auditLog as unknown[],
   })) throw new Error(BACKUP_NOT_PRODUCT_VIABLE);
   return data as Record<V2StoreName, unknown[]>;
 }

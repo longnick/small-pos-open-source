@@ -58,10 +58,125 @@ async function seedViableShop(database: PosDatabase, name: string, tableCount: n
   }
 }
 
+async function seedOperationalShop(database: PosDatabase, name = "Quán Đủ") {
+  await seedViableShop(database, name, 2);
+  const tenantId = `tenant-${name}`;
+  const staffId = `staff-${name}`;
+  const emptyTableId = `table-${name}-1`;
+  const occupiedTableId = `table-${name}-2`;
+  const groupId = `group-${name}`;
+  const itemId = `item-${name}`;
+  const openOrderId = `order-open-${name}`;
+  const paidOrderId = `order-paid-${name}`;
+  const paymentId = `pay-${name}`;
+  const shiftId = `shift-${name}`;
+  const auditId = `audit-${name}`;
+  await database.catalogGroups.add({ id: groupId, tenantId, name: "Nước", sortOrder: 0 });
+  await database.catalogItems.add({
+    id: itemId,
+    tenantId,
+    groupId,
+    name: "Cà phê",
+    price: 25_000,
+    available: true,
+    sortOrder: 0,
+    createdAt: 1,
+    updatedAt: 1,
+  });
+  await database.posTables.put({
+    id: occupiedTableId,
+    tenantId,
+    number: 2,
+    status: "occupied",
+    openedAt: 10,
+    staffId,
+    currentOrderId: openOrderId,
+  });
+  await database.orders.add({
+    id: openOrderId,
+    tenantId,
+    tableId: occupiedTableId,
+    staffId,
+    status: "open",
+    items: [{
+      id: `line-open-${name}`,
+      orderId: openOrderId,
+      catalogItemId: itemId,
+      name: "Cà phê",
+      price: 25_000,
+      quantity: 2,
+    }],
+    subtotal: 50_000,
+    discount: 0,
+    discountType: "amount",
+    total: 50_000,
+    createdAt: 10,
+  });
+  await database.orders.add({
+    id: paidOrderId,
+    tenantId,
+    tableId: emptyTableId,
+    staffId,
+    status: "paid",
+    items: [{
+      id: `line-paid-${name}`,
+      orderId: paidOrderId,
+      catalogItemId: itemId,
+      name: "Cà phê",
+      price: 25_000,
+      quantity: 1,
+    }],
+    subtotal: 25_000,
+    discount: 0,
+    discountType: "amount",
+    total: 25_000,
+    createdAt: 5,
+    paidAt: 8,
+  });
+  await database.payments.add({
+    id: paymentId,
+    tenantId,
+    orderId: paidOrderId,
+    amount: 25_000,
+    tender: 30_000,
+    method: "cash",
+    staffId,
+    createdAt: 8,
+  });
+  await database.shifts.add({
+    id: shiftId,
+    tenantId,
+    staffId,
+    openedAt: 1,
+    closedAt: 9,
+    openingCash: 100_000,
+    closingCash: 125_000,
+  });
+  await database.auditLog.add({
+    id: auditId,
+    tenantId,
+    staffId,
+    action: "payment.recorded",
+    entityType: "order",
+    entityId: paidOrderId,
+    details: { paymentId, method: "cash", paidTotal: 25_000 },
+    timestamp: 8,
+  });
+}
+
 async function readAll(database: PosDatabase) {
   return Object.fromEntries(
     await Promise.all(v2Stores.map(async (store) => [store, await database.table(store).toArray()])),
   );
+}
+
+async function mutateExport(
+  database: PosDatabase,
+  mutate: (data: Record<string, unknown[]>) => void,
+): Promise<string> {
+  const parsed = JSON.parse(await exportBackup(database));
+  mutate(parsed.data);
+  return JSON.stringify(parsed);
 }
 
 test("exports version 2 including appConfig from a first-run shop", async () => {
@@ -153,15 +268,6 @@ test.each([
   }
 });
 
-async function mutateExport(
-  database: PosDatabase,
-  mutate: (data: Record<string, unknown[]>) => void,
-): Promise<string> {
-  const parsed = JSON.parse(await exportBackup(database));
-  mutate(parsed.data);
-  return JSON.stringify(parsed);
-}
-
 test.each([
   [
     "catalog group missing sortOrder",
@@ -205,6 +311,72 @@ test.each([
     await seedViableShop(database, "Quán Nhà", 1);
     const before = await readAll(database);
     expect(Object.keys(before)).toEqual(v2Stores);
+    const json = await mutateExport(database, mutate);
+    await expect(importBackup(database, json)).rejects.toThrow("backup-not-product-viable");
+    expect(await readAll(database)).toEqual(before);
+  } finally {
+    database.close();
+    await database.delete();
+  }
+});
+
+test.each([
+  [
+    "order totals that do not recompute",
+    (data: Record<string, unknown[]>) => {
+      const order = { ...(data.orders[0] as Record<string, unknown>), total: 1 };
+      data.orders = [order, ...data.orders.slice(1)];
+    },
+  ],
+  [
+    "payment amount not equal to paid order total",
+    (data: Record<string, unknown[]>) => {
+      const payment = { ...(data.payments[0] as Record<string, unknown>), amount: 1, tender: 1 };
+      data.payments = [payment];
+    },
+  ],
+  [
+    "occupied table currentOrderId missing",
+    (data: Record<string, unknown[]>) => {
+      data.tables = data.tables.map((row) => {
+        const table = { ...(row as Record<string, unknown>) };
+        if (table.status === "occupied") delete table.currentOrderId;
+        return table;
+      });
+    },
+  ],
+  [
+    "empty table bound to an open order",
+    (data: Record<string, unknown[]>) => {
+      const open = data.orders.find((row) => (row as { status?: string }).status === "open") as { id: string };
+      data.tables = data.tables.map((row) => {
+        const table = { ...(row as Record<string, unknown>) };
+        if (table.status === "empty") return { ...table, currentOrderId: open.id };
+        return table;
+      });
+    },
+  ],
+  [
+    "shift closedAt before openedAt",
+    (data: Record<string, unknown[]>) => {
+      const shift = { ...(data.shifts[0] as Record<string, unknown>), closedAt: 0 };
+      data.shifts = [shift];
+    },
+  ],
+  [
+    "audit details not a plain object",
+    (data: Record<string, unknown[]>) => {
+      const audit = { ...(data.auditLog[0] as Record<string, unknown>), details: ["not-object"] };
+      data.auditLog = [audit];
+    },
+  ],
+])("rejects operational %s and leaves all 10 stores unchanged", async (_name, mutate) => {
+  const database = createDatabase();
+  try {
+    await database.open();
+    await seedOperationalShop(database);
+    const before = await readAll(database);
+    expect(v2Stores.every((store) => (before[store] as unknown[]).length > 0)).toBe(true);
     const json = await mutateExport(database, mutate);
     await expect(importBackup(database, json)).rejects.toThrow("backup-not-product-viable");
     expect(await readAll(database)).toEqual(before);
