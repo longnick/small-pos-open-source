@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 07:53 - Sprint 1 compatibility and order timestamp invariants
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
+Branch: `feat/sprint-1-product-bootstrap`
+Agent: Hermes / gcli/grok-4.6
+Summary: Recovery accepts legacy payment without tender and retired SKU snapshots. Order timestamps cannot contradict status or precede createdAt. Success import proves all 10 stores.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0753-sprint-1-compat-invariants.md`
+
 ## 2026-08-18 07:45 - Sprint 1 recovery graph 10-store prevalidation
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
