@@ -150,7 +150,7 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
       const order = get().currentOrder;
       if (!order || order.status !== "open" || order.items.length === 0 || !isSafeInteger(sentAt) || sentAt < order.createdAt) return false;
       const audit: AuditEntry = {
-        id: `send:${order.id}:${sentAt}`,
+        id: `send:${order.id}`,
         tenantId: order.tenantId,
         staffId: order.staffId,
         action: "order.sent",
@@ -173,6 +173,8 @@ export const useOrderPaymentStore = create<OrderPaymentState>((set, get) => ({
       if (!order || (order.status !== "open" && order.status !== "sent") || !validPayment || !isPayment(validPayment)) return false;
       // Identity checks
       if (validPayment.tenantId !== order.tenantId || validPayment.orderId !== order.id || validPayment.staffId !== order.staffId) return false;
+      if (validPayment.createdAt < order.createdAt) return false;
+      if (order.sentAt !== undefined && validPayment.createdAt < order.sentAt) return false;
       // Idempotency: reject duplicate payment id
       if (get().payments.some(({ id }) => id === validPayment.id)) return false;
       const tender = validPayment.tender;

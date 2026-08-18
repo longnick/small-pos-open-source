@@ -72,15 +72,30 @@ async function withDb(seed: (database: PosDatabase) => Promise<void>, run: (name
   }
 }
 
-async function readOrders(name: string) {
+async function readWritten(name: string) {
   const database = new PosDatabase(name);
   try {
     await database.open();
-    return database.orders.toArray();
+    return {
+      orders: await database.orders.toArray(),
+      auditLog: await database.auditLog.toArray(),
+    };
   } finally {
     database.close();
   }
 }
+
+const sendAudit = () => ({
+  id: "send:order-1",
+  tenantId,
+  staffId: "staff-1",
+  action: "order.sent",
+  entityType: "order",
+  entityId: "order-1",
+  details: { sentAt: 10 },
+  timestamp: 10,
+});
+
 
 beforeEach(() => {
   useOrderPaymentStore.getState().clearCurrentOrder();
@@ -100,9 +115,9 @@ test("persistAfterSend writes the sent order and restore can select it", async (
   }, async (name) => {
     await expect(persistAfterSend(
       { authenticatedTenantId: tenantId, databaseName: name },
-      { order: sentOrder() },
+      { order: sentOrder(), expectedOpen: openOrder(), audit: sendAudit() },
     )).resolves.toBe(true);
-    expect(await readOrders(name)).toEqual([sentOrder()]);
+    expect(await readWritten(name)).toEqual({ orders: [sentOrder()], auditLog: [sendAudit()] });
 
     const restored = await loadOpenOrderForTable(
       { authenticatedTenantId: tenantId, databaseName: name },
@@ -115,5 +130,64 @@ test("persistAfterSend writes the sent order and restore can select it", async (
       sentAt: 10,
       total: 25_000,
     });
+  });
+});
+
+test("persistAfterSend is idempotent for the same sent snapshot and audit id", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(openOrder());
+  }, async (name) => {
+    const input = { authenticatedTenantId: tenantId, databaseName: name };
+    const snapshot = { order: sentOrder(), expectedOpen: openOrder(), audit: sendAudit() };
+    await expect(persistAfterSend(input, snapshot)).resolves.toBe(true);
+    await expect(persistAfterSend(input, snapshot)).resolves.toBe(true);
+    expect(await readWritten(name)).toEqual({ orders: [sentOrder()], auditLog: [sendAudit()] });
+  });
+});
+
+test("persistAfterSend refuses a different sentAt against an already sent order", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(sentOrder());
+    await database.auditLog.add(sendAudit());
+  }, async (name) => {
+    await expect(persistAfterSend(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { order: { ...sentOrder(), sentAt: 11 }, expectedOpen: openOrder(), audit: { ...sendAudit(), id: "send:order-1", details: { sentAt: 11 }, timestamp: 11 } },
+    )).resolves.toBe(false);
+    expect(await readWritten(name)).toEqual({ orders: [sentOrder()], auditLog: [sendAudit()] });
+  });
+});
+
+test("persistAfterSend refuses when existing open snapshot does not match expectedOpen", async () => {
+  const otherOpen = { ...openOrder(), items: [{ ...line(), quantity: 2 }], subtotal: 50_000, total: 50_000 };
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(otherOpen);
+  }, async (name) => {
+    await expect(persistAfterSend(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { order: sentOrder(), expectedOpen: openOrder(), audit: sendAudit() },
+    )).resolves.toBe(false);
+    expect(await readWritten(name)).toEqual({ orders: [otherOpen], auditLog: [] });
+  });
+});
+
+test("persistAfterSend refuses when the existing order is already paid", async () => {
+  const paid = { ...openOrder(), status: "paid" as const, paidAt: 20 };
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(paid);
+  }, async (name) => {
+    await expect(persistAfterSend(
+      { authenticatedTenantId: tenantId, databaseName: name },
+      { order: sentOrder(), expectedOpen: openOrder(), audit: sendAudit() },
+    )).resolves.toBe(false);
+    expect(await readWritten(name)).toEqual({ orders: [paid], auditLog: [] });
   });
 });

@@ -71,7 +71,7 @@ test("sendToKitchen marks open order sent, stores sentAt, and writes order.sent 
   expect(state.currentOrder).not.toHaveProperty("paidAt");
   expect(state.currentOrder).not.toHaveProperty("cancelledAt");
   expect(state.auditEntries).toMatchObject([{
-    id: "send:order-1:10",
+    id: "send:order-1",
     tenantId: "tenant-1",
     staffId: "staff-1",
     action: "order.sent",
@@ -143,4 +143,34 @@ test("recordPayment accepts a sent order and keeps sentAt on the paid order", ()
     paidTotal: 25_000,
     change: 0,
   });
+});
+
+test("recordPayment rejects createdAt before order.createdAt or sentAt without mutation", () => {
+  useOrderPaymentStore.getState().selectOpenOrder(openWithItem());
+  const beforeOpen = snapshot();
+  expect(useOrderPaymentStore.getState().recordPayment({
+    id: "pay-early-open",
+    tenantId: "tenant-1",
+    orderId: "order-1",
+    amount: 25_000,
+    tender: 25_000,
+    method: "cash",
+    staffId: "staff-1",
+    createdAt: 0,
+  })).toBe(false);
+  expect(snapshot()).toEqual(beforeOpen);
+
+  expect(useOrderPaymentStore.getState().sendToKitchen(10)).toBe(true);
+  const beforeSent = snapshot();
+  expect(useOrderPaymentStore.getState().recordPayment({
+    id: "pay-early-sent",
+    tenantId: "tenant-1",
+    orderId: "order-1",
+    amount: 25_000,
+    tender: 25_000,
+    method: "cash",
+    staffId: "staff-1",
+    createdAt: 9,
+  })).toBe(false);
+  expect(snapshot()).toEqual(beforeSent);
 });

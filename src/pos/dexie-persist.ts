@@ -1,5 +1,6 @@
 import { PosDatabase } from "../../packages/pos-storage/src/db";
-import type { Order, OrderItem, Payment, PosTable } from "../../packages/pos-core/src/types";
+import type { AuditEntry, Order, OrderItem, Payment, PosTable } from "../../packages/pos-core/src/types";
+import { isAuditRecord } from "../../packages/pos-core/src/product-records";
 import { notifyDexieTabWrite } from "./dexie-tabs";
 
 export type DexiePersistInput = {
@@ -157,6 +158,29 @@ const materializePayment = (value: unknown): Payment | null => {
   return payment && isPayment(payment) ? canonicalPayment(payment) : null;
 };
 
+const sameJson = (left: unknown, right: unknown): boolean => {
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return false;
+  }
+};
+
+const canonicalAudit = (value: unknown): AuditEntry | null => {
+  const record = materializeRecord(value);
+  if (!record || !isAuditRecord(record)) return null;
+  return {
+    id: record.id as string,
+    tenantId: record.tenantId as string,
+    staffId: record.staffId as string,
+    action: record.action as string,
+    entityType: record.entityType as string,
+    entityId: record.entityId as string,
+    details: { ...(record.details as Record<string, unknown>) },
+    timestamp: record.timestamp as number,
+  };
+};
+
 async function withWritableDb<T>(
   input: DexiePersistInput,
   stores: string[],
@@ -234,27 +258,58 @@ export async function persistAfterOrderEdit(
 
 export async function persistAfterSend(
   input: DexiePersistInput,
-  snapshot: { order: Order },
+  snapshot: { order: Order; expectedOpen: Order; audit: AuditEntry },
 ): Promise<PersistResult> {
   let order: Order | null = null;
+  let expectedOpen: Order | null = null;
+  let audit: AuditEntry | null = null;
   try {
     order = materializeOrder(snapshot?.order);
+    expectedOpen = materializeOrder(snapshot?.expectedOpen);
+    audit = canonicalAudit(snapshot?.audit);
   } catch {
     return false;
   }
   if (
     !order
+    || !expectedOpen
+    || !audit
     || order.tenantId !== input.authenticatedTenantId
+    || expectedOpen.tenantId !== input.authenticatedTenantId
+    || audit.tenantId !== input.authenticatedTenantId
     || order.status !== "sent"
+    || expectedOpen.status !== "open"
+    || expectedOpen.id !== order.id
+    || expectedOpen.tableId !== order.tableId
+    || expectedOpen.staffId !== order.staffId
     || !Number.isSafeInteger(order.sentAt)
     || (order.sentAt as number) < order.createdAt
     || order.items.length === 0
+    || audit.id !== `send:${order.id}`
+    || audit.action !== "order.sent"
+    || audit.entityType !== "order"
+    || audit.entityId !== order.id
+    || audit.staffId !== order.staffId
+    || audit.timestamp !== order.sentAt
+    || !sameJson(audit.details, { sentAt: order.sentAt })
   ) return false;
 
-  const written = await withWritableDb(input, ["orders"], async (database) => {
+  const written = await withWritableDb(input, ["orders", "auditLog"], async (database) => {
     const existing = await database.orders.get(order.id);
-    if (existing && existing.status !== "open" && existing.status !== "sent") return false;
+    if (!existing) return false;
+    const existingOrder = materializeOrder(existing);
+    if (!existingOrder || existingOrder.tenantId !== order.tenantId || existingOrder.tableId !== order.tableId) return false;
+    if (existingOrder.status === "open") {
+      if (!sameJson(existingOrder, expectedOpen)) return false;
+    } else if (existingOrder.status === "sent") {
+      if (!sameJson(existingOrder, order)) return false;
+    } else {
+      return false;
+    }
+    const existingAudit = await database.auditLog.get(audit.id);
+    if (existingAudit && !sameJson(canonicalAudit(existingAudit), audit)) return false;
     await database.orders.put(order);
+    await database.auditLog.put(audit);
     return true;
   });
   if (written === true) notifyDexieTabWrite({ tenantId: input.authenticatedTenantId, kind: "edit" });
