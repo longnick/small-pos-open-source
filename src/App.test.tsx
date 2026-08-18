@@ -32,7 +32,13 @@ const hydrate = vi.hoisted(() => ({
 
 const persist = vi.hoisted(() => ({
   occupy: vi.fn(async () => true),
-  pay: vi.fn(async () => true),
+  pay: vi.fn(async (): Promise<{ kind: "committed" | "idempotent" | "conflict" | "io-error" | "invalid" }> => ({ kind: "committed" })),
+  loadPay: vi.fn(async () => null as null | {
+    table: import("../packages/pos-core/src/types").PosTable;
+    order: import("../packages/pos-core/src/types").Order | null;
+    payments: import("../packages/pos-core/src/types").Payment[];
+    audits: import("../packages/pos-core/src/types").AuditEntry[];
+  }),
 }));
 
 const restore = vi.hoisted(() => ({
@@ -72,6 +78,7 @@ vi.mock("@/pos/dexie-persist", async (importOriginal) => {
     ...actual,
     persistAfterOccupy: persist.occupy,
     persistAfterPay: persist.pay,
+    loadDurablePaySnapshot: persist.loadPay,
   };
 });
 
@@ -175,13 +182,16 @@ beforeEach(() => {
   useTenantAuthStore.setState({ tenant: null, staff: null });
   useCatalogTableStore.setState({ tenantId: null, catalogGroups: [], catalogItems: [], tables: [] });
   useOrderPaymentStore.getState().clearCurrentOrder();
+  useOrderPaymentStore.setState({ payments: Object.freeze([]) as never, auditEntries: [], lastReceipt: null });
   bootstrap.create.mockClear();
   hydrate.fromDexie.mockClear();
   hydrate.fromDexie.mockImplementation(async () => null);
   persist.occupy.mockClear();
   persist.pay.mockClear();
   persist.occupy.mockImplementation(async () => true);
-  persist.pay.mockImplementation(async () => true);
+  persist.pay.mockImplementation(async () => ({ kind: "committed" as const }));
+  persist.loadPay.mockClear();
+  persist.loadPay.mockImplementation(async () => null);
   restore.load.mockClear();
   restore.load.mockImplementation(async () => null);
   backup.exportBackup.mockClear();
@@ -1126,4 +1136,136 @@ test("other-tab persist event rehydrates catalog/tables for the same tenant", as
   await waitFor(() => expect(useCatalogTableStore.getState().tables[0]?.status).toBe("empty"));
   expect(useCatalogTableStore.getState().tables[0]?.currentOrderId).toBeUndefined();
   expect(useOrderPaymentStore.getState().currentOrder?.id).toBe("order-1");
+});
+
+const payOpenOrder = {
+  id: "order-1",
+  tenantId: tenant.id,
+  tableId: "t1",
+  staffId: staffRecord.id,
+  status: "open" as const,
+  items: [{
+    id: "line-1",
+    orderId: "order-1",
+    catalogItemId: "ci1",
+    name: "Cà phê đen",
+    price: 25_000,
+    quantity: 1,
+  }],
+  subtotal: 25_000,
+  discount: 0,
+  discountType: "amount" as const,
+  total: 25_000,
+  createdAt: 1,
+};
+
+const winnerPayment = {
+  id: "pay-win",
+  tenantId: tenant.id,
+  orderId: "order-1",
+  amount: 25_000,
+  tender: 25_000,
+  method: "cash" as const,
+  staffId: staffRecord.id,
+  createdAt: 20,
+};
+
+const winnerAudit = {
+  id: "payment:pay-win",
+  tenantId: tenant.id,
+  staffId: staffRecord.id,
+  action: "payment.recorded",
+  entityType: "order",
+  entityId: "order-1",
+  details: { paymentId: "pay-win", method: "cash", paidTotal: 25_000, tender: 25_000, change: 0 },
+  timestamp: 20,
+};
+
+async function openPayModal() {
+  restore.load.mockImplementation(async () => ({ order: payOpenOrder, audits: [] }));
+  bootstrap.create.mockImplementation(() =>
+    makeReadyBootstrap({ ...occupiedHydrate, persistable: true }),
+  );
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Đăng nhập" })).toBeTruthy());
+  await signInViaUI(staffRecord.id, "7890");
+  await waitFor(() => expect(screen.getByRole("heading", { name: "CafePOS" })).toBeTruthy());
+  fireEvent.click(screen.getAllByRole("button", { name: /Bàn 1/i })[0]);
+  await waitFor(() => expect(useOrderPaymentStore.getState().currentOrder?.items.length).toBe(1));
+  const payButton = screen.getAllByRole("button", { name: /Thanh toán/i }).find((button) => !(button as HTMLButtonElement).disabled);
+  expect(payButton).toBeTruthy();
+  fireEvent.click(payButton!);
+  await waitFor(() => expect(screen.getByLabelText("Số tiền khách đưa")).toBeTruthy());
+  fireEvent.change(screen.getByLabelText("Số tiền khách đưa"), { target: { value: "25000" } });
+  fireEvent.click(screen.getByRole("button", { name: /xác nhận thanh toán/i }));
+}
+
+test("conflict persist reconciles local loser to durable paid/empty and does not show receipt", async () => {
+  persist.pay.mockImplementation(async () => ({ kind: "conflict" as const }));
+  persist.loadPay.mockImplementation(async () => ({
+    table: { ...occupiedHydrate.tables[0], status: "empty" as const, currentOrderId: undefined },
+    order: { ...payOpenOrder, status: "paid" as const, paidAt: 20 },
+    payments: [winnerPayment],
+    audits: [winnerAudit],
+  }));
+  await openPayModal();
+  await waitFor(() => {
+    expect(useCatalogTableStore.getState().tables[0]?.status).toBe("empty");
+  });
+  expect(useOrderPaymentStore.getState().currentOrder?.status).toBe("paid");
+  expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).toEqual(["pay-win"]);
+  expect(screen.queryByText(/thanh toán thành công/i)).toBeNull();
+  expect(useOrderPaymentStore.getState().recordPayment({ ...winnerPayment, id: "pay-again", createdAt: 21 })).toBe(false);
+});
+
+test("io-error with durable predecessor rolls local payment back", async () => {
+  persist.pay.mockImplementation(async () => ({ kind: "io-error" as const }));
+  persist.loadPay.mockImplementation(async () => ({
+    table: occupiedHydrate.tables[0],
+    order: payOpenOrder,
+    payments: [],
+    audits: [],
+  }));
+  await openPayModal();
+  await waitFor(() => {
+    expect(persist.loadPay).toHaveBeenCalled();
+  });
+  expect(useOrderPaymentStore.getState().currentOrder?.status).toBe("open");
+  expect(useOrderPaymentStore.getState().payments).toEqual([]);
+  expect(useCatalogTableStore.getState().tables[0]).toMatchObject({ status: "occupied", currentOrderId: "order-1" });
+  expect(screen.queryByText(/thanh toán thành công/i)).toBeNull();
+});
+
+test("local release fail after durable commit still empties the table", async () => {
+  let resolvePay!: (value: { kind: "committed" }) => void;
+  persist.pay.mockImplementation(() => new Promise((resolve) => { resolvePay = resolve; }));
+  await openPayModal();
+  act(() => {
+    useCatalogTableStore.setState({
+      tables: [{ ...occupiedHydrate.tables[0], status: "occupied", currentOrderId: "order-other" }],
+    });
+  });
+  await act(async () => { resolvePay({ kind: "committed" }); });
+  await waitFor(() => {
+    expect(screen.getByText(/thanh toán thành công/i)).toBeTruthy();
+  });
+  expect(useCatalogTableStore.getState().tables[0]?.status).toBe("empty");
+});
+
+test("auth change while persist awaits reconciles durable and suppresses receipt", async () => {
+  persist.pay.mockImplementation(async () => {
+    useTenantAuthStore.setState({ tenant: null, staff: null });
+    return { kind: "committed" as const };
+  });
+  persist.loadPay.mockImplementation(async () => ({
+    table: { ...occupiedHydrate.tables[0], status: "empty" as const, currentOrderId: undefined },
+    order: { ...payOpenOrder, status: "paid" as const, paidAt: 20 },
+    payments: [winnerPayment],
+    audits: [winnerAudit],
+  }));
+  await openPayModal();
+  await waitFor(() => {
+    expect(persist.loadPay).toHaveBeenCalled();
+  });
+  expect(screen.queryByText(/thanh toán thành công/i)).toBeNull();
 });

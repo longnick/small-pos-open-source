@@ -3,7 +3,8 @@ import { bootstrapDemoPos } from "@/pos/demo-pos-bootstrap";
 import { loadProductBootstrap } from "@/pos/product-bootstrap";
 import { completeFirstRun } from "@/pos/product-setup";
 import { hydrateFromDexie } from "@/pos/dexie-hydrate";
-import { isDexiePersistSession, persistAfterOccupy, persistAfterPay, setDexiePersistSession } from "@/pos/dexie-persist";
+import { isDexiePersistSession, loadDurablePaySnapshot, persistAfterOccupy, persistAfterPay, setDexiePersistSession } from "@/pos/dexie-persist";
+import { reconcileLocalPayFromDurable } from "@/pos/reconcile-pay";
 import { loadRestoredOrderForTable } from "@/pos/dexie-restore";
 import { exportDexieBackup, importDexieBackup, importDexieRecoveryBackup } from "@/pos/dexie-backup";
 import { listenDexieTabEvents } from "@/pos/dexie-tabs";
@@ -63,7 +64,6 @@ function PosShell() {
   const catalogItems = useCatalogTableStore((state) => state.catalogItems);
   const releaseTable = useCatalogTableStore((state) => state.releaseTable);
   const occupyTable = useCatalogTableStore((state) => state.occupyTable);
-  const restoreOccupiedTable = useCatalogTableStore((state) => state.restoreOccupiedTable);
   const clearCurrentOrder = useOrderPaymentStore((state) => state.clearCurrentOrder);
   const createOpenOrder = useOrderPaymentStore((state) => state.createOpenOrder);
   const [view, setView] = useState<ViewId>("pos");
@@ -190,42 +190,59 @@ function PosShell() {
   };
 
   const handlePaymentSuccess = async (): Promise<boolean> => {
+    const startedStaffId = useTenantAuthStore.getState().staff?.id;
     const order = useOrderPaymentStore.getState().currentOrder;
     if (!order || order.status !== "paid") return false;
     const table = useCatalogTableStore.getState().tableById(order.tableId);
-    const payment = useOrderPaymentStore.getState().payments.find((entry) => entry.orderId === order.id);
+    const payment = [...useOrderPaymentStore.getState().payments].reverse().find((entry) => entry.orderId === order.id);
     const audit = useOrderPaymentStore.getState().auditEntries.find((entry) => entry.id === `payment:${payment?.id}`);
     const { paidAt: _paidAt, ...withoutPaidAt } = order;
     const predecessor = order.sentAt !== undefined
       ? { ...withoutPaidAt, status: "sent" as const }
       : { ...withoutPaidAt, status: "open" as const };
-    const rollback = () => {
-      if (payment) {
-        useOrderPaymentStore.getState().revertUnpersistedPayment({ paymentId: payment.id, predecessor });
-      }
-      if (table) restoreOccupiedTable(order.tableId, order.id, order.tenantId);
-    };
-    if (isDexiePersistSession()) {
-      if (!table || !payment || !audit) {
-        rollback();
-        return false;
-      }
-      const emptyTable = { ...table, status: "empty" as const, currentOrderId: undefined };
-      try {
-        const persisted = await persistAfterPay(
-          { authenticatedTenantId: order.tenantId },
-          { table: emptyTable, order, payment, audit, expectedPredecessor: predecessor },
-        );
-        if (!persisted) {
-          rollback();
-          return false;
-        }
-      } catch {
-        rollback();
-        return false;
-      }
+    if (!isDexiePersistSession()) {
+      return releaseTable(order.tableId, order.id);
     }
-    return releaseTable(order.tableId, order.id);
+    if (!table || !payment || !audit) return false;
+    const emptyTable = { ...table, status: "empty" as const, currentOrderId: undefined };
+    const persistInput = { authenticatedTenantId: order.tenantId };
+    const applyDurable = async (forceReceipt: boolean): Promise<boolean> => {
+      const durable = await loadDurablePaySnapshot(persistInput, { tableId: order.tableId, orderId: order.id });
+      if (!durable) return false;
+      reconcileLocalPayFromDurable(durable, { localPaymentId: payment.id, predecessor });
+      if (forceReceipt) {
+        releaseTable(order.tableId, order.id);
+        return true;
+      }
+      return false;
+    };
+    try {
+      if (useTenantAuthStore.getState().staff?.id !== startedStaffId || !isDexiePersistSession()) {
+        return applyDurable(false);
+      }
+      const outcome = await persistAfterPay(
+        persistInput,
+        { table: emptyTable, order, payment, audit, expectedPredecessor: predecessor },
+      );
+      if (useTenantAuthStore.getState().staff?.id !== startedStaffId) {
+        return applyDurable(false);
+      }
+      if (outcome.kind === "committed" || outcome.kind === "idempotent") {
+        if (!releaseTable(order.tableId, order.id)) {
+          useCatalogTableStore.getState().replaceTenantData(order.tenantId, {
+            catalogGroups: useCatalogTableStore.getState().catalogGroups,
+            catalogItems: useCatalogTableStore.getState().catalogItems,
+            tables: useCatalogTableStore.getState().tables.map((row) => (
+              row.id === order.tableId ? { ...row, status: "empty" as const, currentOrderId: undefined } : row
+            )),
+          });
+        }
+        return true;
+      }
+      return applyDurable(false);
+    } catch {
+      return applyDurable(false);
+    }
   };
 
   const handleReceiptClose = (): void => {

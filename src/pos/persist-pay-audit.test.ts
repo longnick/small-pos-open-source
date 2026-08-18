@@ -129,7 +129,7 @@ test("persistAfterPay writes payment.recorded audit atomically with the paid ord
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
       { table: occupiedTable(), order: paidOrder(), payment: payment(), audit: payAudit(), expectedPredecessor: openOrder() },
-    )).resolves.toBe(true);
+    )).resolves.toEqual({ kind: "committed" });
     expect(await readWritten(name)).toEqual({
       orders: [paidOrder()],
       payments: [payment()],
@@ -147,8 +147,8 @@ test("persistAfterPay is idempotent for the same payment audit id", async () => 
   }, async (name) => {
     const input = { authenticatedTenantId: tenantId, databaseName: name };
     const snapshot = { table: occupiedTable(), order: paidOrder(), payment: payment(), audit: payAudit(), expectedPredecessor: openOrder() };
-    await expect(persistAfterPay(input, snapshot)).resolves.toBe(true);
-    await expect(persistAfterPay(input, snapshot)).resolves.toBe(true);
+    await expect(persistAfterPay(input, snapshot)).resolves.toEqual({ kind: "committed" });
+    await expect(persistAfterPay(input, snapshot)).resolves.toEqual({ kind: "idempotent" });
     expect((await readWritten(name)).auditLog).toEqual([payAudit()]);
     expect((await readWritten(name)).payments).toEqual([payment()]);
   });
@@ -163,7 +163,7 @@ test("persistAfterPay rejects missing audit without write", async () => {
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
       { table: occupiedTable(), order: paidOrder(), payment: payment(), expectedPredecessor: openOrder() } as never,
-    )).resolves.toBe(false);
+    )).resolves.toEqual({ kind: "invalid" });
     expect(await readWritten(name)).toEqual({
       orders: [openOrder()],
       payments: [],
@@ -182,14 +182,14 @@ test("persistAfterPay refuses a different payload for the same payment id", asyn
     const input = { authenticatedTenantId: tenantId, databaseName: name };
     await expect(persistAfterPay(input, {
       table: occupiedTable(), order: paidOrder(), payment: payment(), audit: payAudit(), expectedPredecessor: openOrder(),
-    })).resolves.toBe(true);
+    })).resolves.toEqual({ kind: "committed" });
     await expect(persistAfterPay(input, {
       table: occupiedTable(),
       order: paidOrder(),
       payment: { ...payment(), tender: 30_000 },
       audit: { ...payAudit(), details: { ...payAudit().details, tender: 30_000, change: 5_000 } },
       expectedPredecessor: openOrder(),
-    })).resolves.toBe(false);
+    })).resolves.toEqual({ kind: "conflict" });
     expect((await readWritten(name)).payments).toEqual([payment()]);
     expect((await readWritten(name)).auditLog).toEqual([payAudit()]);
   });
@@ -204,14 +204,14 @@ test("persistAfterPay first payment wins against a second payment id", async () 
     const input = { authenticatedTenantId: tenantId, databaseName: name };
     await expect(persistAfterPay(input, {
       table: occupiedTable(), order: paidOrder(), payment: payment(), audit: payAudit(), expectedPredecessor: openOrder(),
-    })).resolves.toBe(true);
+    })).resolves.toEqual({ kind: "committed" });
     await expect(persistAfterPay(input, {
       table: occupiedTable(),
       order: { ...paidOrder(), paidAt: 21 },
       payment: { ...payment(), id: "pay-2", createdAt: 21 },
       audit: { ...payAudit(), id: "payment:pay-2", details: { ...payAudit().details, paymentId: "pay-2" }, timestamp: 21 },
       expectedPredecessor: openOrder(),
-    })).resolves.toBe(false);
+    })).resolves.toEqual({ kind: "conflict" });
     expect((await readWritten(name)).payments.map((row) => row.id)).toEqual(["pay-1"]);
   });
 });
@@ -233,7 +233,7 @@ test("persistAfterPay refuses when durable order is already paid with a differen
         audit: { ...payAudit(), id: "payment:pay-2", details: { ...payAudit().details, paymentId: "pay-2" }, timestamp: 30 },
         expectedPredecessor: openOrder(),
       },
-    )).resolves.toBe(false);
+    )).resolves.toEqual({ kind: "conflict" });
     expect((await readWritten(name)).payments.map((row) => row.id)).toEqual(["pay-1"]);
   });
 });
@@ -248,7 +248,7 @@ test("persistAfterPay refuses when expectedPredecessor does not match durable op
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
       { table: occupiedTable(), order: paidOrder(), payment: payment(), audit: payAudit(), expectedPredecessor: openOrder() },
-    )).resolves.toBe(false);
+    )).resolves.toEqual({ kind: "conflict" });
     expect(await readWritten(name)).toEqual({
       orders: [otherOpen],
       payments: [],
@@ -276,9 +276,113 @@ test("two connections: first payment id wins, second different id is rejected", 
       expectedPredecessor: openOrder(),
     });
     const results = await Promise.all([first, second]);
-    expect(results.filter((ok) => ok === true)).toHaveLength(1);
-    expect(results.filter((ok) => ok === false)).toHaveLength(1);
+    expect(results.map((row) => row.kind).sort()).toEqual(["committed", "conflict"]);
     expect((await readWritten(name)).payments).toHaveLength(1);
     expect((await readWritten(name)).auditLog).toHaveLength(1);
+  });
+});
+
+test("persistAfterPay rejects underpaid cash, over-tender noncash, and overflow tender", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(openOrder());
+  }, async (name) => {
+    const input = { authenticatedTenantId: tenantId, databaseName: name };
+    await expect(persistAfterPay(input, {
+      table: occupiedTable(),
+      order: paidOrder(),
+      payment: { ...payment(), tender: 24_999 },
+      audit: { ...payAudit(), details: { ...payAudit().details, tender: 24_999, change: -1 } },
+      expectedPredecessor: openOrder(),
+    })).resolves.toEqual({ kind: "invalid" });
+    await expect(persistAfterPay(input, {
+      table: occupiedTable(),
+      order: paidOrder(),
+      payment: { ...payment(), method: "card", tender: 30_000 },
+      audit: { ...payAudit(), details: { ...payAudit().details, method: "card", tender: 30_000, change: 5_000 } },
+      expectedPredecessor: openOrder(),
+    })).resolves.toEqual({ kind: "invalid" });
+    await expect(persistAfterPay(input, {
+      table: occupiedTable(),
+      order: paidOrder(),
+      payment: { ...payment(), tender: Number.MAX_SAFE_INTEGER + 1 },
+      audit: { ...payAudit(), details: { ...payAudit().details, tender: Number.MAX_SAFE_INTEGER + 1, change: Number.MAX_SAFE_INTEGER + 1 - 25_000 } },
+      expectedPredecessor: openOrder(),
+    })).resolves.toEqual({ kind: "invalid" });
+    expect(await readWritten(name)).toEqual({
+      orders: [openOrder()],
+      payments: [],
+      tables: [occupiedTable()],
+      auditLog: [],
+    });
+  });
+});
+
+test("persistAfterPay idempotent retry conflicts when table payload mismatches and does not rewrite table", async () => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(openOrder());
+  }, async (name) => {
+    const input = { authenticatedTenantId: tenantId, databaseName: name };
+    await expect(persistAfterPay(input, {
+      table: emptyTable(), order: paidOrder(), payment: payment(), audit: payAudit(), expectedPredecessor: openOrder(),
+    })).resolves.toEqual({ kind: "committed" });
+    expect((await readWritten(name)).tables).toEqual([emptyTable()]);
+    await expect(persistAfterPay(input, {
+      table: occupiedTable(), order: paidOrder(), payment: payment(), audit: payAudit(), expectedPredecessor: openOrder(),
+    })).resolves.toEqual({ kind: "conflict" });
+    expect((await readWritten(name)).tables).toEqual([emptyTable()]);
+    await expect(persistAfterPay(input, {
+      table: emptyTable(), order: paidOrder(), payment: payment(), audit: payAudit(), expectedPredecessor: openOrder(),
+    })).resolves.toEqual({ kind: "idempotent" });
+    expect((await readWritten(name)).tables).toEqual([emptyTable()]);
+  });
+});
+
+test("two connections: loser reconciles local memory to durable paid/empty", async () => {
+  const { useCatalogTableStore } = await import("../stores/catalog-table-store");
+  const { useOrderPaymentStore } = await import("../stores/order-payment-store");
+  const { useTenantAuthStore } = await import("../stores/tenant-auth-store");
+  const { reconcileLocalPayFromDurable } = await import("./reconcile-pay");
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.posTables.add(occupiedTable());
+    await database.orders.add(openOrder());
+  }, async (name) => {
+    const input = { authenticatedTenantId: tenantId, databaseName: name };
+    const first = persistAfterPay(input, {
+      table: emptyTable(), order: paidOrder(), payment: payment(), audit: payAudit(), expectedPredecessor: openOrder(),
+    });
+    const secondPay = { ...payment(), id: "pay-2", createdAt: 21 };
+    const secondAudit = { ...payAudit(), id: "payment:pay-2", details: { ...payAudit().details, paymentId: "pay-2" }, timestamp: 21 };
+    const second = persistAfterPay(input, {
+      table: emptyTable(),
+      order: { ...paidOrder(), paidAt: 21 },
+      payment: secondPay,
+      audit: secondAudit,
+      expectedPredecessor: openOrder(),
+    });
+    const results = await Promise.all([first, second]);
+    expect(results.map((row) => row.kind).sort()).toEqual(["committed", "conflict"]);
+    const { loadDurablePaySnapshot } = await import("./dexie-persist");
+    const durable = await loadDurablePaySnapshot(input, { tableId: "table-1", orderId: "order-1" });
+    expect(durable?.payments).toEqual([payment()]);
+    expect(durable?.table.status).toBe("empty");
+
+    useTenantAuthStore.setState({
+      tenant: null,
+      staff: { id: "staff-1", tenantId, name: "Cashier", role: "cashier", pinHash: "v1$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", createdAt: 0 },
+    });
+    useCatalogTableStore.setState({ tenantId, catalogGroups: [], catalogItems: [], tables: [occupiedTable()] });
+    useOrderPaymentStore.getState().clearCurrentOrder();
+    useOrderPaymentStore.setState({ payments: Object.freeze([]) as never, auditEntries: [], lastReceipt: null });
+    useOrderPaymentStore.getState().selectOpenOrder(openOrder());
+    expect(useOrderPaymentStore.getState().recordPayment(secondPay)).toBe(true);
+    expect(reconcileLocalPayFromDurable(durable!, { localPaymentId: "pay-2", predecessor: openOrder() })).toBe("winner");
+    expect(useOrderPaymentStore.getState().payments.map((row) => row.id)).toEqual(["pay-1"]);
+    expect(useCatalogTableStore.getState().tableById("table-1")?.status).toBe("empty");
+    expect(useOrderPaymentStore.getState().recordPayment({ ...secondPay, id: "pay-3", createdAt: 22 })).toBe(false);
   });
 });

@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 09:35 - Sprint 2 pay typed outcome + durable reconcile
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: persistAfterPay returns committed/idempotent/conflict/io-error/invalid. Loser reads durable snapshot. Winner paid/empty adopted. Tender overflow rejected.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0935-sprint-2-pay-reconcile.md`
+
 ## 2026-08-18 09:15 - Sprint 2 pay CAS + memory rollback
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`

@@ -231,7 +231,7 @@ test("pay writes paid order, payment, and empty table together", async () => {
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
       paySnapshot(emptyTable()),
-    )).resolves.toBe(true);
+    )).resolves.toEqual({ kind: "committed" });
     const written = await readWritten(name);
     expect(written.orders).toEqual([paidOrder()]);
     expect(written.payments).toEqual([payment()]);
@@ -248,7 +248,7 @@ test("pay persists occupied+paid split when release failed", async () => {
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
       paySnapshot(occupiedTable()),
-    )).resolves.toBe(true);
+    )).resolves.toEqual({ kind: "committed" });
     const written = await readWritten(name);
     expect(written.orders).toEqual([paidOrder()]);
     expect(written.payments).toEqual([payment()]);
@@ -372,8 +372,8 @@ test("pay is idempotent on the same payment id", async () => {
   }, async (name) => {
     const input = { authenticatedTenantId: tenantId, databaseName: name };
     const snapshot = paySnapshot(emptyTable());
-    await expect(persistAfterPay(input, snapshot)).resolves.toBe(true);
-    await expect(persistAfterPay(input, snapshot)).resolves.toBe(true);
+    await expect(persistAfterPay(input, snapshot)).resolves.toEqual({ kind: "committed" });
+    await expect(persistAfterPay(input, snapshot)).resolves.toEqual({ kind: "idempotent" });
     const written = await readWritten(name);
     expect(written.payments).toEqual([payment()]);
     expect(written.orders).toEqual([paidOrder()]);
@@ -391,7 +391,7 @@ test("pay snapshot waiting_payment is rejected without write", async () => {
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
       paySnapshot(waiting),
-    )).resolves.toBe(false);
+    )).resolves.toEqual({ kind: "invalid" });
     const written = await readWritten(name);
     expect(written.tables).toEqual([occupiedTable()]);
     expect(written.payments).toEqual([]);
@@ -407,7 +407,7 @@ test("pay refuses when Dexie table is occupied by another order", async () => {
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
       paySnapshot(emptyTable()),
-    )).resolves.toBe(false);
+    )).resolves.toEqual({ kind: "conflict" });
     const written = await readWritten(name);
     expect(written.tables).toEqual([occupiedTable("order-other")]);
     expect(written.orders.map((row) => row.id)).toEqual(["order-other"]);
@@ -425,7 +425,7 @@ test("pay refuses when Dexie table is non-empty without currentOrderId", async (
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
       paySnapshot(emptyTable()),
-    )).resolves.toBe(false);
+    )).resolves.toEqual({ kind: "conflict" });
     const written = await readWritten(name);
     expect(written.tables).toEqual([broken]);
     expect(written.payments).toEqual([]);
@@ -443,7 +443,7 @@ test("pay refuses when payment id already belongs to another order", async () =>
     await expect(persistAfterPay(
       { authenticatedTenantId: tenantId, databaseName: name },
       paySnapshot(emptyTable()),
-    )).resolves.toBe(false);
+    )).resolves.toEqual({ kind: "conflict" });
     expect((await readWritten(name)).payments).toEqual([otherPay]);
   });
 });
