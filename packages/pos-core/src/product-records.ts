@@ -151,6 +151,32 @@ export function isOrderItemRecord(value: unknown): value is Record<string, unkno
     && (value.cancelReason === undefined || typeof value.cancelReason === "string");
 }
 
+function notBeforeCreated(stamp: unknown, createdAt: number): boolean {
+  return stamp === undefined || (isSafeInteger(stamp) && stamp >= createdAt);
+}
+
+function orderStatusTimestampsValid(value: Record<string, unknown>): boolean {
+  const createdAt = value.createdAt;
+  if (!isSafeInteger(createdAt)) return false;
+  if (!notBeforeCreated(value.sentAt, createdAt)
+    || !notBeforeCreated(value.paidAt, createdAt)
+    || !notBeforeCreated(value.cancelledAt, createdAt)
+  ) return false;
+  if (value.status === "open") {
+    return value.sentAt === undefined && value.paidAt === undefined && value.cancelledAt === undefined;
+  }
+  if (value.status === "sent") {
+    return value.sentAt !== undefined && value.paidAt === undefined && value.cancelledAt === undefined;
+  }
+  if (value.status === "paid") {
+    return value.paidAt !== undefined && value.cancelledAt === undefined;
+  }
+  if (value.status === "cancelled") {
+    return value.cancelledAt !== undefined && value.paidAt === undefined;
+  }
+  return false;
+}
+
 export function isOrderRecord(value: unknown): value is Record<string, unknown> {
   if (!isPlainObject(value) || !isOwnDataGraph(value)) return false;
   if (!isNonemptyString(value.id)
@@ -171,10 +197,7 @@ export function isOrderRecord(value: unknown): value is Record<string, unknown> 
     || (value.discountPercent !== undefined && !isMoney(value.discountPercent))
     || (value.discountType === "amount" && value.discountPercent !== undefined)
     || (value.discountType === "percent" && value.discountPercent === undefined)
-    || (value.status === "open" && (value.sentAt !== undefined || value.paidAt !== undefined || value.cancelledAt !== undefined))
-    || (value.status === "paid" && value.paidAt === undefined)
-    || (value.status === "cancelled" && value.cancelledAt === undefined)
-    || (value.status === "sent" && value.sentAt === undefined)
+    || !orderStatusTimestampsValid(value)
   ) return false;
   const items = value.items;
   if (!items.every(isOrderItemRecord) || !uniqueIds(items as Array<{ id: unknown }>)) return false;
@@ -197,13 +220,14 @@ export function isPaymentRecord(value: unknown): value is Record<string, unknown
     || !isNonemptyString(value.tenantId)
     || !isNonemptyString(value.orderId)
     || !isMoney(value.amount)
-    || !isMoney(value.tender)
     || typeof value.method !== "string"
     || !PAYMENT_METHODS.has(value.method)
     || !isNonemptyString(value.staffId)
     || !isSafeInteger(value.createdAt)
     || (value.note !== undefined && typeof value.note !== "string")
   ) return false;
+  if (value.tender === undefined) return true;
+  if (!isMoney(value.tender)) return false;
   return value.method === "cash" ? value.tender >= value.amount : value.tender === value.amount;
 }
 
@@ -288,15 +312,13 @@ export function isProductViableBackupData(data: {
   const tenantId = (data.tenants[0] as { id: string }).id;
   const staffIds = new Set(data.staff.map((row) => (row as { id: string }).id));
   const tableIds = new Set(data.tables.map((row) => (row as { id: string }).id));
-  const catalogIds = new Set(data.catalogItems.map((row) => (row as { id: string }).id));
   if (data.tables.some((row) => !staffIds.has((row as { staffId: string }).staffId))) return false;
   if (!data.orders.every(isOrderRecord) || !uniqueIds(data.orders as Array<{ id: unknown }>)) return false;
   if (data.orders.some((row) => {
-    const order = row as { tenantId: string; tableId: string; staffId: string; items: Array<{ catalogItemId: string }> };
+    const order = row as { tenantId: string; tableId: string; staffId: string };
     return order.tenantId !== tenantId
       || !tableIds.has(order.tableId)
-      || !staffIds.has(order.staffId)
-      || order.items.some((item) => !catalogIds.has(item.catalogItemId));
+      || !staffIds.has(order.staffId);
   })) return false;
   const ordersById = new Map(data.orders.map((row) => [(row as { id: string }).id, row as Record<string, unknown>]));
   if (data.tables.some((row) => {

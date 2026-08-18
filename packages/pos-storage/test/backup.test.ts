@@ -370,6 +370,26 @@ test.each([
       data.auditLog = [audit];
     },
   ],
+  [
+    "paidAt before createdAt",
+    (data: Record<string, unknown[]>) => {
+      data.orders = data.orders.map((row) => {
+        const order = { ...(row as Record<string, unknown>) };
+        if (order.status === "paid") return { ...order, createdAt: 20, paidAt: 8 };
+        return order;
+      });
+    },
+  ],
+  [
+    "paid order also has cancelledAt",
+    (data: Record<string, unknown[]>) => {
+      data.orders = data.orders.map((row) => {
+        const order = { ...(row as Record<string, unknown>) };
+        if (order.status === "paid") return { ...order, cancelledAt: 9 };
+        return order;
+      });
+    },
+  ],
 ])("rejects operational %s and leaves all 10 stores unchanged", async (_name, mutate) => {
   const database = createDatabase();
   try {
@@ -386,20 +406,52 @@ test.each([
   }
 });
 
-test("successful import replaces every store with a viable shop", async () => {
+test("successful import replaces every store from a nonempty 10-store backup", async () => {
   const source = createDatabase();
   const database = createDatabase();
 
   try {
     await source.open();
     await database.open();
-    await seedViableShop(database, "Quán Cũ", 1);
-    await seedViableShop(source, "Quán Mới", 2);
+    await seedOperationalShop(database, "Quán Cũ");
+    await seedOperationalShop(source, "Quán Mới");
+    const beforeSource = await readAll(source);
+    expect(v2Stores.every((store) => (beforeSource[store] as unknown[]).length > 0)).toBe(true);
     const json = await exportBackup(source);
     await importBackup(database, json);
-    expect((await database.tenants.toArray())[0].name).toBe("Quán Mới");
-    expect(await database.posTables.count()).toBe(2);
-    expect(await database.appConfig.count()).toBe(1);
+    expect(await readAll(database)).toEqual(beforeSource);
+  } finally {
+    source.close();
+    database.close();
+    await source.delete();
+    await database.delete();
+  }
+});
+
+test("imports a legacy payment without tender and a retired catalog SKU snapshot", async () => {
+  const source = createDatabase();
+  const database = createDatabase();
+
+  try {
+    await source.open();
+    await database.open();
+    await seedOperationalShop(source);
+    await seedViableShop(database, "Quán Cũ", 1);
+    const json = await mutateExport(source, (data) => {
+      const payment = { ...(data.payments[0] as Record<string, unknown>) };
+      delete payment.tender;
+      data.payments = [payment];
+      const order = data.orders.find((row) => (row as { status?: string }).status === "paid") as Record<string, unknown>;
+      const items = [...(order.items as unknown[])];
+      items[0] = { ...(items[0] as Record<string, unknown>), catalogItemId: "retired-sku" };
+      data.orders = data.orders.map((row) => ((row as { id: string }).id === order.id ? { ...order, items } : row));
+    });
+    await importBackup(database, json);
+    const imported = JSON.parse(json).data;
+    expect(await readAll(database)).toEqual(imported);
+    expect((await database.payments.toArray())[0].tender).toBeUndefined();
+    const paid = (await database.orders.toArray()).find((row) => row.status === "paid");
+    expect(paid?.items[0].catalogItemId).toBe("retired-sku");
   } finally {
     source.close();
     database.close();
