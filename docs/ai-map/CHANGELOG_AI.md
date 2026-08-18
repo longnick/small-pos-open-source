@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 12:25 - Sprint 2 restore audit relevance
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`
+Branch: `feat/sprint-2-canonical-sell-flow`
+Agent: Hermes / gcli/grok-4.6
+Summary: Restore ignores payment audits for other orders. Fail-closed stays for malformed target-order audits.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-1225-sprint-2-restore-audit.md`
+
 ## 2026-08-18 12:10 - Sprint 2 reset selected table on sessionToken
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-99ef4e50`

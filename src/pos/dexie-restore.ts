@@ -220,7 +220,7 @@ export async function loadRestoredOrderForTable(
         const record = materializeRecord(raw);
         const related = record && (
           record.entityId === order.id
-          || (typeof record.id === "string" && (record.id === `send:${order.id}` || String(record.id).startsWith("payment:")))
+          || (typeof record.id === "string" && record.id === `send:${order.id}`)
         );
         if (!related) continue;
         if (!record || !isAuditRecord(record) || record.entityType !== "order" || record.entityId !== order.id) return null;
