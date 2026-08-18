@@ -1,5 +1,53 @@
 # AI Changelog
 
+## 2026-08-18 08:03 - Sprint 1 sentAt ordering + untracked E2E screenshots
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
+Branch: `feat/sprint-1-product-bootstrap`
+Agent: Hermes / gcli/grok-4.6
+Summary: paidAt/cancelledAt must be >= sentAt when sentAt exists. Smoke/visual screenshots go to gitignored test-results.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0803-sprint-1-sentat-order.md`
+
+## 2026-08-18 07:53 - Sprint 1 compatibility and order timestamp invariants
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
+Branch: `feat/sprint-1-product-bootstrap`
+Agent: Hermes / gcli/grok-4.6
+Summary: Recovery accepts legacy payment without tender and retired SKU snapshots. Order timestamps cannot contradict status or precede createdAt. Success import proves all 10 stores.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0753-sprint-1-compat-invariants.md`
+
+## 2026-08-18 07:45 - Sprint 1 recovery graph 10-store prevalidation
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
+Branch: `feat/sprint-1-product-bootstrap`
+Agent: Hermes / gcli/grok-4.6
+Summary: Backup import validates all 10 stores and table/order/payment/shift/audit graph before write. Hydrate reuses shared record checkers. CI runs real oxlint.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0745-sprint-1-recovery-graph.md`
+
+## 2026-08-18 07:26 - Sprint 1 Sol P1 validator follow-up
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
+Branch: `feat/sprint-1-product-bootstrap`
+Agent: Hermes / gcli/grok-4.6
+Summary: Shared product-record validators for backup and setup-state. Strict v1 PIN hash lengths. Recovery verifier proof. Drop unused node:path.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0726-sprint-1-p1-validators.md`
+
+## 2026-08-18 07:15 - Sprint 1 Sol BLOCKED fixes
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
+Branch: `feat/sprint-1-product-bootstrap`
+Agent: Hermes / gcli/grok-4.6
+Summary: Prevalidate backup before write. Reject v1. Recovery + Chromium v1→v2 E2E. CI/release include those suites. PIN throttle + hash-risk docs.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0715-sprint-1-sol-blockers.md`
+
+## 2026-08-18 06:10 - Sprint 1 product bootstrap
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
+Branch: `feat/sprint-1-product-bootstrap`
+Agent: Hermes / gcli/grok-4.6
+Summary: First-run wizard, Dexie v2 appConfig, product bootstrap, salted PIN, setup/start scripts, clean-profile E2E. Demo PIN no longer product default.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0610-sprint-1-product-bootstrap.md`
+
 ## 2026-08-15 11:45 - Dexie Later #3 multi-tab CAS
 
 Repo: `/home/longnick/projects/small-pos-dexie-tabs`

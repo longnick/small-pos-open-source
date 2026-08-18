@@ -39,8 +39,9 @@ test("opens exact v1 schema with isolated typed records and indexes", async () =
     await database.staff.add(staff);
     await database.posTables.add(posTable);
 
-    expect(database.verno).toBe(1);
+    expect(database.verno).toBe(2);
     expect(database.tables.map(({ name }) => name).sort()).toEqual([
+      "appConfig",
       "auditLog",
       "catalogGroups",
       "catalogItems",

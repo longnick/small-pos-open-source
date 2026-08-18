@@ -1,5 +1,12 @@
 import { PosDatabase } from "../../packages/pos-storage/src/db";
-import type { CatalogGroup, CatalogItem, PosTable, Tenant } from "../../packages/pos-core/src/types";
+import type { CatalogGroup, CatalogItem, PosTable } from "../../packages/pos-core/src/types";
+import {
+  isCatalogGroupRecord,
+  isCatalogItemRecord,
+  isPlainObject,
+  isPosTableRecord,
+  isTenantRecord,
+} from "../../packages/pos-core/src/product-records";
 
 export type DexieHydrateInput = {
   authenticatedTenantId: string;
@@ -13,12 +20,6 @@ export type DexieHydrateResult = {
 };
 
 const isPrimitiveNonemptyString = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
-const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
-const isNonnegativeInteger = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0;
-const isTableNumber = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 10;
-const isOptionalString = (value: unknown): value is string | undefined => value === undefined || typeof value === "string";
 
 const materializeRecord = (value: unknown): Record<string, unknown> | null => {
   if (!isPlainObject(value)) return null;
@@ -27,38 +28,10 @@ const materializeRecord = (value: unknown): Record<string, unknown> | null => {
   return Object.fromEntries(Reflect.ownKeys(descriptors).map((key) => [key, descriptors[key as keyof typeof descriptors].value]));
 };
 
-const hasRecordIdentity = (value: Record<string, unknown>): value is Record<string, unknown> & { id: string; tenantId: string } =>
-  isPrimitiveNonemptyString(value.id) && isPrimitiveNonemptyString(value.tenantId);
-
-const isTenant = (value: Record<string, unknown>): value is Record<string, unknown> & Tenant =>
-  isPrimitiveNonemptyString(value.id)
-  && isPrimitiveNonemptyString(value.name)
-  && isPrimitiveNonemptyString(value.address)
-  && isPrimitiveNonemptyString(value.phone)
-  && value.currency === "VND";
-
-const isCatalogGroup = (value: Record<string, unknown>): value is Record<string, unknown> & CatalogGroup =>
-  hasRecordIdentity(value) && isPrimitiveNonemptyString(value.name) && isFiniteNumber(value.sortOrder);
-
-const isCatalogItem = (value: Record<string, unknown>): value is Record<string, unknown> & CatalogItem =>
-  hasRecordIdentity(value)
-  && isPrimitiveNonemptyString(value.groupId)
-  && isPrimitiveNonemptyString(value.name)
-  && isNonnegativeInteger(value.price)
-  && typeof value.available === "boolean"
-  && isFiniteNumber(value.sortOrder)
-  && isFiniteNumber(value.createdAt)
-  && isFiniteNumber(value.updatedAt)
-  && isOptionalString(value.description)
-  && isOptionalString(value.imageUrl);
-
-const isPosTable = (value: Record<string, unknown>): value is Record<string, unknown> & PosTable =>
-  hasRecordIdentity(value)
-  && isPrimitiveNonemptyString(value.staffId)
-  && isTableNumber(value.number)
-  && (value.status === "empty" || value.status === "occupied" || value.status === "waiting_payment")
-  && isFiniteNumber(value.openedAt)
-  && isOptionalString(value.currentOrderId);
+const isTenant = (value: Record<string, unknown>) => isTenantRecord(value);
+const isCatalogGroup = (value: Record<string, unknown>) => isCatalogGroupRecord(value);
+const isCatalogItem = (value: Record<string, unknown>) => isCatalogItemRecord(value);
+const isPosTable = (value: Record<string, unknown>) => isPosTableRecord(value);
 
 const hasDuplicate = <T extends { id: string }>(records: T[]) => new Set(records.map(({ id }) => id)).size !== records.length;
 

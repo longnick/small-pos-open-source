@@ -3,13 +3,14 @@ import { fileURLToPath } from "url";
 import path from "path";
 
 // ---------------------------------------------------------------------------
-// Screenshot directory (relative to this spec file → docs/ai-map/TASK_LOGS)
+// Screenshot directory: untracked test-results so release verification
+// cannot rewrite committed historical PNGs under docs/.
 // ---------------------------------------------------------------------------
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const SCREENSHOT_DIR = path.resolve(__dirname, "../docs/ai-map/TASK_LOGS");
+const SCREENSHOT_DIR = path.resolve(__dirname, "../test-results/e2e-screenshots");
 
 // ---------------------------------------------------------------------------
 // Existing Slice A smoke tests

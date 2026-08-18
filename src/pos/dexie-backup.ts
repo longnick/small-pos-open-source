@@ -61,3 +61,20 @@ export async function importDexieBackup(
   useCatalogTableStore.getState().clear();
   return "imported-unusable";
 }
+
+export async function importDexieRecoveryBackup(
+  input: { databaseName?: string },
+  json: string,
+): Promise<boolean> {
+  if (!input || typeof json !== "string") return false;
+  const database = new PosDatabase(input.databaseName ?? "small-pos");
+  try {
+    await database.open();
+    await importBackup(database, json);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    database.close();
+  }
+}

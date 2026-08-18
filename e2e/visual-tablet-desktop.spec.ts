@@ -4,7 +4,7 @@ import path from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const SCREENSHOT_DIR = path.resolve(__dirname, "../docs/ai-map/TASK_LOGS");
+const SCREENSHOT_DIR = path.resolve(__dirname, "../test-results/e2e-screenshots");
 
 /** Tailwind `lg` is 1024px. Desktop shell uses 3 columns; tablet keeps tabs. */
 const DESKTOP_MIN_WIDTH = 1024;

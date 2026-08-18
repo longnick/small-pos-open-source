@@ -1,15 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { bootstrapDemoAuth } from "@/auth/demo-auth-adapter";
 import { bootstrapDemoPos } from "@/pos/demo-pos-bootstrap";
+import { loadProductBootstrap } from "@/pos/product-bootstrap";
+import { completeFirstRun } from "@/pos/product-setup";
 import { hydrateFromDexie } from "@/pos/dexie-hydrate";
 import { isDexiePersistSession, persistAfterOccupy, persistAfterPay, setDexiePersistSession } from "@/pos/dexie-persist";
 import { loadOpenOrderForTable } from "@/pos/dexie-restore";
-import { exportDexieBackup, importDexieBackup } from "@/pos/dexie-backup";
+import { exportDexieBackup, importDexieBackup, importDexieRecoveryBackup } from "@/pos/dexie-backup";
 import { listenDexieTabEvents } from "@/pos/dexie-tabs";
 import { PinLoginScreen } from "@/components/auth/PinLogin";
+import { FirstRunWizard } from "@/components/setup/FirstRunWizard";
+import { SetupRecovery } from "@/components/setup/SetupRecovery";
+import { allowPinAttempt } from "@/auth/login-throttle";
 import { useTenantAuthStore } from "@/stores/tenant-auth-store";
 import { useCatalogTableStore } from "@/stores/catalog-table-store";
 import { useOrderPaymentStore } from "@/stores/order-payment-store";
+import { PosDatabase } from "../packages/pos-storage/src/db";
+import type { FirstRunInput } from "./pos/product-setup";
 import type { Staff, Tenant } from "../packages/pos-core/src/types";
 import type { PinHashVerifier } from "../packages/pos-core/src/auth";
 import {
@@ -365,7 +371,7 @@ function PosShell() {
 // ponytail: ephemeral demo verifier only; replace with approved bcrypt/cloud
 // adapter at persistence/auth integration.
 
-type BootstrapState = "loading" | "fatal" | "ready";
+type BootstrapState = "loading" | "fatal" | "ready" | "needs-setup" | "corrupt";
 
 function App() {
   const [bootState, setBootState] = useState<BootstrapState>("loading");
@@ -379,6 +385,7 @@ function App() {
   const [authenticatedStaff, setAuthenticatedStaff] = useState<Staff | null>(null);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const verifierRef = useRef<PinHashVerifier | null>(null);
+  const bootGenerationRef = useRef(0);
 
   const { tenant, staff: signedInStaff, setTenant, signIn } = useTenantAuthStore();
 
@@ -414,30 +421,47 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
+    const generation = ++bootGenerationRef.current;
     setAuthenticatedStaff(null);
     setDexiePersistSession(false);
-    Promise.all([bootstrapDemoAuth(), bootstrapDemoPos()])
-      .then(async ([{ tenant: t, staff: s, verifier: v }, pos]) => {
-        if (cancelled) return;
-        verifierRef.current = v;
-        setTenant(t);
-        setBootTenant(t);
-        setStaffList(s);
+    Promise.all([loadProductBootstrap(), bootstrapDemoPos()])
+      .then(async ([product, pos]) => {
+        if (cancelled || generation !== bootGenerationRef.current) return;
+        if (product.kind === "needs-setup") {
+          verifierRef.current = null;
+          setBootTenant(null);
+          setStaffList([]);
+          setTenant(null);
+          setBootState("needs-setup");
+          return;
+        }
+        if (product.kind === "corrupt") {
+          verifierRef.current = null;
+          setBootTenant(null);
+          setStaffList([]);
+          setTenant(null);
+          setBootState("corrupt");
+          return;
+        }
+        verifierRef.current = product.verifier;
+        setTenant(product.tenant);
+        setBootTenant(product.tenant);
+        setStaffList(product.staff);
         if (pos) {
-          useCatalogTableStore.getState().replaceTenantData(t.id, pos);
+          useCatalogTableStore.getState().replaceTenantData(product.tenant.id, pos);
           if (pos.currentOrder) useOrderPaymentStore.getState().selectOpenOrder(pos.currentOrder);
         } else {
-          const hydrated = await hydrateFromDexie({ authenticatedTenantId: t.id });
-          if (cancelled) return;
-          if (hydrated) {
-            useCatalogTableStore.getState().replaceTenantData(t.id, hydrated);
-            setDexiePersistSession(true);
-          }
+          useCatalogTableStore.getState().replaceTenantData(product.tenant.id, {
+            catalogGroups: product.catalogGroups,
+            catalogItems: product.catalogItems,
+            tables: product.tables,
+          });
+          if (product.persistable) setDexiePersistSession(true);
         }
         setBootState("ready");
       })
       .catch(() => {
-        if (cancelled) return;
+        if (cancelled || generation !== bootGenerationRef.current) return;
         verifierRef.current = null;
         setAuthenticatedStaff(null);
         setBootTenant(null);
@@ -472,6 +496,7 @@ function App() {
   async function handleSignIn(staffId: string, pin: string): Promise<boolean> {
     const verifier = verifierRef.current;
     if (!verifier) return false;
+    if (!allowPinAttempt(staffId)) return false;
     const candidate = staffList.find((s) => s.id === staffId);
     if (!candidate || candidate.tenantId !== tenant?.id) return false;
     const ok = await signIn(pin, candidate, verifier);
@@ -485,14 +510,69 @@ function App() {
     return ok;
   }
 
+  async function handleFirstRun(input: FirstRunInput): Promise<boolean> {
+    const database = new PosDatabase();
+    try {
+      await database.open();
+      const result = await completeFirstRun(database, input);
+      if (!result.ok) return false;
+    } catch {
+      return false;
+    } finally {
+      database.close();
+    }
+    const product = await loadProductBootstrap();
+    if (product.kind !== "ready") return false;
+    verifierRef.current = product.verifier;
+    setTenant(product.tenant);
+    setBootTenant(product.tenant);
+    setStaffList(product.staff);
+    useCatalogTableStore.getState().replaceTenantData(product.tenant.id, {
+      catalogGroups: product.catalogGroups,
+      catalogItems: product.catalogItems,
+      tables: product.tables,
+    });
+    if (product.persistable) setDexiePersistSession(true);
+    setBootState("ready");
+    return true;
+  }
+
+  async function handleRecoveryImport(json: string): Promise<boolean> {
+    const imported = await importDexieRecoveryBackup({}, json);
+    if (!imported) return false;
+    const product = await loadProductBootstrap();
+    if (product.kind !== "ready") return false;
+    verifierRef.current = product.verifier;
+    setTenant(product.tenant);
+    setBootTenant(product.tenant);
+    setStaffList(product.staff);
+    useCatalogTableStore.getState().replaceTenantData(product.tenant.id, {
+      catalogGroups: product.catalogGroups,
+      catalogItems: product.catalogItems,
+      tables: product.tables,
+    });
+    if (product.persistable) setDexiePersistSession(true);
+    setBootState("ready");
+    return true;
+  }
+
   if (isAuthenticated) {
     return <PosShell />;
   }
 
+  if (bootState === "needs-setup") {
+    return <FirstRunWizard onComplete={handleFirstRun} />;
+  }
+
+  if (bootState === "corrupt") {
+    return <SetupRecovery onImport={handleRecoveryImport} />;
+  }
+
   return (
     <PinLoginScreen
-      state={bootState}
+      state={bootState === "fatal" ? "fatal" : bootState === "ready" ? "ready" : "loading"}
       staff={staffList}
+      tenantName={bootTenant?.name ?? ""}
       onSignIn={handleSignIn}
     />
   );

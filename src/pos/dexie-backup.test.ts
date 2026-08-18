@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test } from "vitest";
 import type { CatalogGroup, CatalogItem, PosTable, Staff, Tenant } from "../../packages/pos-core/src/types";
 import { PosDatabase } from "../../packages/pos-storage/src/db";
 import { exportBackup } from "../../packages/pos-storage/src/backup";
@@ -89,7 +89,8 @@ test("exportDexieBackup returns JSON only after hydrate-success session", async 
     const json = await exportDexieBackup({ authenticatedTenantId: tenantId, databaseName: name });
     expect(json).not.toBeNull();
     const parsed = JSON.parse(json as string);
-    expect(parsed.version).toBe(1);
+    expect(parsed.version).toBe(2);
+    expect(parsed.data.appConfig).toBeDefined();
     expect(parsed.data.tenants).toHaveLength(1);
     expect(parsed.data.staff[0].pinHash).toBe(pinHash);
   });
@@ -130,6 +131,7 @@ test("importDexieBackup replaces stores then hydrates catalog/tables and clears 
       await source.open();
       await source.tenants.add(tenant());
       await source.staff.add(staff());
+      await source.appConfig.add({ id: "product", tenantId, completedAt: 1 });
       await source.catalogGroups.add({ ...group(), name: "Trà" });
       await source.catalogItems.add(item());
       await source.posTables.add(table());
@@ -171,7 +173,7 @@ test("importDexieBackup is no-op when persist session is off", async () => {
   });
 });
 
-test("import that writes Dexie but fails hydrate clears stale catalog", async () => {
+test("unviable backup is rejected before write and leaves memory stores", async () => {
   useCatalogTableStore.getState().replaceTenantData(tenantId, {
     catalogGroups: [group()],
     catalogItems: [item()],
@@ -204,16 +206,31 @@ test("import that writes Dexie but fails hydrate clears stale catalog", async ()
   };
   const json = JSON.stringify({ version: 1, exportedAt: 0, data: emptyStores });
 
-  await withDb(async () => undefined, async (name) => {
+  const beforeCatalog = structuredClone(useCatalogTableStore.getState().catalogGroups);
+  const beforeOrder = structuredClone(useOrderPaymentStore.getState().currentOrder);
+
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.staff.add(staff());
+    await database.appConfig.add({ id: "product", tenantId, completedAt: 1 });
+    await database.posTables.add(table());
+  }, async (name) => {
     const result = await importDexieBackup({ authenticatedTenantId: tenantId, databaseName: name }, json);
-    expect(result).toBe("imported-unusable");
-    expect(useOrderPaymentStore.getState().currentOrder).toBeNull();
-    expect(useCatalogTableStore.getState().catalogGroups).toEqual([]);
-    expect(useCatalogTableStore.getState().tables).toEqual([]);
+    expect(result).toBe(false);
+    expect(useOrderPaymentStore.getState().currentOrder).toEqual(beforeOrder);
+    expect(useCatalogTableStore.getState().catalogGroups).toEqual(beforeCatalog);
+    const live = new PosDatabase(name);
+    try {
+      await live.open();
+      expect(await live.tenants.count()).toBe(1);
+      expect(await live.appConfig.count()).toBe(1);
+    } finally {
+      live.close();
+    }
   });
 });
 
-test("import that writes Dexie then hydrate throw still clears stale catalog", async () => {
+test("v1 backup is rejected before write even if hydrate would throw", async () => {
   useCatalogTableStore.getState().replaceTenantData(tenantId, {
     catalogGroups: [group()],
     catalogItems: [item()],
@@ -231,14 +248,21 @@ test("import that writes Dexie then hydrate throw still clears stale catalog", a
     auditLog: [],
   };
   const json = JSON.stringify({ version: 1, exportedAt: 0, data: emptyStores });
-  const hydrate = await import("./dexie-hydrate");
-  const spy = vi.spyOn(hydrate, "hydrateFromDexie").mockRejectedValueOnce(new Error("hydrate-boom"));
+  const before = structuredClone(useCatalogTableStore.getState().catalogGroups);
 
-  await withDb(async () => undefined, async (name) => {
+  await withDb(async (database) => {
+    await database.tenants.add(tenant());
+    await database.appConfig.add({ id: "product", tenantId, completedAt: 1 });
+  }, async (name) => {
     const result = await importDexieBackup({ authenticatedTenantId: tenantId, databaseName: name }, json);
-    expect(result).toBe("imported-unusable");
-    expect(useCatalogTableStore.getState().catalogGroups).toEqual([]);
-    expect(useCatalogTableStore.getState().tables).toEqual([]);
+    expect(result).toBe(false);
+    expect(useCatalogTableStore.getState().catalogGroups).toEqual(before);
+    const live = new PosDatabase(name);
+    try {
+      await live.open();
+      expect(await live.tenants.count()).toBe(1);
+    } finally {
+      live.close();
+    }
   });
-  spy.mockRestore();
 });

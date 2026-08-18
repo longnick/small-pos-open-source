@@ -17,6 +17,8 @@ export interface PinLoginScreenProps {
   state: LoginState;
   /** Staff list from demo-auth-adapter bootstrap, already stripped of raw PIN. */
   staff: Staff[];
+  /** Visible shop name. Product bootstrap supplies the persisted tenant name. */
+  tenantName?: string;
   /** Called with (staffId, pin). Returns true on success. */
   onSignIn: (staffId: string, pin: string) => Promise<boolean>;
 }
@@ -61,9 +63,11 @@ function FatalScreen() {
 
 function LoginForm({
   staff,
+  tenantName,
   onSignIn,
 }: {
   staff: Staff[];
+  tenantName: string;
   onSignIn: (staffId: string, pin: string) => Promise<boolean>;
 }) {
   const [selectedId, setSelectedId] = useState("");
@@ -135,7 +139,7 @@ function LoginForm({
             Đăng nhập
           </h1>
           <p className="mb-6 text-center text-sm text-muted-foreground">
-            Quán Demo
+            {tenantName}
           </p>
 
           <form
@@ -230,8 +234,8 @@ function LoginForm({
 
 // --- Exported screen ---
 
-export function PinLoginScreen({ state, staff, onSignIn }: PinLoginScreenProps) {
+export function PinLoginScreen({ state, staff, tenantName = "", onSignIn }: PinLoginScreenProps) {
   if (state === "loading") return <LoadingScreen />;
   if (state === "fatal") return <FatalScreen />;
-  return <LoginForm staff={staff} onSignIn={onSignIn} />;
+  return <LoginForm staff={staff} tenantName={tenantName} onSignIn={onSignIn} />;
 }

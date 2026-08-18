@@ -217,14 +217,22 @@ Purpose: render hardcoded staff rows in the Lovable shell. No store, no mutation
 ## Module: Local persistence
 
 - `packages/pos-storage/src/db.ts`
-  - role: Dexie v1, 9 stores.
+  - role: Dexie v2 additive. Nine v1 stores plus `appConfig`.
   - depends on: `packages/pos-core/src/types.ts`.
-  - used by: package tests + `src/pos/dexie-hydrate.ts` + `src/pos/dexie-persist.ts`.
-  - notes: Hydrate `docs/dexie-design.md`. Write-back `docs/dexie-persist.md`. No schema bump.
+  - used by: package tests + product bootstrap/setup + Dexie adapters.
+  - notes: `version(2)` only adds `appConfig`. v1 rows survive upgrade.
 
 - `packages/pos-storage/src/backup.ts`
-  - role: v1 JSON export/import, fail-closed.
+  - role: export version 2 including `appConfig`. Import accepts v1 (9 stores) or v2 (10 stores).
   - used by: package tests + `src/pos/dexie-backup.ts`.
+
+- `src/pos/product-setup.ts`
+  - role: first-run write + setup-state read + salted PIN verify.
+  - used by: `src/App.tsx`, `src/pos/product-bootstrap.ts`.
+
+- `src/pos/product-bootstrap.ts`
+  - role: product default boot. Empty = needs-setup. Valid config = ready tenant/staff/catalog/tables. Else corrupt.
+  - used by: `src/App.tsx`. E2E aliases this module.
 
 - `src/pos/dexie-backup.ts`
   - role: session-gated export/import. Import clears currentOrder then rehydrates catalog/tables.

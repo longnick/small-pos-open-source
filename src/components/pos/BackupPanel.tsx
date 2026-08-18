@@ -67,7 +67,7 @@ export function BackupPanel({ persistSession, onExport, onImport }: BackupPanelP
     <div className="flex h-full flex-col gap-3">
       <div>
         <h2 className="text-lg font-bold text-foreground">Sao lưu dữ liệu</h2>
-        <p className="text-xs text-muted-foreground">Tải hoặc thay thế bản sao lưu local. Không hiện mã PIN.</p>
+        <p className="text-xs text-muted-foreground">Tải hoặc thay thế bản sao lưu local phiên bản 2. Tệp chứa hash PIN — không chia sẻ. Không hiện mã PIN.</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={!persistSession} onClick={() => void exportBackup()}>

@@ -6,7 +6,7 @@ Small POS is a reference starter. Roadmap items are not promises and should not 
 
 - [x] Tenant, staff, catalog, table, order, shift, and audit domain foundations.
 - [x] Integer-VND order totals and discount calculation.
-- [x] Local PIN-gated demo shell and fixture E2E adapter.
+- [x] Local PIN-gated product shell, first-run wizard, and fixture E2E adapter.
 - [x] Local payment lifecycle with tender validation, change, receipt, audit, and duplicate protection.
 - [x] Unit, typecheck, build, leakage, and fixture Playwright gates.
 

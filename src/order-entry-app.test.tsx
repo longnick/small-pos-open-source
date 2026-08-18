@@ -14,7 +14,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { Staff, Tenant } from "../packages/pos-core/src/types";
 import type { PinHashVerifier } from "../packages/pos-core/src/auth";
-import type { DemoAuthBootstrap } from "./auth/demo-auth-adapter";
+import type { ProductBootstrap } from "./pos/product-bootstrap";
 import { useTenantAuthStore } from "./stores/tenant-auth-store";
 import { useCatalogTableStore } from "./stores/catalog-table-store";
 import { useOrderPaymentStore } from "./stores/order-payment-store";
@@ -24,13 +24,13 @@ import { useOrderPaymentStore } from "./stores/order-payment-store";
 // ---------------------------------------------------------------------------
 
 const bootstrap = vi.hoisted(() => ({
-  create: vi.fn<() => Promise<DemoAuthBootstrap>>(
-    () => new Promise<DemoAuthBootstrap>(() => {}),
+  create: vi.fn<() => Promise<ProductBootstrap>>(
+    () => new Promise<ProductBootstrap>(() => {}),
   ),
 }));
 
-vi.mock("@/auth/demo-auth-adapter", () => ({
-  bootstrapDemoAuth: bootstrap.create,
+vi.mock("@/pos/product-bootstrap", () => ({
+  loadProductBootstrap: bootstrap.create,
 }));
 
 vi.mock("@/pos/dexie-hydrate", () => ({
@@ -67,11 +67,16 @@ const staffRecord: Staff = {
 
 const acceptAllVerifier: PinHashVerifier = async () => true;
 
-function makeReadyBootstrap() {
+function makeReadyBootstrap(): Promise<ProductBootstrap> {
   return Promise.resolve({
+    kind: "ready",
     tenant,
     staff: [staffRecord],
+    catalogGroups: [],
+    catalogItems: [],
+    tables: [],
     verifier: acceptAllVerifier,
+    persistable: false,
   });
 }
 
@@ -168,7 +173,7 @@ beforeEach(() => {
   useOrderPaymentStore.getState().clearCurrentOrder();
   bootstrap.create.mockClear();
   bootstrap.create.mockImplementation(
-    () => new Promise<DemoAuthBootstrap>(() => {}),
+    () => new Promise<ProductBootstrap>(() => {}),
   );
 });
 

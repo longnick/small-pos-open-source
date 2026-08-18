@@ -15,10 +15,14 @@
     "test:e2e:payment": "playwright test --config playwright.payment.config.ts",
     "test:e2e:order": "playwright test --config playwright.order-entry.config.ts",
     "test:e2e:visual": "playwright test --config playwright.visual.config.ts",
+    "test:e2e:first-run": "playwright test --config playwright.first-run.config.ts",
+    "verify:release": "npm run ci && npm run test:e2e && npm run test:e2e:payment && npm run test:e2e:order && npm run test:e2e:visual && npm run test:e2e:first-run",
+    "setup": "node scripts/setup.mjs",
+    "start": "node scripts/start.mjs",
     "test:e2e:mobile": "playwright test --project=mobile",
-    "ci": "npm run typecheck && npm test && npm run build && npm run scan:leakage",
+    "ci": "npm run typecheck && npx oxlint -c .oxlintrc.json src packages e2e scripts && npm test && npm run build && npm run scan:leakage",
     "ci:e2e": "npm run ci && npm run test:e2e",
-    "lint": "oxlint",
+    "lint": "oxlint -c .oxlintrc.json src packages e2e scripts",
     "preview": "vite preview"
   },
   "dependencies": {
