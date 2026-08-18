@@ -20,9 +20,9 @@
     "setup": "node scripts/setup.mjs",
     "start": "node scripts/start.mjs",
     "test:e2e:mobile": "playwright test --project=mobile",
-    "ci": "npm run typecheck && npm test && npm run build && npm run scan:leakage",
+    "ci": "npm run typecheck && npx oxlint -c .oxlintrc.json src packages e2e scripts && npm test && npm run build && npm run scan:leakage",
     "ci:e2e": "npm run ci && npm run test:e2e",
-    "lint": "oxlint",
+    "lint": "oxlint -c .oxlintrc.json src packages e2e scripts",
     "preview": "vite preview"
   },
   "dependencies": {

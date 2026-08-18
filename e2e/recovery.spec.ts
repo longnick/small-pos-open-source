@@ -83,6 +83,28 @@ test("corrupt database recovers from a good v2 backup and rejects a bad file", a
   await expect(page.getByRole("heading", { name: "Không thể đọc dữ liệu quán" })).toBeVisible();
   expect(await tenantNames(page)).toEqual([shop]);
 
+  const semanticBad = testInfo.outputPath("semantic-bad-backup.json");
+  const raw = await (await import("node:fs/promises")).readFile(goodBackup, "utf8");
+  const parsed = JSON.parse(raw) as { version: number; exportedAt: number; data: Record<string, unknown[]> };
+  parsed.data.orders = [{
+    id: "order-bad",
+    tenantId: "wrong",
+    tableId: "missing",
+    staffId: "missing",
+    status: "open",
+    items: [],
+    subtotal: 1,
+    discount: 0,
+    discountType: "amount",
+    total: 99,
+    createdAt: 1,
+  }];
+  await writeFile(semanticBad, JSON.stringify(parsed));
+  await page.getByLabel("Nhập sao lưu").setInputFiles(semanticBad);
+  await expect(page.getByRole("alert")).toContainText("Không thể nhập sao lưu");
+  await expect(page.getByRole("heading", { name: "Không thể đọc dữ liệu quán" })).toBeVisible();
+  expect(await tenantNames(page)).toEqual([shop]);
+
   await page.getByLabel("Nhập sao lưu").setInputFiles(goodBackup);
   await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(shop)).toBeVisible();
