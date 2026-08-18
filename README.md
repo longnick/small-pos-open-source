@@ -67,8 +67,10 @@ Open the exact local URL printed by Vite preview (`http://127.0.0.1:4173` by
 default). Stop the server with `Ctrl+C`.
 
 The first launch is a shop setup wizard: shop name, 1–10 tables, manager name,
-and a 4-digit PIN. Optional sample menu. There is no public demo PIN. Data stays
-in this browser profile. `npm run dev` remains the Vite development server.
+and a 4-digit PIN used only on this device. Optional sample menu. There is no
+public demo PIN. Data stays in this browser profile. `npm run dev` remains the
+Vite development server. Backup files contain PIN hashes — do not share them.
+Version-1 backups cannot restore a product shop.
 
 The server runs only the browser frontend. It does not start a backend, database
 server, cloud service, or payment gateway. Do not enter real payment credentials.
@@ -82,11 +84,13 @@ npm run test:e2e
 npm run test:e2e:payment
 npm run test:e2e:order
 npm run test:e2e:visual
+npm run test:e2e:first-run
 ```
 
 `npm run ci` covers type checking, unit/component tests, the production build,
-and the source-leakage scan. The Playwright install is required once per
-machine before running the browser suites that follow it.
+and the source-leakage scan. `npm run verify:release` adds the fixture and
+clean-profile Playwright suites, including first-run, recovery, and v1→v2
+IndexedDB upgrade.
 
 ## Project boundaries
 

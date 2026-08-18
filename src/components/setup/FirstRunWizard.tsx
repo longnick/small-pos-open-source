@@ -58,7 +58,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
             Thiết lập quán
           </h1>
           <p className="mb-6 text-center text-sm text-muted-foreground">
-            Tạo tên quán, bàn, và PIN quản lý. Không dùng PIN mẫu.
+            Tạo tên quán, bàn, và PIN 4 số chỉ trên máy này. Không dùng PIN mẫu.
           </p>
           <form onSubmit={handleSubmit} noValidate aria-busy={busy}>
             <div className="mb-4">

@@ -36,9 +36,10 @@ fail-closes on empty or hostile IDB.
    as the App default. Demo adapter remains for existing unit tests and for
    E2E module aliases. Fixture E2E aliases the product bootstrap module, not
    production seed.
-7. v1 backups (nine stores) still import. New exports are version 2 and
-   include `appConfig`.
-8. Corrupt setup shows a recovery surface that can import a backup. No
+7. v1 backups are rejected before any write (`unsupported-for-product-bootstrap`).
+   New exports are version 2 and include `appConfig`. Import prevalidates that
+   the payload can become a ready product shop; otherwise no clear/write.
+8. Corrupt setup shows a recovery surface that can import a version-2 backup. No
    auto-seed from `DEMO_STAFF` / `DEMO_TENANT`.
 
 ## Non-goals

@@ -30,7 +30,7 @@ export function SetupRecovery({ onImport }: SetupRecoveryProps) {
           Không thể đọc dữ liệu quán
         </h1>
         <p className="mb-6 text-center text-sm text-muted-foreground">
-          Dữ liệu local hỏng hoặc thiếu. Nhập bản sao lưu để khôi phục. Không dùng PIN mẫu.
+          Dữ liệu local hỏng hoặc thiếu. Nhập bản sao lưu phiên bản 2. Tệp chứa hash PIN — không chia sẻ. Bản v1 không dùng được.
         </p>
         <Button type="button" className="h-11 w-full" onClick={() => fileRef.current?.click()}>
           <Upload className="h-4 w-4" aria-hidden="true" />

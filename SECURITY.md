@@ -23,7 +23,11 @@ Please redact secrets and personal data. Maintainers will acknowledge valid repo
 
 ## Security boundaries today
 
-This is a demo/local-first project. It has no production backend, payment gateway, cloud sync, or real-user authentication. The demo PIN adapter is intentionally non-production. Do not deploy it as an authentication or payment system.
+This is a local-first starter. It has no production backend, payment gateway, cloud sync, or real-user authentication. Do not deploy it as an authentication or payment system.
+
+- Manager PIN is exactly four digits, hashed in the browser with Web Crypto PBKDF2, and checked only on this device.
+- Login is throttled in memory: five attempts per staff id per 60 seconds. Reload clears the counter.
+- Backup JSON is version 2 only for product restore. It contains `staff.pinHash`. Treat the file as a local secret. Version-1 backups are rejected before any write.
 
 ## Automated checks
 

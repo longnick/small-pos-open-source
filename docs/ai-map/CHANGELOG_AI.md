@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-08-18 07:15 - Sprint 1 Sol BLOCKED fixes
+
+Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
+Branch: `feat/sprint-1-product-bootstrap`
+Agent: Hermes / gcli/grok-4.6
+Summary: Prevalidate backup before write. Reject v1. Recovery + Chromium v1→v2 E2E. CI/release include those suites. PIN throttle + hash-risk docs.
+Task log: `docs/ai-map/TASK_LOGS/2026-08-18-0715-sprint-1-sol-blockers.md`
+
 ## 2026-08-18 06:10 - Sprint 1 product bootstrap
 
 Repo: `/home/longnick/projects/small-pos-open-source/.worktrees/hermes-fe974674`
